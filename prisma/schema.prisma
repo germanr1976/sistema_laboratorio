@@ -11,8 +11,12 @@ datasource db {
 model User {
   id        Int      @id @default(autoincrement())
   dni       String   @unique
+  email     String?  @unique 
+  password  String?  
+  license   String? 
   roleId    Int
   createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt 
   profile   Profile?
   studies   Study[]
   role      Role     @relation(fields: [roleId], references: [id])
