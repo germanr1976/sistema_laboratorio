@@ -24,3 +24,14 @@ export async function generateToken(userData: {
     const token = jwt.sign(userData, jwtSecret, { expiresIn } as jwt.SignOptions);
     return token;
 }
+
+export async function verifyToken(token:string): Promise<any> {
+    const jwtSecret = process.env.JWT_SECRET || 'fallback-secret';
+    try{
+        const isTokenCorrect = jwt.verify(token,jwtSecret)
+        return isTokenCorrect
+    }catch(error){
+        console.error(error)
+        throw error   
+    }
+}
