@@ -69,12 +69,14 @@ req.user.id, req.user.dni, req.user.role.name, req.user.profile
   "success": true,
   "message": "BIOCHEMIST registrado exitosamente",
   "data": {
-    "id": 1,
-    "dni": "12345678",
-    "role": "BIOCHEMIST",
-    "profile": { "firstName": "Dr. Juan", "lastName": "Pérez" }
-  },
-  "token": "eyJhbGciOiJIUzI1NiIs..."
+    "user": {
+      "id": 1,
+      "dni": "12345678",
+      "role": "BIOCHEMIST",
+      "profile": { "firstName": "Dr. Juan", "lastName": "Pérez" }
+    },
+    "token": "eyJhbGciOiJIUzI1NiIs..."
+  }
 }
 ```
 
@@ -157,50 +159,169 @@ npm run dev
 npx prisma studio
 ```
 
-## Testing con Cliente HTTP
+## Testing con Postman
 
-### Thunder Client / Postman
-**Base URL:** `http://localhost:3000/api/auth`
+### 🚀 Setup Inicial
 
-#### 1. Registrar Bioquímico
-```http
-POST /register-biochemist
+#### Verificar Prerequisitos
+```bash
+# Verificar que el servidor esté corriendo
+npm run dev
+
+# Verificar roles en BD (Prisma Studio)
+npx prisma studio
+```
+
+#### Roles requeridos en tabla `Role`:
+```
+| id | name       |
+|----|------------|
+| 1  | ADMIN      |
+| 2  | PATIENT    |
+| 3  | BIOCHEMIST |
+```
+
+### 📋 Configuración Base en Postman
+
+#### Headers para todas las requests:
+```
 Content-Type: application/json
+Accept: application/json
+```
 
+#### Base URL:
+```
+http://localhost:3000/api/auth
+```
+
+### 🧪 Casos de Prueba
+
+#### 1. **Registrar Paciente**
+- **Method:** `POST`
+- **URL:** `/register-patient`
+- **Body:**
+```json
+{
+  "firstName": "Ana",
+  "lastName": "García",
+  "dni": "87654321",
+  "birthDate": "1985-03-20"
+}
+```
+- **Respuesta esperada:** `201 Created`
+- **Nota:** No devuelve token (pacientes no necesitan login con password)
+
+#### 2. **Registrar Bioquímico**
+- **Method:** `POST`
+- **URL:** `/register-biochemist`
+- **Body:**
+```json
 {
   "firstName": "Dr. Carlos",
-  "lastName": "López", 
-  "dni": "11111111",
-  "license": "BQ001", 
+  "lastName": "López",
+  "dni": "12345678",
+  "license": "BQ001",
   "email": "carlos@lab.com",
   "password": "password123"
 }
 ```
+- **Respuesta esperada:** `201 Created` + **token**
+- **Nota:** Devuelve token (auto-login después del registro)
 
-#### 2. Registrar Paciente
-```http
-POST /register-patient
-Content-Type: application/json
-
+#### 3. **Login Paciente (solo DNI)**
+- **Method:** `POST`
+- **URL:** `/login`
+- **Body:**
+```json
 {
-  "firstName": "Ana",
-  "lastName": "Martín",
-  "dni": "22222222",
-  "birthDate": "1985-03-20"
+  "dni": "87654321"
 }
 ```
+- **Respuesta esperada:** `200 OK` + **token**
 
-#### 3. Login y obtener JWT
-```http
-POST /login
-Content-Type: application/json
-
-// Bioquímico
-{ "dni": "11111111", "password": "password123" }
-
-// Paciente
-{ "dni": "22222222" }
+#### 4. **Login Bioquímico (DNI + Password)**
+- **Method:** `POST`
+- **URL:** `/login`
+- **Body:**
+```json
+{
+  "dni": "12345678",
+  "password": "password123"
+}
 ```
+- **Respuesta esperada:** `200 OK` + **token**
+
+### 🔐 Testing del Middleware (Opcional)
+
+#### Crear ruta de prueba temporal en `auth.routes.ts`:
+```typescript
+router.get('/me', authMiddleware, (req, res) => {
+  res.json({ 
+    message: 'Ruta protegida funcionando',
+    user: req.user 
+  });
+});
+```
+
+#### Probar ruta protegida:
+- **Method:** `GET`
+- **URL:** `/me`
+- **Headers:**
+```
+Authorization: Bearer <token-obtenido-del-login>
+```
+- **Respuesta esperada:** `200 OK` con datos del usuario
+
+### ❌ Casos de Error a Verificar
+
+#### 1. **DNI Duplicado**
+```json
+{
+  "firstName": "Otro",
+  "lastName": "Usuario", 
+  "dni": "87654321",
+  "birthDate": "1990-01-01"
+}
+```
+**Esperado:** `409 Conflict`
+
+#### 2. **Email Duplicado (Bioquímicos)**
+```json
+{
+  "firstName": "Otro",
+  "lastName": "Doctor",
+  "dni": "99999999",
+  "license": "BQ999",
+  "email": "carlos@lab.com",
+  "password": "123456"
+}
+```
+**Esperado:** `409 Conflict`
+
+#### 3. **Login con Credenciales Incorrectas**
+```json
+{
+  "dni": "12345678",
+  "password": "wrongpassword"
+}
+```
+**Esperado:** `401 Unauthorized`
+
+#### 4. **Token Inválido/Expirado**
+```
+Authorization: Bearer token-invalido-o-expirado
+```
+**Esperado:** `401 Unauthorized`
+
+### 🔄 Flujo Completo de Testing
+
+#### Orden recomendado:
+1. ✅ **Registrar paciente** → Verificar 201
+2. ✅ **Registrar bioquímico** → Verificar 201 + token
+3. ✅ **Login paciente** → Verificar 200 + token
+4. ✅ **Login bioquímico** → Verificar 200 + token
+5. ✅ **Probar middleware** (opcional) → Verificar 200 con token
+6. ✅ **Casos de error** → Verificar códigos apropiados
 
 ## Integración Frontend
 
@@ -301,13 +422,16 @@ const ProtectedRoute = ({ children, allowedRoles }) => {
 - Maneja errores: missing, invalid, expired tokens
 
 ## Códigos de Estado HTTP
-- **200**: Login exitoso
-- **201**: Registro exitoso
-- **400**: Datos inválidos
-- **401**: No autorizado (token/credenciales inválidas)
-- **404**: Usuario no encontrado
-- **409**: DNI/Email duplicado
-- **500**: Error interno del servidor
+
+| Código | Significado | Cuándo aparece |
+|--------|-------------|----------------|
+| **200** | OK | Login exitoso |
+| **201** | Created | Registro exitoso |
+| **400** | Bad Request | Datos inválidos/faltantes |
+| **401** | Unauthorized | Token inválido, credenciales incorrectas |
+| **404** | Not Found | Usuario no encontrado |
+| **409** | Conflict | DNI o email duplicado |
+| **500** | Internal Error | Error del servidor/BD |
 
 ## Consideraciones de Seguridad
 - Contraseñas hasheadas con bcrypt salt 12
@@ -317,8 +441,41 @@ const ProtectedRoute = ({ children, allowedRoles }) => {
 - Verificación de unicidad en DNI y email
 - Headers CORS configurados en Express
 
+## 💡 Tips para Devs
 
+### Automatización con Variables en Postman:
+```javascript
+// En tab "Tests" del login request:
+pm.test("Save token", function () {
+    var jsonData = pm.response.json();
+    pm.globals.set("authToken", jsonData.data.token);
+});
+
+// Usar en headers:
+Authorization: Bearer {{authToken}}
+```
+
+### Verificar en BD:
+Después de cada operación, verificar en Prisma Studio:
+- Tabla `User`: Nuevos registros
+- Tabla `Profile`: Datos de perfil
+- Contraseñas hasheadas en `User.password`
+
+## ✅ Checklist Final
+
+- [ ] Servidor corriendo en puerto 3000
+- [ ] Roles creados en BD
+- [ ] Headers configurados en Postman
+- [ ] Registro de paciente funciona (201)
+- [ ] Registro de bioquímico funciona (201 + token)
+- [ ] Login de paciente funciona (200 + token)
+- [ ] Login de bioquímico funciona (200 + token)
+- [ ] Casos de error manejan códigos apropiados
+- [ ] Middleware protege rutas correctamente (opcional)
 
 ---
 
 **Desarrollado con arquitectura limpia, separación de responsabilidades y mejores prácticas de seguridad Node.js.**
+
+
+
