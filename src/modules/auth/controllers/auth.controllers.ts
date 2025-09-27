@@ -53,7 +53,6 @@ export async function loginController(req: Request, res: Response) {
                             token: tokenGenerated
                         }
                     });
-                case 'DOCTOR':
                 case 'BIOCHEMIST':
                     if(!password){
                         return res.status(400).json({
@@ -154,12 +153,12 @@ export async function registerDoctorController(req: Request, res: Response) {
        }
        const hashedPassword = await hashPassword(password);
        const doctorRole = await prisma.role.findUnique({
-            where: {name: 'DOCTOR'}
+            where: {name: 'BIOCHEMIST'}
        })
        if(!doctorRole){
             return res.status(500).json({
                 success: false,
-                message: 'Rol DOCTOR no encontrado'
+                message: 'Rol BIOCHEMIST no encontrado'
             })
        }
        const result = await prisma.$transaction(async(tx:any) => {
@@ -189,12 +188,12 @@ export async function registerDoctorController(req: Request, res: Response) {
        });
        return res.status(201).json({
             success: true,
-            message: 'Doctor registrado exitosamente',
+            message: 'BIOCHEMIST registrado exitosamente',
             data:{
                 id: result.user.id,
                 dni: result.user.dni,
                 email: result.user.email,
-                role: 'DOCTOR',
+                role: 'BIOCHEMIST',
                 profile:{
                     firstName: result.profile.firstName,
                     lastName: result.profile.lastName

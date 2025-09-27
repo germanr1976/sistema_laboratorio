@@ -4,7 +4,7 @@ import { loginController, registerDoctorController, registerPatientController } 
 const router = Router();
 
 router.post('/login',loginController)
-router.post('/register-doctor',registerDoctorController)
+router.post('/register-biochemist',registerDoctorController)
 router.post('/register-patient',registerPatientController)
 
 

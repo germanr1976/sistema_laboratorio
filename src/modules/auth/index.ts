@@ -14,7 +14,7 @@ export interface LoginRequest{
     password?: string
 }
 
-export interface RegisterDoctorRequest{
+export interface RegisterBiochemistRequest{
     firstName: string; 
     lastName: string;
     dni: string;
@@ -50,7 +50,6 @@ export interface AuthResponse{
 
 export const ROLE_NAMES = {
   PATIENT: 'PATIENT',
-  DOCTOR: 'DOCTOR', 
   BIOCHEMIST: 'BIOCHEMIST',
   ADMIN: 'ADMIN'
 } as const;
