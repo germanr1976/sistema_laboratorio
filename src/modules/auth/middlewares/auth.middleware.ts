@@ -7,7 +7,6 @@ const prisma = new PrismaClient();
 
 export async function authMiddleware(req: Request, res: Response, next: NextFunction) {
     try {
-        // 1. Extraer token del header
         const authHeader = req.headers.authorization;
         if(!authHeader){
             return res.status(401).json({
@@ -42,12 +41,9 @@ export async function authMiddleware(req: Request, res: Response, next: NextFunc
                 message:'usuario no encontrado' 
             })
         }
-        // 4. Agregar user al req
         req.user = user
-        // 5. Llamar next()
        return  next()
     } catch (error) {
-        // Manejar errores
         return res.status(401).json({ 
             success: false, 
             message: 'Token inválido' 
