@@ -2,8 +2,9 @@ import { Request, Response } from 'express';
 import { validateLogin } from '../validators/validators';
 import { comparePassword, generateToken } from '../services/auth.services';
 import { PrismaClient } from '@prisma/client';
-import { validateDoctor } from '../validators/validators';
+import { validateDoctor, validatePatient } from '../validators/validators';
 import { hashPassword } from '../services/auth.services';
+
 
 const prisma = new PrismaClient();
 
@@ -208,5 +209,77 @@ export async function registerDoctorController(req: Request, res: Response) {
             success: false,
             message: 'Error interno del servidor'
         });
+    }
+}
+export async function registerPatientController (req: Request, res: Response) {
+    try{
+        const validationResultPatient = validatePatient(req.body)
+        if(validationResultPatient.error){
+            return res.status(400).json({
+                success:false,
+                message: 'Datos de entrada invalidos'})
+        }
+        const validatedData = validationResultPatient.value; 
+        const firstName: string = validatedData.firstName; 
+        const lastName: string = validatedData.lastName;
+        const dni: string = validatedData.dni;
+        const birthDate:string = validatedData.birthDate;
+        
+        const existingPatientByDni = await prisma.user.findUnique({
+            where:{dni}
+        });
+        if(existingPatientByDni){
+            return res.status(409).json({
+                success: false,
+                message: 'DNI/CURP ya registrado'
+            })
+       }
+       const patientRole = await prisma.role.findUnique({
+            where: {name:'PATIENT'}
+       });
+       if(!patientRole){
+            return res.status(500).json({
+                success: false,
+                message: 'Rol PATIENT no encontrado'
+            })
+       }
+       const result = await prisma.$transaction(async(tx: any) => {
+            const newPatientUser = await tx.user.create({
+                data:{
+                    dni,
+                    roleId: patientRole?.id
+                }
+            });
+            const newPatientProfile = await tx.profile.create({
+                data:{
+                    firstName,
+                    lastName,
+                    birthDate,
+                    userId: newPatientUser.id
+                }
+            });
+            return {user:newPatientUser, profile:newPatientProfile}
+        });
+        return res.status(201).json({
+            success: true,
+            message: 'Paciente registrado exitosamente',
+            data:{
+                id: result.user.id,
+                role: 'PATIENT',
+                profile:{
+                    firstName: result.profile.firstName,
+                    lastName: result.profile.lastName,
+                    birthDate: result.profile.birthDate
+                }
+            },
+       });
+
+    }catch(error){
+        console.error(error);
+        return res.status(500).json({
+            success: false,
+            message: 'Error interno del servidor'
+        });
+        
     }
 }
