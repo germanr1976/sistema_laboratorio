@@ -22,7 +22,6 @@ export async function authMiddleware(req: Request, res: Response, next: NextFunc
             })
         }
         const token = authHeader.substring(7); 
-        // 2. Verificar token
         const tokenverify = await verifyToken(token);
         if(!tokenverify){
             return res.status(401).json({
@@ -30,7 +29,6 @@ export async function authMiddleware(req: Request, res: Response, next: NextFunc
                 message: 'Token expirado'
             }); 
         }
-        // 3. Buscar usuario en BD
         const user = await prisma.user.findUnique({
             where:{id: tokenverify.userId},
             include:{profile: true, role:true}
