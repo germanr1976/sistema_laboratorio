@@ -50,7 +50,7 @@ export async function getMyAnalysisController (req: Request, res: Response) {
     }catch(error){
         console.error('Error al obtener los análisis del paciente', error)
         return res.status(500).json({
-            succes: false, 
+            success: false, 
             message: 'Error interno del servidor al obtener los análisis'
         });
     }
@@ -70,7 +70,7 @@ export async  function getAnalysisByIdController (req: Request, res: Response) {
 
     // validar rol 
     if(userRole !== ROLE_NAMES.PATIENT){
-        res.status(403).json({
+        return res.status(403).json({
             success: false,
             message: 'Acceso denegado. Este recurso es solo para pacientes' 
         });
@@ -79,7 +79,7 @@ export async  function getAnalysisByIdController (req: Request, res: Response) {
     // validar ID
     if(isNaN(analysisId)){
         return res.status(400).json({
-            succes: false,
+            success: false,
             message: 'ID de análisis invalido'
         });
     }
@@ -111,13 +111,13 @@ export async  function getAnalysisByIdController (req: Request, res: Response) {
         }
         return res.status(200).json({
             sucess: true, 
-            messasge: 'Análisis encontrado exitosamente',
+            message: 'Análisis encontrado exitosamente',
             data: analysis
         });
     }catch(error){
         console.error('Error al obtener los análisis del paciente', error)
         return res.status(500).json({
-            succes: false, 
+            success: false, 
             message: 'Error interno del servidor al obtener los análisis'
         });
     }
