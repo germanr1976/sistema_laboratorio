@@ -17,7 +17,7 @@ export async function getMyAnalysisController (req: Request, res: Response) {
         return res.status(403).json({
             success: false,
             message: 'Acceso denegado. Este recurso es solo para pacientes'
-        })
+        });
     }
 
     try{
