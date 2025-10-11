@@ -110,7 +110,7 @@ export async  function getAnalysisByIdController (req: Request, res: Response) {
             });
         }
         return res.status(200).json({
-            sucess: true, 
+            success: true, 
             message: 'Análisis encontrado exitosamente',
             data: analysis
         });
