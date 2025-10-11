@@ -56,8 +56,6 @@
 - [x] Controlador (`getMyAnalysisController`, `getAnalysisByIdController`)
 - [x] Rutas y middlewares (`patient.routes.ts` con `authMiddleware`)
 - [x] Tests manuales (Postman/Thunder) - Todos los casos probados exitosamente
-- [ ] Tests automatizados (opcional)
-- [ ] Documentación (README/Swagger)
 - [x] Revisión de código
 
 ---
