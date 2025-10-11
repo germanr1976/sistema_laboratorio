@@ -1,9 +1,10 @@
-import { Study } from "@prisma/client";
+import { Study, Status } from "@prisma/client";
 
 export interface AnalysisResponse {
     success: boolean;
     message: string;
     data?: Study | Study[]
+    status: Status
 }
 
 export interface GetAnalysisByIdRequest {

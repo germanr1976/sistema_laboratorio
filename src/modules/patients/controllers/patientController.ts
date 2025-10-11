@@ -29,6 +29,8 @@ export async function getMyAnalysisController (req: Request, res: Response) {
                 id:true, 
                 studyName: true,
                 pdfUrl: true,
+                studyDate: true,
+                socialInsurance: true,
                 status:{
                     select:{
                         name: true
@@ -52,4 +54,72 @@ export async function getMyAnalysisController (req: Request, res: Response) {
             message: 'Error interno del servidor al obtener los análisis'
         });
     }
+}
+
+
+export async  function getAnalysisByIdController (req: Request, res: Response) {
+    const userId = req.user?.id;
+    const userRole = req.user?.role.name;
+    const analysisId = parseInt(req.params.id!);
+     if(!userId){
+        return res.status(401).json({
+            success: false,
+            message: 'usuario no autenticado'
+        });
+    }
+
+    // validar rol 
+    if(userRole !== ROLE_NAMES.PATIENT){
+        res.status(403).json({
+            success: false,
+            message: 'Acceso denegado. Este recurso es solo para pacientes' 
+        });
+    }
+
+    // validar ID
+    if(isNaN(analysisId)){
+        return res.status(400).json({
+            succes: false,
+            message: 'ID de análisis invalido'
+        });
+    }
+
+    try{
+        const analysis = await prisma.study.findFirst({
+            where:{
+                id: analysisId,
+                userId: userId
+            },
+            select:{
+                id: true,
+                studyName: true,
+                studyDate: true,
+                pdfUrl: true,
+                socialInsurance: true,
+                status:{
+                    select:{
+                        name: true
+                    }
+                }
+            }
+        });
+        if(!analysis){
+            return res.status(404).json({
+                success: false,
+                message: 'Análisis no encontrado'
+            });
+        }
+        return res.status(200).json({
+            sucess: true, 
+            messasge: 'Análisis encontrado exitosamente',
+            data: analysis
+        });
+    }catch(error){
+        console.error('Error al obtener los análisis del paciente', error)
+        return res.status(500).json({
+            succes: false, 
+            message: 'Error interno del servidor al obtener los análisis'
+        });
+    }
+   
 }
