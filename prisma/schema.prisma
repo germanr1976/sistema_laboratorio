@@ -9,17 +9,18 @@ datasource db {
 }
 
 model User {
-  id        Int      @id @default(autoincrement())
-  dni       String   @unique
-  email     String?  @unique 
-  password  String?  
-  license   String? 
-  roleId    Int
-  createdAt DateTime @default(now())
-  updatedAt DateTime @updatedAt 
-  profile   Profile?
-  studies   Study[]
-  role      Role     @relation(fields: [roleId], references: [id])
+  id                             Int      @id @default(autoincrement())
+  dni                            String   @unique
+  roleId                         Int
+  createdAt                      DateTime @default(now())
+  email                          String?  @unique
+  license                        String?
+  password                       String?
+  updatedAt                      DateTime @updatedAt
+  profile                        Profile?
+  Study_Study_biochemistIdToUser Study[]  @relation("Study_biochemistIdToUser")
+  studies                        Study[]
+  role                           Role     @relation(fields: [roleId], references: [id])
 }
 
 model Role {
@@ -38,17 +39,18 @@ model Profile {
 }
 
 model Study {
-  id                 Int      @id @default(autoincrement())
-  userId             Int
-  studyName          String
-  studyDate          DateTime
-  socialInsurance    String?
-  assignedBiochemist String?
-  pdfUrl             String?
-  statusId           Int
-  createdAt          DateTime @default(now())
-  status             Status   @relation(fields: [statusId], references: [id])
-  user               User     @relation(fields: [userId], references: [id])
+  id                            Int      @id @default(autoincrement())
+  userId                        Int
+  studyName                     String
+  studyDate                     DateTime
+  socialInsurance               String?
+  pdfUrl                        String?
+  statusId                      Int
+  createdAt                     DateTime @default(now())
+  biochemistId                  Int?
+  User_Study_biochemistIdToUser User?    @relation("Study_biochemistIdToUser", fields: [biochemistId], references: [id])
+  status                        Status   @relation(fields: [statusId], references: [id])
+  user                          User     @relation(fields: [userId], references: [id])
 }
 
 model Status {
