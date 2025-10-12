@@ -48,3 +48,81 @@ export async function authMiddleware(req: Request, res: Response, next: NextFunc
         });
     }
 }
+
+// Middleware para verificar si el usuario es administrador
+export async function isAdmin(req: Request, res: Response, next: NextFunction) {
+    try {
+        if (!req.user) {
+            return res.status(401).json({
+                success: false,
+                message: 'Usuario no autenticado'
+            });
+        }
+
+        if (req.user.role.name !== 'ADMIN') {
+            return res.status(403).json({
+                success: false,
+                message: 'Acceso denegado. Se requieren permisos de administrador'
+            });
+        }
+
+        return next();
+    } catch (error) {
+        return res.status(500).json({
+            success: false,
+            message: 'Error al verificar permisos de administrador'
+        });
+    }
+}
+
+// Middleware para verificar si el usuario es bioquímico
+export async function isBiochemist(req: Request, res: Response, next: NextFunction) {
+    try {
+        if (!req.user) {
+            return res.status(401).json({
+                success: false,
+                message: 'Usuario no autenticado'
+            });
+        }
+
+        if (req.user.role.name !== 'BIOCHEMIST') {
+            return res.status(403).json({
+                success: false,
+                message: 'Acceso denegado. Se requieren permisos de bioquímico'
+            });
+        }
+
+        return next();
+    } catch (error) {
+        return res.status(500).json({
+            success: false,
+            message: 'Error al verificar permisos de bioquímico'
+        });
+    }
+}
+
+// Middleware para verificar si el usuario es paciente
+export async function isPatient(req: Request, res: Response, next: NextFunction) {
+    try {
+        if (!req.user) {
+            return res.status(401).json({
+                success: false,
+                message: 'Usuario no autenticado'
+            });
+        }
+
+        if (req.user.role.name !== 'PATIENT') {
+            return res.status(403).json({
+                success: false,
+                message: 'Acceso denegado. Se requieren permisos de paciente'
+            });
+        }
+
+        return next();
+    } catch (error) {
+        return res.status(500).json({
+            success: false,
+            message: 'Error al verificar permisos de paciente'
+        });
+    }
+}
