@@ -4,12 +4,19 @@ import routes from "@/routes";
 
 const app = express();
 
-// Middlewares
-app.use(cors());
+const corsOptions = {
+  origin: process.env.ALLOWED_ORIGINS 
+    ? process.env.ALLOWED_ORIGINS.split(',') 
+    : '*', 
+  methods: ['GET', 'POST', 'PUT', 'PATCH', 'DELETE', 'OPTIONS'],
+  allowedHeaders: ['Content-Type', 'Authorization'],
+  credentials: true,
+  maxAge: 86400,
+};
+
+app.use(cors(corsOptions));
 app.use(express.json());
 
-// Routes
 app.use("/api", routes);
 
-//export 
 export default app;
