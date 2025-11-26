@@ -2,7 +2,7 @@
 
 import type React from "react"
 
-import { useState, useRef } from "react"
+import { useState, useRef, useEffect } from "react"
 import type { EstudioData } from "../app/revision/page"
 import { savePdf } from "../utils/estudiosStore"
 
@@ -45,16 +45,35 @@ const X = ({ className }: { className?: string }) => (
 
 interface CargarNuevoProps {
   onCargarEstudio: (data: EstudioData, opts?: { autoComplete?: boolean }) => void
+  initialId?: string
+  initialData?: Partial<EstudioData>
 }
 
-export function CargarNuevo({ onCargarEstudio }: CargarNuevoProps) {
+export function CargarNuevo({ onCargarEstudio, initialId, initialData }: CargarNuevoProps) {
   const [formData, setFormData] = useState({
-    nombreApellido: "",
-    dni: "",
-    fecha: "",
-    obraSocial: "",
-    medico: "",
+    nombreApellido: initialData?.nombreApellido ?? "",
+    dni: initialData?.dni ?? "",
+    fecha: initialData?.fecha ?? "",
+    obraSocial: initialData?.obraSocial ?? "",
+    medico: initialData?.medico ?? "",
   })
+
+  // If the parent provides initialData after mount (e.g. via ?id=... navigation),
+  // update the local form state so fields are populated.
+  useEffect(() => {
+    if (initialData) {
+      setFormData({
+        nombreApellido: initialData.nombreApellido ?? "",
+        dni: initialData.dni ?? "",
+        fecha: initialData.fecha ?? "",
+        obraSocial: initialData.obraSocial ?? "",
+        medico: initialData.medico ?? "",
+      })
+      // reset file state when loading an existing record
+      setPdfFile(null)
+      if (fileInputRef.current) fileInputRef.current.value = ""
+    }
+  }, [initialData])
   const [pdfFile, setPdfFile] = useState<File | null>(null)
   const [isDragging, setIsDragging] = useState(false)
   const fileInputRef = useRef<HTMLInputElement>(null)
@@ -107,19 +126,22 @@ export function CargarNuevo({ onCargarEstudio }: CargarNuevoProps) {
       return
     }
 
-    if (!pdfFile) {
+    // If there's no pdf and this is NOT a pre-created en_proceso (initialId), require PDF
+    if (!pdfFile && !initialId) {
       alert("Por favor, seleccione un archivo PDF")
       return
     }
 
     // Guardar PDF en IndexedDB y crear un id para referenciarlo
-    const id = `estudio_${Date.now()}_${Math.floor(Math.random() * 10000)}`
+    const id = initialId ?? `estudio_${Date.now()}_${Math.floor(Math.random() * 10000)}`
     let saveSucceeded = false
     console.debug('[cargar] handleSubmit start', { formData, fileName: pdfFile?.name, id })
     try {
-      await savePdf(id, pdfFile)
-      saveSucceeded = true
-      console.debug('[cargar] savePdf succeeded', id)
+      if (pdfFile) {
+        await savePdf(id, pdfFile)
+        saveSucceeded = true
+        console.debug('[cargar] savePdf succeeded', id)
+      }
     } catch (err) {
       console.error('[cargar] Error guardando PDF en IndexedDB', err)
       // continuar: queremos que el padre reciba metadata para debugging
@@ -190,7 +212,7 @@ export function CargarNuevo({ onCargarEstudio }: CargarNuevoProps) {
             <FileText className="w-6 h-6 text-blue-600" />
           </div>
           <div>
-            <h1 className="text-2xl font-bold text-black mb-1 text-left">Cargar Nuevo Estudio</h1>
+            <h1 className="text-2xl font-bold text-black mb-1 text-left">Cargar Estudio</h1>
             <p className="text-gray-700 text-base text-left">
               Complete la información del paciente y adjunte el archivo del estudio
             </p>
@@ -353,7 +375,7 @@ export function CargarNuevo({ onCargarEstudio }: CargarNuevoProps) {
 
           <div className="bg-red-50 rounded-lg p-6 border border-red-200">
             <div className="flex gap-3">
-              <div className="w-5 h-5 bg-red-200 rounded-full flex items-center justify-center flex-shrink-0 mt-0.5">
+              <div className="w-5 h-5 bg-red-200 rounded-full flex items-center justify-center shrink-0 mt-0.5">
                 <span className="text-red-600 text-xs font-bold">!</span>
               </div>
               <p className="text-sm text-red-600">

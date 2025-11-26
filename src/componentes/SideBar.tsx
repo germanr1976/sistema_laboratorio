@@ -21,8 +21,9 @@ export function Sidebar({ className = "" }: SidebarProps) {
       icon: BarChart3,
       hasSubmenu: true,
       submenu: [
-        { id: "cargar-nuevo", label: "Cargar nuevo", href: "/cargar-nuevo" },
-        { id: "pendientes", label: "Pendientes", href: "/estudios/pendientes" },
+
+        { id: "proceso", label: "En Proceso", href: "/estudios/proceso" },
+        { id: "parciales", label: "Parcial", href: "/estudios/parciales" },
         { id: "completados", label: "Completados", href: "/estudios/completados" },
       ],
     },
@@ -109,10 +110,9 @@ export function Sidebar({ className = "" }: SidebarProps) {
             key={item.id}
             href={item.href}
             className={`flex items-center px-2 py-2 rounded-md text-left 
-              ${
-                item.destructive
-                  ? "text-red-600 hover:bg-red-50 hover:text-red-700"
-                  : pathname === item.href
+              ${item.destructive
+                ? "text-red-600 hover:bg-red-50 hover:text-red-700"
+                : pathname === item.href
                   ? "bg-blue-500 text-white"
                   : "text-gray-700 hover:bg-blue-500 hover:text-white"
               }`}
