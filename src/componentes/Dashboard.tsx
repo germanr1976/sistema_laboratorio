@@ -1,7 +1,20 @@
 "use client"
-import { useEffect, useState } from 'react'
+import { useEffect, useRef, useState } from 'react'
 import { getPdf, deletePdf } from '../utils/estudiosStore'
 import { Share2, Download, Trash2 } from 'lucide-react'
+import {
+  cardClasses,
+  leftColClasses,
+  nameClasses,
+  metaClasses,
+  rightActionsClasses,
+  btnPdf,
+  btnNoFile,
+  iconBtn,
+  badgeCompletado,
+  badgeParcial,
+  badgeEnProceso,
+} from '../utils/uiClasses'
 import Toast from './Toast'
 type UltimoCompletado = { id?: string; nombreApellido: string; dni: string; fecha: string; obraSocial: string; medico: string; pdfUrl?: string } | null
 
@@ -70,9 +83,11 @@ export default function Dashboard({ completados = 0, totales = 0, ultimoCompleta
   const [activeView, setActiveView] = useState<'none' | 'completados' | 'parciales' | 'todos' | 'en_proceso'>('none')
   const [displayList, setDisplayList] = useState<Array<Record<string, any>>>([])
   const [listLoading, setListLoading] = useState<boolean>(false)
+  const [recentStudies, setRecentStudies] = useState<Array<Record<string, any>>>([])
+  const [recentLoading, setRecentLoading] = useState<boolean>(false)
+  const recentUrlsRef = useRef<string[]>([])
 
-  // delete an estudio by id (remove metadata + PDF blob)
-  // If id is not provided, try to match by nombreApellido + fecha + dni
+
   const handleDelete = async (id?: string, match?: { nombreApellido?: string; fecha?: string; dni?: string }) => {
     if (!id && !match) return
     try {
@@ -116,6 +131,13 @@ export default function Dashboard({ completados = 0, totales = 0, ultimoCompleta
       } catch (e) {
         console.warn('[dashboard] no se pudo borrar blob en IndexedDB', e)
       }
+
+      // revoke any object URL we may have created for the deleted estudio to avoid stale previews
+      try {
+        if (id && localUltimo && localUltimo.pdfUrl) {
+          try { URL.revokeObjectURL(localUltimo.pdfUrl) } catch (e) { /* ignore */ }
+        }
+      } catch (e) { /* ignore */ }
 
       // update local counters and displayed list
       const tot = filtered.length
@@ -168,6 +190,7 @@ export default function Dashboard({ completados = 0, totales = 0, ultimoCompleta
         setLocalEnProceso(proceso)
         if (last) {
           setLocalUltimo({
+            id: last.id ?? undefined,
             nombreApellido: last.nombreApellido ?? '',
             dni: last.dni ?? '',
             fecha: last.fecha ?? '',
@@ -176,6 +199,7 @@ export default function Dashboard({ completados = 0, totales = 0, ultimoCompleta
             pdfUrl: last.pdfUrl ?? undefined,
           })
         }
+        // Recent studies removed per UX change — no-op
       } catch (e) {
         console.warn('[dashboard] could not read estudios_metadata from localStorage', e)
       }
@@ -334,46 +358,8 @@ export default function Dashboard({ completados = 0, totales = 0, ultimoCompleta
         <div className="flex justify-end mt-4">
           <button onClick={() => setShowPatientModal(true)} className="px-4 py-2 bg-yellow-400 text-black rounded-lg shadow-sm hover:bg-yellow-500">Cargar nuevo</button>
         </div>
-        {/* Main Content Area */}
-        <div className="bg-white rounded-xl border-2 border-dashed border-gray-300 p-12 text-center mt-8">
-          {localUltimo ? (
-            <div className="text-left max-w-2xl mx-auto">
-              <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between mb-4">
-                <div>
-                  <div className="font-bold text-gray-700 uppercase text-sm">{localUltimo.nombreApellido}</div>
-                  <div className="text-xs text-gray-700">DNI: {localUltimo.dni}</div>
-                </div>
-                <div className="flex items-center gap-2">
-                  <span className="inline-block bg-green-500 text-white text-xs font-semibold px-3 py-1 rounded-full">Completado</span>
-                  <button onClick={() => handleDelete(localUltimo?.id, { nombreApellido: localUltimo?.nombreApellido, fecha: localUltimo?.fecha, dni: localUltimo?.dni })} title="Eliminar estudio" className="p-2 rounded border text-gray-500 hover:bg-gray-100">
-                    <Trash2 size={16} />
-                  </button>
-                </div>
-              </div>
-              <div className="flex flex-wrap gap-6 mb-4 text-gray-700 text-sm">
-                <div>Fecha: {new Date(localUltimo.fecha).toLocaleDateString("es-AR", { day: "2-digit", month: "long", year: "numeric" })}</div>
-                <div>Obra social: {localUltimo.obraSocial}</div>
-                <div>Médico: {localUltimo.medico}</div>
-              </div>
-              {localUltimo.pdfUrl ? (
-                <a href={localUltimo.pdfUrl} target="_blank" rel="noopener noreferrer" className="inline-block bg-green-500 hover:bg-green-600 text-white font-bold px-6 py-2 rounded transition-colors">Ver PDF</a>
-              ) : null}
-            </div>
-          ) : (
-            <div className="text-gray-400">
-              <svg className="w-12 h-12 mx-auto mb-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path
-                  strokeLinecap="round"
-                  strokeLinejoin="round"
-                  strokeWidth={1}
-                  d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"
-                />
-              </svg>
-              <p className="text-lg font-medium">Área de contenido principal</p>
-              <p className="text-sm">Aquí se mostrarán los estudios médicos y resultados</p>
-            </div>
-          )}
-        </div>
+
+
         {/* Dynamic list area (completados / parciales) shown below when a tile is active */}
         {activeView !== 'none' && (
           <div className="mt-8">
@@ -385,10 +371,10 @@ export default function Dashboard({ completados = 0, totales = 0, ultimoCompleta
             ) : (
               <div className="space-y-4">
                 {displayList.map((e) => (
-                  <div key={e.id} className="p-4 border rounded-lg bg-white shadow-sm flex items-center justify-between">
-                    <div className="flex flex-col gap-1">
-                      <div className="font-bold text-gray-700">{e.nombreApellido}</div>
-                      <div className="flex flex-wrap text-sm text-gray-600 gap-3">
+                  <div key={e.id} className={cardClasses}>
+                    <div className={`${leftColClasses} flex flex-col gap-1`}>
+                      <div className={nameClasses}>{e.nombreApellido}</div>
+                      <div className={metaClasses}>
                         <span>DNI {e.dni}</span>
                         <span>Fecha {e.fecha}</span>
                         <span>Obra social {e.obraSocial}</span>
@@ -396,29 +382,33 @@ export default function Dashboard({ completados = 0, totales = 0, ultimoCompleta
                       </div>
                     </div>
 
-                    <div className="flex items-center gap-2">
+                    <div className={rightActionsClasses}>
                       {e.status === 'completado' && (
-                        <span className="text-xs bg-green-100 text-green-700 font-semibold px-2 py-1 rounded-full">completado</span>
+                        <span className={badgeCompletado}>completado</span>
                       )}
                       {e.status === 'parcial' && (
-                        <span className="text-xs bg-red-100 text-red-700 font-semibold px-2 py-1 rounded-full">parcial</span>
+                        <span className={badgeParcial}>parcial</span>
+                      )}
+
+                      {(e.status === 'en_proceso' || e.status === 'en proceso') && (
+                        <span className={badgeEnProceso}>en proceso</span>
                       )}
 
                       {e.pdfUrl ? (
-                        <a href={e.pdfUrl} target="_blank" rel="noopener noreferrer" className="bg-green-500 hover:bg-green-600 text-white px-3 py-2 rounded font-semibold">ver PDF</a>
+                        <a href={e.pdfUrl} target="_blank" rel="noopener noreferrer" className={btnPdf}>ver PDF</a>
                       ) : (
-                        <button className="px-3 py-2 rounded border text-sm text-gray-500">Sin archivo</button>
+                        <button className={btnNoFile}>Sin archivo</button>
                       )}
 
-                      <button className="p-2 rounded border text-gray-500 hover:bg-sky-500">
+                      <button className={iconBtn}>
                         <Share2 size={16} />
                       </button>
 
-                      <button className="p-2 rounded border text-gray-500 hover:bg-green-500">
+                      <button className={iconBtn}>
                         <Download size={16} />
                       </button>
 
-                      <button onClick={() => handleDelete(e.id)} title="Eliminar estudio" className="p-2 rounded border text-gray-500 hover:bg-red-500">
+                      <button onClick={() => handleDelete(e.id)} title="Eliminar estudio" className={iconBtn}>
                         <Trash2 size={16} />
                       </button>
                     </div>

@@ -3,6 +3,7 @@ import "./globals.css";
 
 import { Sidebar } from "../componentes/SideBar";
 import { Bell } from "lucide-react";
+import Clock from "../componentes/Clock";
 
 export default function RootLayout({
   children,
@@ -19,8 +20,8 @@ export default function RootLayout({
             <div className="bg-white border-b border-gray-200 px-8 py-4 flex items-center justify-between">
               <h1 className="text-2xl font-bold text-gray-900">¡Bienvenido!</h1>
               <div className="flex items-center gap-4">
-                <Bell className="w-5 h-5 text-gray-600" />
-                <span className="text-gray-600">Jueves 11 de septiembre 2025</span>
+
+                <Clock iconColor="text-emerald-600" boxBg="bg-emerald-50/70" boxBorder="border-emerald-100" />
               </div>
             </div>
             <main className="flex-1 bg-gray-50 p-8">

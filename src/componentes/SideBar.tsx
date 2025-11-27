@@ -17,7 +17,7 @@ export function Sidebar({ className = "" }: SidebarProps) {
     { id: "dashboard", label: "Dashboard", icon: Home, href: "/dashboard" },
     {
       id: "estudios",
-      label: "Estudios",
+      label: "Gestionar Estudios",
       icon: BarChart3,
       hasSubmenu: true,
       submenu: [

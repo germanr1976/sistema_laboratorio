@@ -2,6 +2,7 @@
 
 import React, { useEffect, useState } from 'react'
 import Link from 'next/link'
+import { cardClasses, leftColClasses, nameClasses, metaClasses, rightActionsClasses, btnPrimary, badgeEnProceso } from '../../../utils/uiClasses'
 
 type Meta = {
     id: string
@@ -40,34 +41,39 @@ export default function ProcesoPage() {
     }
 
     return (
-        <div className="min-h-screen bg-gray-50 p-8">
-            <div className="max-w-4xl mx-auto bg-white rounded-lg p-6 shadow">
-                <h1 className="text-2xl font-bold mb-4 text-gray-800">Estudios en proceso</h1>
+        <div className="p-6">
+            <h1 className="text-2xl font-bold text-black mb-4">Estudios en proceso</h1>
+            {items.length === 0 ? (
+                <p className="text-gray-600">No hay estudios en proceso todavía.</p>
+            ) : (
                 <div className="space-y-4">
                     {items.map(item => (
-                        <div key={item.id} className="p-4 border rounded-lg bg-white shadow-sm">
-                            <div className="flex items-center justify-between">
-                                <div className="flex items-start gap-4">
-                                    <div className="flex flex-col">
-                                        <div className="flex items-center gap-2">
-                                            <div className="font-bold text-gray-800 uppercase text-sm">{item.nombreApellido || '—'}</div>
-                                            <span className="inline-block bg-yellow-200 text-yellow-800 text-xs font-semibold px-3 py-1 rounded-full">En proceso</span>
-                                        </div>
-                                        <div className="text-xs text-gray-600 mt-2">DNI {item.dni || '—'}</div>
-                                        <div className="text-xs text-gray-600">Fecha {item.fecha ? new Date(item.fecha).toLocaleDateString('es-AR') : '—'}</div>
-                                        <div className="text-xs text-gray-600">Obra social : {item.obraSocial || '—'}</div>
-                                        <div className="text-xs text-gray-600">Medico: {item.medico || '—'}</div>
+                        <div key={item.id} className={cardClasses}>
+
+                            <div className={leftColClasses}>
+                                <div className="flex flex-col gap-1">
+                                    <div className={nameClasses}>{item.nombreApellido || '—'}</div>
+                                    <div className={metaClasses}>
+                                        <span className="truncate">DNI {item.dni || '—'}</span>
+                                        <span className="truncate">Fecha {item.fecha ? new Date(item.fecha).toLocaleDateString('es-AR') : '—'}</span>
+                                        <span className="truncate">Obra social {item.obraSocial || '—'}</span>
+                                        <span className="truncate">Médico: {item.medico || '—'}</span>
                                     </div>
                                 </div>
-
-                                <div className="flex items-center gap-3">
-                                    <Link href={`/cargar-nuevo?id=${encodeURIComponent(item.id)}`} className="px-6 py-2 bg-red-600 hover:bg-red-700 text-white font-semibold rounded">Cargar Estudio</Link>
-                                </div>
                             </div>
+
+                            <div className={rightActionsClasses}>
+                                {item.status === 'en_proceso' || item.status === 'en proceso' ? (
+                                    <span className={badgeEnProceso}>En proceso</span>
+                                ) : null}
+
+                                <Link href={`/cargar-nuevo?id=${encodeURIComponent(item.id)}`} className={btnPrimary}>Cargar Estudio</Link>
+                            </div>
+
                         </div>
                     ))}
                 </div>
-            </div>
+            )}
         </div>
     )
 }
