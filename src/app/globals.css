@@ -1,21 +1,7 @@
 @import "tailwindcss";
 
-:root {
-  --background: #000000; /* negro siempre */
-  --foreground: #ededed; /* texto claro */
-}
-
-@theme inline {
-  --color-background: var(--background);
-  --color-foreground: var(--foreground);
-  --font-sans: var(--font-geist-sans);
-  --font-mono: var(--font-geist-mono);
-}
-
-/* Eliminamos el @media prefers-color-scheme */
-
 body {
-  background: var(--background);
-  color: var(--foreground);
-  font-family: Verdana, Geneva, sans-serif; /* Verdana */
+  background: #fff;
+  color: #222;
+  font-family: Verdana, Geneva, sans-serif;
 }
