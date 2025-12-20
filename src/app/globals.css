@@ -1,7 +1,61 @@
 @import "tailwindcss";
 
+:root {
+  --background: #ffffff;
+  /* blanco */
+  --foreground: #222222;
+  /* texto oscuro */
+}
+
+@theme inline {
+  --color-background: var(--background);
+  --color-foreground: var(--foreground);
+  --font-sans: var(--font-geist-sans);
+  --font-mono: var(--font-geist-mono);
+}
+
 body {
-  background: #fff;
-  color: #222;
+  background: var(--background);
+  color: var(--foreground);
   font-family: Verdana, Geneva, sans-serif;
+}
+
+/* Toast animations */
+@keyframes fadeInUp {
+  from {
+    opacity: 0;
+    transform: translateY(8px) scale(0.995);
+  }
+
+  to {
+    opacity: 1;
+    transform: translateY(0) scale(1);
+  }
+}
+
+@keyframes fadeOutDown {
+  from {
+    opacity: 1;
+    transform: translateY(0) scale(1);
+  }
+
+  to {
+    opacity: 0;
+    transform: translateY(8px) scale(0.995);
+  }
+}
+
+.animate-fade-in {
+  animation: fadeInUp 220ms cubic-bezier(.16, .84, .26, 1) both;
+}
+
+.animate-fade-out {
+  animation: fadeOutDown 200ms cubic-bezier(.16, .84, .26, 1) both;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .animate-fade-in,
+  .animate-fade-out {
+    animation: none !important;
+  }
 }
