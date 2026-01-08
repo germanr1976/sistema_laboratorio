@@ -5,6 +5,7 @@
   "main": "dist/server.js",
   "scripts": {
     "dev": "tsx watch src/server.ts",
+    "seed": "tsx src/seed.ts",
     "build": "tsc && tsc-alias",
     "start": "node dist/server.js"
   },
@@ -33,7 +34,7 @@
     "@types/multer": "^2.0.0",
     "@types/node": "^24.5.2",
     "nodemon": "^3.1.10",
-    "prisma": "^6.16.2",
+    "prisma": "^6.19.1",
     "ts-node": "^10.9.2",
     "tsc-alias": "^1.8.16",
     "tsconfig-paths": "^4.2.0",

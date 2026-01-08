@@ -54,9 +54,18 @@ export default function LoginProfesional() {
                 return;
             }
 
-            try { const { setAuthToken } = await import('@/utils/authFetch'); setAuthToken(token); } catch { }
+            try {
+                const { setAuthToken } = await import('@/utils/authFetch');
+                setAuthToken(token);
+                // Guardar tipo de usuario
+                localStorage.setItem('userType', 'professional');
+                if (json?.data?.user) {
+                    localStorage.setItem('userData', JSON.stringify(json.data.user));
+                }
+            } catch { }
             toast.success('Login exitoso');
-            window.location.href = '/';
+            // Redirigir al dashboard
+            window.location.href = '/dashboard';
         } catch (error: any) {
             console.error('Login error', error);
             toast.error(error?.message || 'Error al conectar con el servidor');

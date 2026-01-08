@@ -3,24 +3,23 @@ generator client {
 }
 
 datasource db {
-  provider  = "postgresql"
-  url       = env("DATABASE_URL")
-  directUrl = env("DIRECT_URL")
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
 }
 
 model User {
-  id              Int       @id @default(autoincrement())
-  dni             String    @unique
+  id              Int      @id @default(autoincrement())
+  dni             String   @unique
   roleId          Int
-  email           String?   @unique
+  createdAt       DateTime @default(now())
+  email           String? @unique  @db.VarChar(255)
   license         String?
-  password        String?
-  createdAt       DateTime  @default(now())
-  updatedAt       DateTime  @updatedAt
+  password        String? @db.VarChar(255)
+  updatedAt       DateTime @updatedAt
   profile         Profile?
-  assignedStudies Study[]   @relation("StudyBiochemist")
-  patientStudies  Study[]   @relation("StudyPatient")
-  role            Role      @relation(fields: [roleId], references: [id])
+  assignedStudies Study[]  @relation("StudyBiochemist")
+  patientStudies  Study[]  @relation("StudyPatient")
+  role            Role     @relation(fields: [roleId], references: [id])
 
   @@index([roleId])
   @@index([dni])
@@ -49,14 +48,14 @@ model Study {
   studyName       String   @db.VarChar(255)
   studyDate       DateTime
   socialInsurance String?  @db.VarChar(50)
-  pdfUrl          String?  @db.Text
+  pdfUrl          String?  @db.VarChar(500)
   statusId        Int
-  biochemistId    Int?
   createdAt       DateTime @default(now())
+  biochemistId    Int?
   updatedAt       DateTime @default(now()) @updatedAt
+  biochemist      User?    @relation("StudyBiochemist", fields: [biochemistId], references: [id])
+  status          Status   @relation(fields: [statusId], references: [id])
   patient         User     @relation("StudyPatient", fields: [userId], references: [id], onDelete: Cascade)
-  biochemist      User?    @relation("StudyBiochemist", fields: [biochemistId], references: [id], onDelete: SetNull)
-  status          Status   @relation(fields: [statusId], references: [id], onDelete: Restrict)
 
   @@index([userId])
   @@index([biochemistId])

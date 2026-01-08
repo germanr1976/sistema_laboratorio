@@ -71,10 +71,18 @@ export default function LoginPaciente() {
             }
 
             // Guardar token y notificar
-            try { const { setAuthToken } = await import('@/utils/authFetch'); setAuthToken(token); } catch { }
+            try {
+                const { setAuthToken } = await import('@/utils/authFetch');
+                setAuthToken(token);
+                // Guardar tipo de usuario
+                localStorage.setItem('userType', 'patient');
+                if (json?.data?.user) {
+                    localStorage.setItem('userData', JSON.stringify(json.data.user));
+                }
+            } catch { }
             toast.success('Login exitoso');
-            // Redirigir a home o dashboard
-            window.location.href = '/';
+            // Redirigir al dashboard
+            window.location.href = '/dashboard';
         } catch (error: any) {
             console.error('Login error', error);
             toast.error(error?.message || 'Error al conectar con el servidor');

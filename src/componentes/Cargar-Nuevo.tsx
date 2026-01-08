@@ -3,7 +3,7 @@
 import type React from "react"
 
 import { useState, useRef, useEffect } from "react"
-import type { EstudioData } from "../app/revision/page"
+import type { EstudioData } from "../app/(protected)/revision/page"
 import { savePdf } from "../utils/estudiosStore"
 
 const Upload = ({ className }: { className?: string }) => (
@@ -204,18 +204,40 @@ export function CargarNuevo({ onCargarEstudio, initialId, initialData }: CargarN
     }
   }
 
+  const [now, setNow] = useState<Date>(new Date())
+  useEffect(() => {
+    const t = window.setInterval(() => setNow(new Date()), 1000)
+    return () => window.clearInterval(t)
+  }, [])
+
+  const formatDate = (date: Date) => {
+    return date.toLocaleDateString('es-ES', { weekday: 'long', year: 'numeric', month: 'long', day: 'numeric' })
+  }
+
+  const formatTime = (date: Date) => {
+    return date.toLocaleTimeString('es-ES', { hour: '2-digit', minute: '2-digit', second: '2-digit' })
+  }
+
   return (
     <div className="min-h-screen bg-gray-50 w-full text-black">
-      <div className="border-b border-gray-300 px-8 py-8">
-        <div className="flex items-center gap-3">
-          <div className="w-12 h-12 bg-blue-100 rounded-2xl flex items-center justify-center mb-0">
-            <FileText className="w-6 h-6 text-blue-600" />
-          </div>
+      {/* Header fijo con fecha y hora */}
+      <div className="sticky top-0 z-10 bg-white border-b border-gray-300 px-8 py-4 shadow-sm">
+        <div className="flex items-center justify-between">
           <div>
-            <h1 className="text-2xl font-bold text-black mb-1 text-left">Cargar Estudio</h1>
-            <p className="text-gray-700 text-base text-left">
+            <h1 className="text-2xl font-bold text-black mb-1">Cargar Estudio</h1>
+            <p className="text-gray-600 text-sm">
               Complete la información del paciente y adjunte el archivo del estudio
             </p>
+          </div>
+          <div className="flex gap-4">
+            <div className="bg-white border border-gray-300 rounded-lg px-4 py-2 shadow-sm">
+              <p className="text-sm text-gray-600">Fecha</p>
+              <p className="text-base font-semibold text-gray-800 capitalize">{formatDate(now)}</p>
+            </div>
+            <div className="bg-white border border-gray-300 rounded-lg px-4 py-2 shadow-sm">
+              <p className="text-sm text-gray-600">Hora</p>
+              <p className="text-base font-semibold text-gray-800">{formatTime(now)}</p>
+            </div>
           </div>
         </div>
       </div>

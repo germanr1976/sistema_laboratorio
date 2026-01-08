@@ -8,9 +8,10 @@ type ClockProps = {
     boxBg?: string // Tailwind bg class for the box, e.g. 'bg-sky-50'
     boxBorder?: string // Tailwind border color class, e.g. 'border-sky-100'
     showIcon?: boolean
+    showDate?: boolean
 }
 
-export default function Clock({ iconColor = 'text-sky-500', boxBg = 'bg-sky-50/60', boxBorder = 'border-sky-100', showIcon = true }: ClockProps) {
+export default function Clock({ iconColor = 'text-sky-500', boxBg = 'bg-sky-50/60', boxBorder = 'border-sky-100', showIcon = true, showDate = true }: ClockProps) {
     const [now, setNow] = useState<Date>(new Date())
     const [blink, setBlink] = useState<boolean>(true)
 
@@ -41,7 +42,7 @@ export default function Clock({ iconColor = 'text-sky-500', boxBg = 'bg-sky-50/6
         <div className="flex items-center gap-3">
             {showIcon && <ClockIcon className={`${iconColor} w-5 h-5`} />}
             <div className={`${boxBg} ${boxBorder} backdrop-blur-sm px-3 py-2 rounded-lg shadow-sm border text-right`}>
-                <div className="text-sm text-gray-600 leading-4">{dateStr}</div>
+                {showDate && <div className="text-sm text-gray-600 leading-4">{dateStr}</div>}
                 <div className="text-lg font-semibold text-gray-900 tracking-wide">{timeStr}</div>
             </div>
         </div>

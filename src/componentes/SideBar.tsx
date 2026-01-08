@@ -1,8 +1,9 @@
 "use client"
 
-import { useState } from "react"
+import { useState, useEffect } from "react"
 import Link from "next/link"
 import { usePathname } from "next/navigation"
+import { useRouter } from "next/navigation"
 import { Home, BarChart3, ChevronDown, ChevronRight, User, Settings, HelpCircle, LogOut } from "lucide-react"
 
 interface SidebarProps {
@@ -11,7 +12,50 @@ interface SidebarProps {
 
 export function Sidebar({ className = "" }: SidebarProps) {
   const pathname = usePathname()
+  const router = useRouter()
   const [isEstudiosOpen, setIsEstudiosOpen] = useState(pathname?.startsWith("/estudios"))
+  const [userName, setUserName] = useState<string>("Usuario")
+  const [userRole, setUserRole] = useState<string>("")
+  const [userInitials, setUserInitials] = useState<string>("U")
+
+  useEffect(() => {
+    // Obtener datos del usuario desde localStorage
+    try {
+      const userDataStr = localStorage.getItem('userData')
+      const userType = localStorage.getItem('userType')
+
+      if (userDataStr) {
+        const userData = JSON.parse(userDataStr)
+        const name = userData.nombre || userData.nombreApellido || `Usuario ${userData.dni || ''}`
+        setUserName(name)
+
+        // Calcular iniciales
+        const initials = name
+          .split(' ')
+          .map((n: string) => n[0])
+          .join('')
+          .toUpperCase()
+          .slice(0, 2)
+        setUserInitials(initials)
+
+        // Establecer rol
+        if (userType === 'professional') {
+          setUserRole(userData.role || userData.matricula || 'PROFESIONAL')
+        } else if (userType === 'patient') {
+          setUserRole('PACIENTE')
+        }
+      }
+    } catch (e) {
+      console.error('Error loading user data', e)
+    }
+  }, [])
+
+  const handleLogout = () => {
+    localStorage.removeItem('authToken')
+    localStorage.removeItem('userType')
+    localStorage.removeItem('userData')
+    router.push('/login-profesional')
+  }
 
   const menuItems = [
     { id: "dashboard", label: "Dashboard", icon: Home, href: "/dashboard" },
@@ -21,7 +65,6 @@ export function Sidebar({ className = "" }: SidebarProps) {
       icon: BarChart3,
       hasSubmenu: true,
       submenu: [
-
         { id: "proceso", label: "En Proceso", href: "/estudios/proceso" },
         { id: "parciales", label: "Parcial", href: "/estudios/parciales" },
         { id: "completados", label: "Completados", href: "/estudios/completados" },
@@ -37,22 +80,32 @@ export function Sidebar({ className = "" }: SidebarProps) {
   ]
 
   return (
-    <div className={`flex min-h-screen w-64 flex-col bg-white border-r border-gray-200 ${className}`}>
+    <div className={`fixed left-0 top-0 h-screen w-64 flex flex-col bg-white border-r border-gray-200 z-40 ${className}`}>
+      {/* Logo Section */}
+      <div className="p-4 border-b border-gray-200 flex justify-center">
+        <img
+          src="/icons/logo_lab.png"
+          alt="Icono laboratorio"
+          className="h-16 w-16 object-contain rounded-full border-2 border-blue-300 bg-white cursor-pointer hover:scale-105 transition-transform"
+          onClick={() => router.push("/")}
+        />
+      </div>
+
       {/* User Profile Section */}
       <div className="p-4 border-b border-gray-200">
         <div className="flex items-center gap-3">
-          <div className="h-10 w-10 rounded-full bg-gray-300 flex items-center justify-center text-gray-600 font-bold">
-            AS
+          <div className="h-10 w-10 rounded-full bg-blue-500 flex items-center justify-center text-white font-bold text-sm">
+            {userInitials}
           </div>
           <div className="flex flex-col">
-            <span className="text-xs text-gray-500 uppercase tracking-wide">BOQUIMICO M.P1010</span>
-            <span className="text-sm font-medium text-gray-900">Andrew Smith</span>
+            {userRole && <span className="text-xs text-gray-500 uppercase tracking-wide">{userRole}</span>}
+            <span className="text-sm font-medium text-gray-900">{userName}</span>
           </div>
         </div>
       </div>
 
       {/* Main Navigation */}
-      <nav className="flex-1 p-4 space-y-1">
+      <nav className="flex-1 p-4 space-y-1 overflow-y-auto">
         {menuItems.map((item) => (
           <div key={item.id}>
             {item.hasSubmenu ? (
@@ -109,6 +162,12 @@ export function Sidebar({ className = "" }: SidebarProps) {
           <Link
             key={item.id}
             href={item.href}
+            onClick={(e) => {
+              if (item.id === 'cerrar-sesion') {
+                e.preventDefault()
+                handleLogout()
+              }
+            }}
             className={`flex items-center px-2 py-2 rounded-md text-left 
               ${item.destructive
                 ? "text-red-600 hover:bg-red-50 hover:text-red-700"
@@ -125,4 +184,10 @@ export function Sidebar({ className = "" }: SidebarProps) {
     </div>
   )
 }
+
+
+
+
+
+
 

@@ -1,12 +1,20 @@
 
 "use client";
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
-import authFetch from '@/utils/authFetch';
+import authFetch, { getAuthToken } from '@/utils/authFetch';
 
 export default function HomePage() {
     const [selected, setSelected] = useState<'paciente' | 'profesional' | null>(null);
     const router = useRouter();
+
+    useEffect(() => {
+        // Si el usuario ya está autenticado, redirigir al dashboard
+        const token = getAuthToken();
+        if (token) {
+            router.push('/dashboard');
+        }
+    }, [router]);
 
     return (
         <main className="min-h-screen flex flex-col items-center justify-center bg-white relative overflow-hidden z-10">

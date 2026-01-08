@@ -2,7 +2,7 @@
 
 import React, { useEffect, useState } from 'react'
 import Link from 'next/link'
-import { cardClasses, leftColClasses, nameClasses, metaClasses, rightActionsClasses, btnPrimary, badgeEnProceso } from '../../../utils/uiClasses'
+import { cardClasses, leftColClasses, nameClasses, metaClasses, rightActionsClasses, btnPrimary, badgeEnProceso } from '@/utils/uiClasses'
 
 type Meta = {
     id: string
@@ -31,9 +31,9 @@ export default function ProcesoPage() {
 
     if (items.length === 0) {
         return (
-            <div className="min-h-screen bg-gray-50 p-8">
-                <div className="max-w-3xl mx-auto bg-white rounded-lg p-8 shadow">
-                    <h1 className="text-2xl font-bold mb-4">Estudios en proceso</h1>
+            <div className="p-8">
+                <div className="bg-white rounded-lg p-8 shadow">
+                    <h1 className="text-3xl font-bold text-gray-900 mb-4">Estudios en proceso</h1>
                     <p className="text-gray-600">No hay estudios en proceso. Podés crear uno desde el Dashboard o desde "Cargar nuevo".</p>
                 </div>
             </div>
@@ -42,7 +42,10 @@ export default function ProcesoPage() {
 
     return (
         <div className="p-6">
-            <h1 className="text-2xl font-bold text-black mb-4">Estudios en proceso</h1>
+            <div className="mb-6">
+                <h1 className="text-3xl font-bold text-gray-900">Estudios en proceso</h1>
+                <p className="text-gray-600 mt-1">Estudios que están siendo procesados</p>
+            </div>
             {items.length === 0 ? (
                 <p className="text-gray-600">No hay estudios en proceso todavía.</p>
             ) : (

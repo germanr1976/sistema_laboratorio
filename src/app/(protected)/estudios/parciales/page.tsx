@@ -1,9 +1,10 @@
 "use client"
 
 import { useEffect, useState } from "react"
-import { getPdf } from "../../../utils/estudiosStore"
+import { useRouter } from 'next/navigation'
+import { getPdf } from "@/utils/estudiosStore"
 import { Share2, Download, Trash2 } from "lucide-react"
-import { cardClasses, leftColClasses, nameClasses, metaClasses, rightActionsClasses, btnPdf, btnNoFile, iconBtn, badgeCompletado } from "../../../utils/uiClasses"
+import { cardClasses, leftColClasses, nameClasses, metaClasses, rightActionsClasses, btnPdf, btnNoFile, iconBtn, badgeParcial } from "@/utils/uiClasses"
 
 type EstudioMeta = {
     id?: string
@@ -16,23 +17,27 @@ type EstudioMeta = {
     status?: string
 }
 
-export default function CompletadosPage() {
-    const [completados, setCompletados] = useState<EstudioMeta[]>([])
+export default function ParcialesPage() {
+    const [parciales, setParciales] = useState<EstudioMeta[]>([])
     const [loading, setLoading] = useState(true)
+
+    const router = useRouter()
 
     useEffect(() => {
         let mounted = true
+        const createdUrls: string[] = []
+
         async function load() {
             try {
                 const raw = localStorage.getItem('estudios_metadata')
                 if (!raw) {
-                    if (mounted) setCompletados([])
+                    if (mounted) setParciales([])
                     return
                 }
                 const metas = JSON.parse(raw) as EstudioMeta[]
-                const onlyCompleted = metas.filter(m => m.status === 'completado')
+                const onlyPartial = metas.filter(m => m.status === 'parcial')
                 const dedupMap: Record<string, EstudioMeta> = {}
-                onlyCompleted.forEach(m => { if (m.id) dedupMap[m.id] = m })
+                onlyPartial.forEach(m => { if (m.id) dedupMap[m.id] = m })
                 const deduped = Object.values(dedupMap)
 
                 const resolved = await Promise.all(deduped.map(async (m) => {
@@ -41,6 +46,7 @@ export default function CompletadosPage() {
                             const blob = await getPdf(m.id)
                             if (blob) {
                                 const url = URL.createObjectURL(blob)
+                                createdUrls.push(url)
                                 return { ...m, pdfUrl: url }
                             }
                         } catch { }
@@ -48,48 +54,72 @@ export default function CompletadosPage() {
                     return m
                 }))
 
-                if (mounted) setCompletados(resolved)
+                if (mounted) setParciales(resolved)
             } catch (e) {
-                console.error('Error cargando completados', e)
+                console.error('Error cargando parciales', e)
+                if (mounted) setParciales([])
             } finally {
                 if (mounted) setLoading(false)
             }
         }
+
         load()
-        return () => { mounted = false }
+
+        return () => {
+            mounted = false
+            try {
+                createdUrls.forEach(u => { try { URL.revokeObjectURL(u) } catch { } })
+            } catch { /* ignore */ }
+        }
     }, [])
 
-    if (loading) return <div>Cargando completados...</div>
+    if (loading) return <div>Cargando parciales...</div>
 
     function handleDelete(id: string | undefined): void {
-        throw new Error("Function not implemented.")
+        if (!id) return
+        if (!confirm("¿Eliminar estudio? Esta acción no se puede deshacer.")) return
+
+        try {
+            const raw = localStorage.getItem("estudios_metadata")
+            const metas = raw ? (JSON.parse(raw) as EstudioMeta[]) : []
+
+            const toRemove = metas.find(m => m.id === id)
+            if (toRemove?.pdfUrl) {
+                try { URL.revokeObjectURL(toRemove.pdfUrl) } catch { /* ignore */ }
+            }
+
+            const updated = metas.filter(m => m.id !== id)
+            localStorage.setItem("estudios_metadata", JSON.stringify(updated))
+
+            setParciales(prev => prev.filter(p => p.id !== id))
+        } catch (e) {
+            console.error("Error eliminando estudio", e)
+        }
     }
 
     return (
         <div className="p-6">
-            <h1 className="text-2xl font-bold text-black mb-4">Estudios completados</h1>
-            {completados.length === 0 ? (
-                <p className="text-gray-600">No hay estudios completados todavía.</p>
+            <h1 className="text-2xl font-bold text-black mb-4">Estudios parciales</h1>
+            {parciales.length === 0 ? (
+                <p className="text-gray-600">No hay estudios parciales.</p>
             ) : (
                 <div className="space-y-4">
-                    {completados.map((e) => (
+                    {parciales.map((e) => (
                         <div key={e.id} className={cardClasses}>
 
                             <div className={leftColClasses}>
-                                <div className="flex flex-col gap-1">
-                                    <div className={nameClasses}>{e.nombreApellido}</div>
-                                    <div className={metaClasses}>
-                                        <span className="truncate">DNI {e.dni}</span>
-                                        <span className="truncate">Fecha {e.fecha}</span>
-                                        <span className="truncate">Obra social {e.obraSocial}</span>
-                                        <span className="truncate">Médico: {e.medico}</span>
-                                    </div>
+                                <div className="font-bold text-gray-900">{e.nombreApellido}</div>
+                                <div className="flex flex-wrap text-sm text-gray-600 gap-3">
+                                    <span className="truncate">DNI {e.dni}</span>
+                                    <span className="truncate">Fecha {e.fecha}</span>
+                                    <span className="truncate">Obra social {e.obraSocial}</span>
+                                    <span className="truncate">Médico: {e.medico}</span>
                                 </div>
                             </div>
 
                             <div className={rightActionsClasses}>
-                                {e.status === "completado" && (
-                                    <span className={badgeCompletado}>Completado</span>
+                                {e.status === "parcial" && (
+                                    <span className={badgeParcial}>Parcial</span>
                                 )}
 
                                 {e.pdfUrl ? (
@@ -109,6 +139,9 @@ export default function CompletadosPage() {
                                 <button onClick={() => handleDelete(e.id)} title="Eliminar estudio" className={`${iconBtn} hover:bg-red-500`}>
                                     <Trash2 size={16} />
                                 </button>
+
+                                <button onClick={() => router.push(`/cargar-nuevo?id=${e.id}`)} className="px-4 py-2 bg-yellow-400 text-black rounded whitespace-nowrap">Pendiente</button>
+
                             </div>
 
                         </div>
