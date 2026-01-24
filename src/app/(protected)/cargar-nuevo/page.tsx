@@ -1,215 +1,138 @@
 
 "use client"
 
-import { useState, useEffect } from "react"
-import { useRouter, useSearchParams } from 'next/navigation'
+import { useSearchParams } from 'next/navigation'
+import { useState, useEffect } from 'react'
+import { EstudioForm } from '@/componentes/EstudioForm'
 import authFetch from '@/utils/authFetch'
-import { CargarNuevo } from "@/componentes/Cargar-Nuevo"
-import { RevisarEstudio } from "@/componentes/Revisar-Estudio"
-import Toast from '@/componentes/Toast'
-import type { EstudioData } from "../revision/page"
+
+const toDateInput = (value?: string | null) => {
+    if (!value) return ''
+    // Evitar desfases por zona horaria: tomar solo la parte de fecha
+    return value.slice(0, 10)
+}
+
+interface EstudioExistente {
+    id: string | number
+    backendId?: number | string
+    nombreApellido: string
+    dni: string
+    fechaEstudio: string
+    obraSocial: string
+    medico: string
+    pdfs?: string[]
+    attachments?: Array<{ id: number; url: string; filename?: string }>
+    estado?: 'completado' | 'en_proceso' | 'parcial'
+}
 
 export default function Page() {
-    const [currentView, setCurrentView] = useState<"cargar" | "revisar">("cargar")
-    const [estudioData, setEstudioData] = useState<EstudioData | null>(null)
-    const [toastMessage, setToastMessage] = useState<string>('')
-    const [showToast, setShowToast] = useState<boolean>(false)
-    const [loading, setLoading] = useState(false)
-
     const searchParams = useSearchParams()
-    const router = useRouter()
+    const [estudioExistente, setEstudioExistente] = useState<EstudioExistente | null>(null)
+    const [loading, setLoading] = useState(false)
+    const [permitirCambio, setPermitirCambio] = useState(false)
 
+    // Cargar estudio si viene con ID en params
     useEffect(() => {
-        const loadStudy = async () => {
+        const id = searchParams?.get('id')
+        if (!id) return
+
+        setLoading(true)
+        const loadFromLocal = () => {
             try {
-                const id = searchParams?.get('id')
-                if (!id) return
-
-                setLoading(true)
-
-                // Primero intenta cargar desde localStorage (flujo local)
                 const raw = localStorage.getItem('estudios_metadata')
-                const metas = raw ? JSON.parse(raw) as Array<Record<string, any>> : []
-                const localFound = metas.find(m => m.id === id)
+                const metas = raw ? JSON.parse(raw) : []
+                const encontrado = metas.find((m: any) => m.id === id)
 
-                if (localFound) {
-                    setEstudioData(localFound as EstudioData)
-                    setCurrentView('cargar')
+                if (encontrado) {
+                    const estudioMapeado: EstudioExistente = {
+                        id: encontrado.id,
+                        backendId: encontrado.backendId || encontrado.serverId,
+                        nombreApellido: encontrado.nombreApellido || encontrado.studyName || '',
+                        dni: encontrado.dni || '',
+                        fechaEstudio: encontrado.fechaEstudio || encontrado.fecha || '',
+                        obraSocial: encontrado.obraSocial || encontrado.socialInsurance || '',
+                        medico: encontrado.medico || '',
+                        pdfs: encontrado.pdfs || [],
+                        estado: encontrado.estado || encontrado.status || 'en_proceso',
+                    }
+                    console.log('Estudio cargado (local):', estudioMapeado)
+                    setEstudioExistente(estudioMapeado)
+                    setPermitirCambio(estudioMapeado.estado === 'en_proceso' || estudioMapeado.estado === 'parcial')
+                    return true
+                }
+            } catch (error) {
+                console.error('Error cargando estudio local:', error)
+            }
+            return false
+        }
+
+        const loadFromBackend = async () => {
+            try {
+                const response = await authFetch(`http://localhost:3000/api/studies/${id}`)
+                if (!response.ok) {
+                    if (response.status === 401) {
+                        console.warn('No autorizado: revisa sesión/token')
+                    } else {
+                        console.warn('Backend no devolvió el estudio, status:', response.status)
+                    }
                     return
                 }
-
-                // Si no está en localStorage, intenta cargar desde la API (estudios de BD)
-                const response = await authFetch(`http://localhost:3000/api/studies/${id}`)
-                if (response.ok) {
-                    const result = await response.json()
-                    const study = result.data || result
-
-                    // Mapear los datos del backend al formato EstudioData
-                    const estudio: EstudioData = {
-                        nombreApellido: study.patient?.profile
-                            ? `${study.patient.profile.firstName || ''} ${study.patient.profile.lastName || ''}`.trim()
-                            : 'Sin nombre',
-                        dni: study.patient?.documentNumber || study.patient?.dni || '',
-                        fecha: study.studyDate ? new Date(study.studyDate).toISOString().split('T')[0] : '',
-                        obraSocial: study.socialInsurance || '',
-                        medico: study.biochemist?.profile
-                            ? `${study.biochemist.profile.firstName || ''} ${study.biochemist.profile.lastName || ''}`.trim()
-                            : '',
-                        pdfFile: null,
-                        pdfUrl: study.pdfUrl ? `http://localhost:3000${study.pdfUrl}` : '',
-                        id: study.id?.toString(),
-                        status: study.status?.name?.toLowerCase().includes('completed') ? 'completado'
-                            : study.status?.name?.toLowerCase().includes('partial') ? 'parcial'
-                                : 'en-proceso'
-                    }
-
-                    setEstudioData(estudio)
-                    setCurrentView('cargar')
+                const result = await response.json()
+                const study = result.data || result
+                const estudioMapeado: EstudioExistente = {
+                    id: study.id,
+                    backendId: study.id,
+                    nombreApellido: study.patient?.profile
+                        ? `${study.patient.profile.firstName || ''} ${study.patient.profile.lastName || ''}`.trim()
+                        : study.studyName || '',
+                    dni: study.patient?.dni || study.patient?.documentNumber || '',
+                    fechaEstudio: toDateInput(study.studyDate),
+                    obraSocial: study.socialInsurance || '',
+                    // Médico: tomar solo desde campo 'doctor' del estudio; sin fallback al bioquímico
+                    medico: study.doctor || '',
+                    pdfs: Array.isArray(study.pdfs) ? study.pdfs : (study.pdfUrl ? [study.pdfUrl] : []),
+                    attachments: Array.isArray(study.attachments) ? study.attachments : [],
+                    estado: study.status?.name?.toLowerCase() === 'completed' ? 'completado'
+                        : study.status?.name?.toLowerCase() === 'partial' ? 'parcial'
+                            : 'en_proceso',
                 }
-            } catch (e) {
-                console.error('[cargar-nuevo] error loading study:', e)
-            } finally {
-                setLoading(false)
+                console.log('Estudio cargado (backend):', estudioMapeado)
+                setEstudioExistente(estudioMapeado)
+                setPermitirCambio(estudioMapeado.estado === 'en_proceso' || estudioMapeado.estado === 'parcial')
+            } catch (error) {
+                console.error('Error cargando estudio backend:', error)
             }
         }
 
-        loadStudy()
+        // Intenta primero local, si no existe intenta backend
+        const foundLocal = loadFromLocal()
+        if (!foundLocal) {
+            loadFromBackend().finally(() => setLoading(false))
+        } else {
+            setLoading(false)
+        }
     }, [searchParams])
 
-    const handleCargarEstudio = (data: EstudioData, opts?: { autoComplete?: boolean }) => {
-        // Actualizar el estudio en la BD
-        const updateStudy = async () => {
-            try {
-                if (!data.id) {
-                    console.warn('No study ID provided')
-                    return
-                }
-
-                const formData = new FormData()
-                if (data.pdfFile) {
-                    formData.append('pdf', data.pdfFile)
-                }
-
-                const response = await authFetch(`http://localhost:3000/api/studies/${data.id}`, {
-                    method: 'PATCH',
-                    body: formData
-                })
-
-                if (!response.ok) {
-                    throw new Error('Error actualizando estudio')
-                }
-
-                setToastMessage('Estudio actualizado exitosamente')
-                setShowToast(true)
-
-                setTimeout(() => {
-                    router.push('/estudios/proceso')
-                }, 600)
-            } catch (e) {
-                console.error('Error actualizando estudio:', e)
-                setToastMessage('Error al actualizar estudio')
-                setShowToast(true)
-            }
-        }
-
-        if (opts?.autoComplete) {
-            updateStudy()
-            return
-        }
-
-        setEstudioData(data)
-        setCurrentView('revisar')
-    }
-
-    const handleVolver = () => {
-        setCurrentView("cargar")
-        setEstudioData(null)
-    }
-
-    const handleCompletado = () => {
-        if (!estudioData) return
-
-        const updateStatus = async () => {
-            try {
-                const response = await authFetch(`http://localhost:3000/api/studies/${estudioData.id}/status`, {
-                    method: 'PATCH',
-                    headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify({ status: 'COMPLETED' })
-                })
-
-                if (!response.ok) {
-                    throw new Error('Error marcando como completado')
-                }
-
-                setToastMessage('Estudio marcado como completado')
-                setShowToast(true)
-
-                setTimeout(() => {
-                    setEstudioData(null)
-                    router.push('/estudios/completados')
-                }, 600)
-            } catch (e) {
-                console.error('Error marcando como completado:', e)
-                setToastMessage('Error al marcar como completado')
-                setShowToast(true)
-            }
-        }
-
-        updateStatus()
-    }
-
-    const handleParcial = () => {
-        if (!estudioData) return
-
-        const updateStatus = async () => {
-            try {
-                const response = await authFetch(`http://localhost:3000/api/studies/${estudioData.id}/status`, {
-                    method: 'PATCH',
-                    headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify({ status: 'PARTIAL' })
-                })
-
-                if (!response.ok) {
-                    throw new Error('Error marcando como parcial')
-                }
-
-                setToastMessage('Estudio marcado como parcial')
-                setShowToast(true)
-
-                setTimeout(() => {
-                    setEstudioData(null)
-                    router.push('/estudios/parciales')
-                }, 600)
-            } catch (e) {
-                console.error('Error marcando como parcial:', e)
-                setToastMessage('Error al marcar como parcial')
-                setShowToast(true)
-            }
-        }
-
-        updateStatus()
-    }
-
-
-    return (
-        <div className="min-h-screen bg-gray-100 flex items-center justify-center">
-            {loading ? (
+    if (loading) {
+        return (
+            <div className="min-h-screen bg-gray-100 flex items-center justify-center">
                 <div className="text-center">
                     <div className="inline-block animate-spin rounded-full h-12 w-12 border-b-2 border-blue-500"></div>
                     <p className="mt-4 text-gray-600">Cargando estudio...</p>
                 </div>
-            ) : currentView === "cargar" && (
-                <CargarNuevo onCargarEstudio={handleCargarEstudio} initialData={estudioData ?? undefined} initialId={estudioData?.id} />
-            )}
-            {currentView === "revisar" && estudioData && (
-                <RevisarEstudio
-                    estudioData={estudioData}
-                    onVolver={handleVolver}
-                    onCompletado={handleCompletado}
-                    onParcial={handleParcial}
+            </div>
+        )
+    }
+
+    return (
+        <div className="min-h-screen bg-gray-100 py-8">
+            <div className="max-w-6xl mx-auto px-4">
+                <EstudioForm
+                    estudioExistente={estudioExistente ?? undefined}
+                    modoEdicion={!!estudioExistente}
+                    permitirCambioEstado={permitirCambio}
                 />
-            )}
-            <Toast message={toastMessage} type="success" show={showToast} onClose={() => setShowToast(false)} />
+            </div>
         </div>
     )
 }

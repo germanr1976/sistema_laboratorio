@@ -11,6 +11,7 @@ type EstudioMeta = {
     studyDate?: string
     socialInsurance?: string
     pdfUrl?: string
+    pdfs?: string[]
     status?: {
         name: string
     }
@@ -139,17 +140,47 @@ export default function CompletadosPage() {
                                 <div className={rightActionsClasses}>
                                     <span className={badgeCompletado}>Completado</span>
 
-                                    {pdfUrl ? (
-                                        <a href={pdfUrl} target="_blank" rel="noopener noreferrer" className={btnPdf}>ver PDF</a>
+                                    {Array.isArray(e.pdfs) && e.pdfs.length > 0 ? (
+                                        <div className="mt-2 w-full flex flex-wrap gap-2">
+                                            {e.pdfs.map((p, idx) => {
+                                                const fullUrl = `http://localhost:3000${p}`
+                                                return (
+                                                    <div key={idx} className="flex items-center gap-1 px-2 py-1 rounded bg-slate-800 text-white text-xs">
+                                                        <a href={fullUrl} target="_blank" rel="noopener noreferrer" className="underline">Ver</a>
+                                                        <a href={fullUrl} download className="p-1 hover:bg-slate-700 rounded" title="Descargar">
+                                                            <Download size={12} />
+                                                        </a>
+                                                        <button
+                                                            onClick={async () => {
+                                                                try {
+                                                                    await navigator.clipboard.writeText(fullUrl)
+                                                                    alert('Enlace copiado al portapapeles')
+                                                                } catch {
+                                                                    prompt('Copiá el enlace:', fullUrl)
+                                                                }
+                                                            }}
+                                                            className="p-1 hover:bg-slate-700 rounded"
+                                                            title="Compartir"
+                                                        >
+                                                            <Share2 size={12} />
+                                                        </button>
+                                                    </div>
+                                                )
+                                            })}
+                                        </div>
                                     ) : (
-                                        <button className={btnNoFile}>Sin archivo</button>
+                                        pdfUrl ? (
+                                            <a href={pdfUrl} target="_blank" rel="noopener noreferrer" className={btnPdf}>ver PDF</a>
+                                        ) : (
+                                            <button className={btnNoFile}>Sin archivo</button>
+                                        )
                                     )}
 
                                     <button className={`${iconBtn} hover:bg-sky-500`} title="Compartir estudio">
                                         <Share2 size={16} />
                                     </button>
 
-                                    {pdfUrl && (
+                                    {pdfUrl && !e.pdfs?.length && (
                                         <a href={pdfUrl} download className={`${iconBtn} hover:bg-green-500`} title="Descargar estudio">
                                             <Download size={16} />
                                         </a>

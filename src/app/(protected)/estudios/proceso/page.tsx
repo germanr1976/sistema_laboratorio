@@ -4,13 +4,14 @@ import React, { useEffect, useState } from 'react'
 import Link from 'next/link'
 import authFetch from '@/utils/authFetch'
 import { cardClasses, leftColClasses, nameClasses, metaClasses, rightActionsClasses, btnPrimary, badgeEnProceso, iconBtn } from '@/utils/uiClasses'
-import { Trash2 } from 'lucide-react'
+import { Trash2, Share2, Download } from 'lucide-react'
 
 type Meta = {
     id?: number | string
     studyName?: string
     studyDate?: string
     socialInsurance?: string
+    pdfs?: string[]
     status?: {
         name: string
     }
@@ -105,6 +106,16 @@ export default function ProcesoPage() {
         }
     }
 
+    const copyLink = async (url: string) => {
+        try {
+            await navigator.clipboard.writeText(url)
+            alert('Enlace copiado al portapapeles')
+        } catch (e) {
+            console.warn('No se pudo copiar. Mostrando prompt.')
+            prompt('Copiá el enlace:', url)
+        }
+    }
+
     return (
         <div className="p-6">
             <div className="mb-6">
@@ -142,6 +153,24 @@ export default function ProcesoPage() {
                                 <button onClick={() => handleDelete(item.id)} className={`${iconBtn} hover:bg-red-500`} title="Eliminar estudio">
                                     <Trash2 size={16} />
                                 </button>
+                                {Array.isArray(item.pdfs) && item.pdfs.length > 0 && (
+                                    <div className="mt-2 w-full flex flex-wrap gap-2">
+                                        {item.pdfs.map((p, idx) => {
+                                            const fullUrl = `http://localhost:3000${p}`
+                                            return (
+                                                <div key={idx} className="flex items-center gap-1 px-2 py-1 rounded bg-slate-800 text-white text-xs">
+                                                    <a href={fullUrl} target="_blank" rel="noopener noreferrer" className="underline">Ver</a>
+                                                    <button onClick={() => copyLink(fullUrl)} className="p-1 hover:bg-slate-700 rounded" title="Compartir">
+                                                        <Share2 size={12} />
+                                                    </button>
+                                                    <a href={fullUrl} download className="p-1 hover:bg-slate-700 rounded" title="Descargar">
+                                                        <Download size={12} />
+                                                    </a>
+                                                </div>
+                                            )
+                                        })}
+                                    </div>
+                                )}
                             </div>
 
                         </div>

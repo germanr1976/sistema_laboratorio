@@ -56,7 +56,7 @@ http://localhost:3000
 
 Permite a un bioquímico crear un nuevo estudio para un paciente.
 
-> **Nota Importante:** El `biochemistId` es **opcional**. Si no se especifica, se asignará automáticamente al bioquímico autenticado. Si se especifica, se asignará al bioquímico con ese ID.
+> Nota: En la creación inicial (estado IN_PROGRESS), el estudio se guarda **con bioquímico asignado** al usuario autenticado que realiza la carga y **sin fecha**. El campo `doctor` también queda vacío y se completa en los pasos “Parcial” o “Completo”.
 
 **Endpoint:**
 ```http
@@ -71,36 +71,22 @@ POST /api/studies
 }
 ```
 
-**Body (Opción 1 - Sin especificar bioquímico):**
+**Body (Creación inicial):**
 ```json
 {
   "dni": "12345678",
   "studyName": "Análisis de Sangre Completo",
-  "studyDate": "2025-10-15T10:00:00Z",
-  "socialInsurance": "OSDE",
-  "pdfUrl": "https://storage.supabase.co/bucket/studies/abc123.pdf"
-}
-```
-
-**Body (Opción 2 - Asignar a un bioquímico específico):**
-```json
-{
-  "dni": "12345678",
-  "studyName": "Análisis de Sangre Completo",
-  "studyDate": "2025-10-15T10:00:00Z",
-  "socialInsurance": "OSDE",
-  "pdfUrl": "https://storage.supabase.co/bucket/studies/abc123.pdf",
-  "biochemistId": 2
+  "socialInsurance": "OSDE"
 }
 ```
 
 **Campos:**
 - `dni` (requerido): DNI del paciente (8 dígitos)
 - `studyName` (requerido): Nombre del estudio (3-255 caracteres)
-- `studyDate` (requerido): Fecha del estudio (formato ISO 8601, no puede ser futura)
+- `studyDate` (opcional en creación inicial): se define en actualización posterior (parcial/completo)
 - `socialInsurance` (opcional): Obra social del paciente
 - `pdfUrl` (opcional): URL del PDF con los resultados
-- `biochemistId` (opcional): ID del bioquímico a asignar. Si no se especifica, se asigna al usuario autenticado
+- `biochemistId`: se asigna automáticamente al usuario autenticado que crea el estudio.
 
 **Respuesta Exitosa (201):**
 ```json

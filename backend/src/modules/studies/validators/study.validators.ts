@@ -20,19 +20,24 @@ export const createStudySchema = Joi.object({
       "any.required": "El nombre del estudio es requerido",
     }),
   studyDate: Joi.date()
-    .required()
-    .max("now")
+    .optional()
+    .allow(null, "")
     .messages({
       "date.base": "La fecha del estudio debe ser una fecha válida",
-      "date.max": "La fecha del estudio no puede ser futura",
-      "any.required": "La fecha del estudio es requerida",
     }),
   socialInsurance: Joi.string()
     .optional()
-    .allow("")
+    .allow("", null)
     .max(50)
     .messages({
       "string.max": "El número de obra social no puede exceder 50 caracteres",
+    }),
+  doctor: Joi.string()
+    .optional()
+    .allow("", null)
+    .max(255)
+    .messages({
+      "string.max": "El nombre del médico no puede exceder 255 caracteres",
     }),
   pdfUrl: Joi.string()
     .optional()

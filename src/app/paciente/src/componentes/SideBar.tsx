@@ -80,17 +80,17 @@ export function Sidebar({ className = "" }: SidebarProps) {
   ]
 
   return (
-    <div className={`flex min-h-screen w-64 flex-col bg-white border-r border-gray-200 ${className}`}>
+    <div className={`flex min-h-screen w-64 flex-col bg-gradient-to-b from-slate-900 to-slate-800 border-r border-slate-700 ${className}`}>
       {/* User Profile Section */}
-      <div className="p-4 border-b border-gray-200">
+      <div className="p-4 border-b border-slate-700">
         <div className="flex items-center gap-3">
-          <div className="h-10 w-10 rounded-full bg-blue-500 flex items-center justify-center text-white font-bold text-sm">
+          <div className="h-10 w-10 rounded-full bg-blue-600 flex items-center justify-center text-white font-bold text-sm">
             {userInitials}
           </div>
           <div className="flex flex-col flex-1 min-w-0">
-            <span className="text-xs text-gray-500 uppercase tracking-wide">PACIENTE</span>
-            <span className="text-sm font-medium text-gray-900 truncate">{userName}</span>
-            {userDni && <span className="text-xs text-gray-600 truncate">DNI: {userDni}</span>}
+            <span className="text-xs text-slate-400 uppercase tracking-wide">PACIENTE</span>
+            <span className="text-sm font-medium text-white truncate">{userName}</span>
+            {userDni && <span className="text-xs text-slate-300 truncate">DNI: {userDni}</span>}
           </div>
         </div>
       </div>
@@ -108,7 +108,7 @@ export function Sidebar({ className = "" }: SidebarProps) {
                     setIsEstudiosOpen(!isEstudiosOpen)
                   }}
                   className={`w-full flex items-center rounded-md px-2 py-2 text-left 
-                    ${isEstudiosOpen ? "bg-blue-500 text-white" : "text-gray-700 hover:bg-blue-500 hover:text-white"}`}
+                    ${isEstudiosOpen ? "bg-blue-600 text-white" : "text-slate-300 hover:bg-slate-700/50 hover:text-white"}`}
                 >
                   <item.icon className="mr-3 h-4 w-4" />
                   {item.label}
@@ -125,7 +125,7 @@ export function Sidebar({ className = "" }: SidebarProps) {
                         key={subItem.label}
                         href={subItem.href}
                         className={`block w-full text-sm px-2 py-1 rounded-md text-left 
-                          ${pathname === subItem.href ? "bg-blue-500 text-white" : "text-gray-700 hover:bg-blue-500 hover:text-white"}`}
+                          ${pathname === subItem.href ? "bg-blue-600 text-white" : "text-slate-300 hover:bg-slate-700/50 hover:text-white"}`}
                       >
                         {subItem.label}
                       </Link>
@@ -137,7 +137,7 @@ export function Sidebar({ className = "" }: SidebarProps) {
               <Link
                 href={item.href || "#"}
                 className={`flex items-center px-2 py-2 rounded-md text-left 
-                  ${pathname === item.href ? "bg-blue-500 text-white" : "text-gray-700 hover:bg-blue-500 hover:text-white"}`}
+                  ${pathname === item.href ? "bg-blue-600 text-white" : "text-slate-300 hover:bg-slate-700/50 hover:text-white"}`}
               >
                 <item.icon className="mr-3 h-4 w-4" />
                 {item.label}
@@ -148,17 +148,17 @@ export function Sidebar({ className = "" }: SidebarProps) {
       </nav>
 
       {/* Bottom Menu Items */}
-      <div className="p-4 border-t border-gray-200 space-y-1">
+      <div className="p-4 border-t border-slate-700 space-y-1">
         {bottomMenuItems.map((item) => (
           <Link
             key={item.id}
             href={item.href}
             className={`flex items-center px-2 py-2 rounded-md text-left 
               ${item.destructive
-                ? "text-red-600 hover:bg-red-50 hover:text-red-700"
+                ? "text-red-400 hover:bg-red-900/20 hover:text-red-300"
                 : pathname === item.href
-                  ? "bg-blue-500 text-white"
-                  : "text-gray-700 hover:bg-blue-500 hover:text-white"
+                  ? "bg-blue-600 text-white"
+                  : "text-slate-300 hover:bg-slate-700/50 hover:text-white"
               }`}
           >
             <item.icon className="mr-3 h-4 w-4" />

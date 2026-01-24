@@ -3,8 +3,9 @@ import prisma from "@/config/prisma";
 interface CreateStudyData {
   userId: number;
   studyName: string;
-  studyDate: Date;
-  socialInsurance?: string | undefined;
+  studyDate?: Date | null;
+  socialInsurance?: string | null;
+  doctor?: string | null;
   statusId: number;
   pdfUrl?: string | undefined;
   biochemistId?: number | undefined;
@@ -14,17 +15,25 @@ interface UpdateStudyStatusData {
   statusId: number;
 }
 
+interface UpdateStudyPdfData {
+  pdfUrl: string;
+}
+
 export const createStudy = async (data: CreateStudyData) => {
+  const payload: any = {
+    userId: data.userId,
+    studyName: data.studyName,
+    socialInsurance: data.socialInsurance || null,
+    doctor: data.doctor || null,
+    statusId: data.statusId,
+    pdfUrl: data.pdfUrl || null,
+    biochemistId: data.biochemistId || null,
+  };
+  if (data.studyDate !== undefined && data.studyDate !== null) {
+    payload.studyDate = data.studyDate;
+  }
   return await prisma.study.create({
-    data: {
-      userId: data.userId,
-      studyName: data.studyName,
-      studyDate: data.studyDate,
-      socialInsurance: data.socialInsurance || null,
-      statusId: data.statusId,
-      pdfUrl: data.pdfUrl || null,
-      biochemistId: data.biochemistId || null,
-    },
+    data: payload,
     include: {
       patient: {
         include: {
@@ -37,6 +46,7 @@ export const createStudy = async (data: CreateStudyData) => {
         },
       },
       status: true,
+      attachments: true,
     },
   });
 };
@@ -47,17 +57,10 @@ export const getStudiesByBiochemist = async (biochemistId: number) => {
       biochemistId,
     },
     include: {
-      patient: {
-        include: {
-          profile: true,
-        },
-      },
-      biochemist: {
-        include: {
-          profile: true,
-        },
-      },
+      patient: { include: { profile: true } },
+      biochemist: { include: { profile: true } },
       status: true,
+      attachments: true,
     },
     orderBy: {
       createdAt: "desc",
@@ -68,17 +71,10 @@ export const getStudiesByBiochemist = async (biochemistId: number) => {
 export const getAllStudies = async () => {
   return await prisma.study.findMany({
     include: {
-      patient: {
-        include: {
-          profile: true,
-        },
-      },
-      biochemist: {
-        include: {
-          profile: true,
-        },
-      },
+      patient: { include: { profile: true } },
+      biochemist: { include: { profile: true } },
       status: true,
+      attachments: true,
     },
     orderBy: {
       createdAt: "desc",
@@ -92,17 +88,10 @@ export const getStudyById = async (studyId: number) => {
       id: studyId,
     },
     include: {
-      patient: {
-        include: {
-          profile: true,
-        },
-      },
-      biochemist: {
-        include: {
-          profile: true,
-        },
-      },
+      patient: { include: { profile: true } },
+      biochemist: { include: { profile: true } },
       status: true,
+      attachments: true,
     },
   });
 };
@@ -119,18 +108,37 @@ export const updateStudyStatus = async (
       statusId: data.statusId,
     },
     include: {
-      patient: {
-        include: {
-          profile: true,
-        },
-      },
-      biochemist: {
-        include: {
-          profile: true,
-        },
-      },
+      patient: { include: { profile: true } },
+      biochemist: { include: { profile: true } },
       status: true,
+      attachments: true,
     },
+  });
+};
+
+export const updateStudyPdfUrl = async (
+  studyId: number,
+  data: UpdateStudyPdfData
+) => {
+  return await prisma.study.update({
+    where: { id: studyId },
+    data: { pdfUrl: data.pdfUrl },
+    include: {
+      patient: { include: { profile: true } },
+      biochemist: { include: { profile: true } },
+      status: true,
+      attachments: true,
+    },
+  });
+};
+
+export const addStudyAttachments = async (
+  studyId: number,
+  files: { url: string; filename?: string }[]
+) => {
+  if (files.length === 0) return { count: 0 };
+  return await prisma.studyAttachment.createMany({
+    data: files.map((f) => ({ studyId, url: f.url, filename: f.filename || null })),
   });
 };
 
@@ -140,12 +148,9 @@ export const getStudiesByPatient = async (userId: number) => {
       userId,
     },
     include: {
-      biochemist: {
-        include: {
-          profile: true,
-        },
-      },
+      biochemist: { include: { profile: true } },
       status: true,
+      attachments: true,
     },
     orderBy: {
       createdAt: "desc",
@@ -210,3 +215,9 @@ export const getAllBiochemists = async () => {
 
 // Función NUEVA para obtener estudios con paginación
 // Servicio de paginación eliminado
+
+export const deleteAttachment = async (attachmentId: number) => {
+  return await prisma.studyAttachment.delete({
+    where: { id: attachmentId },
+  });
+};

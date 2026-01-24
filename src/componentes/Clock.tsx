@@ -24,15 +24,13 @@ export default function Clock({ iconColor = 'text-sky-500', boxBg = 'bg-sky-50/6
         }
     }, [])
 
-    const dateFormatter = new Intl.DateTimeFormat('es-ES', {
-        weekday: 'long',
-        day: 'numeric',
-        month: 'short',
+    const dateFormatter = new Intl.DateTimeFormat('es-AR', {
+        day: '2-digit',
+        month: '2-digit',
         year: 'numeric'
     })
 
-    const rawDate = dateFormatter.format(now)
-    const dateStr = rawDate.charAt(0).toUpperCase() + rawDate.slice(1)
+    const dateStr = dateFormatter.format(now)
 
     const hours = now.getHours().toString().padStart(2, '0')
     const minutes = now.getMinutes().toString().padStart(2, '0')

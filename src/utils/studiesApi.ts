@@ -6,7 +6,7 @@ export interface Study {
     id: number;
     userId: number;
     studyName: string;
-    studyDate: string;
+    studyDate: string | null;
     socialInsurance: string | null;
     pdfUrl: string | null;
     statusId: number;
@@ -33,6 +33,7 @@ export interface Study {
             lastName: string;
         } | null;
     } | null;
+    doctor?: string | null;
 }
 
 /**

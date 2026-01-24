@@ -14,7 +14,7 @@ export interface UserData {
     [key: string]: any;
 }
 
-export function useAuth(redirectTo: string = '/login-profesional') {
+export function useAuth(redirectTo: string = '/') {
     const router = useRouter();
     const [isAuthenticated, setIsAuthenticated] = useState(false);
     const [isLoading, setIsLoading] = useState(true);
@@ -57,7 +57,8 @@ export function useAuth(redirectTo: string = '/login-profesional') {
         localStorage.removeItem('authToken');
         localStorage.removeItem('userType');
         localStorage.removeItem('userData');
-        router.push(redirectTo);
+        sessionStorage.setItem('justLoggedOut', 'true');
+        router.push('/');
     };
 
     return {

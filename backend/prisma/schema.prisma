@@ -46,8 +46,9 @@ model Study {
   id              Int      @id @default(autoincrement())
   userId          Int
   studyName       String   @db.VarChar(255)
-  studyDate       DateTime
+  studyDate       DateTime?
   socialInsurance String?  @db.VarChar(50)
+  doctor          String?  @db.VarChar(255)
   pdfUrl          String?  @db.VarChar(500)
   statusId        Int
   createdAt       DateTime @default(now())
@@ -56,6 +57,7 @@ model Study {
   biochemist      User?    @relation("StudyBiochemist", fields: [biochemistId], references: [id])
   status          Status   @relation(fields: [statusId], references: [id])
   patient         User     @relation("StudyPatient", fields: [userId], references: [id], onDelete: Cascade)
+  attachments     StudyAttachment[]
 
   @@index([userId])
   @@index([biochemistId])
@@ -67,4 +69,16 @@ model Status {
   id      Int     @id @default(autoincrement())
   name    String  @unique
   studies Study[]
+}
+
+model StudyAttachment {
+  id        Int      @id @default(autoincrement())
+  studyId   Int
+  url       String   @db.VarChar(500)
+  filename  String?  @db.VarChar(255)
+  createdAt DateTime @default(now())
+
+  study     Study    @relation(fields: [studyId], references: [id], onDelete: Cascade)
+
+  @@index([studyId])
 }

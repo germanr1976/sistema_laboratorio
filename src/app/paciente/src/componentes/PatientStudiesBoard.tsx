@@ -1,7 +1,7 @@
 "use client"
 
 import { useEffect, useMemo, useState } from "react"
-import { Download, FileText, Loader2, Share2 } from "lucide-react"
+import { Download, FileText, Loader2, Share2, Calendar, Building2, UserRound, FileCheck, Clock, AlertCircle } from "lucide-react"
 import authFetch from "@/utils/authFetch"
 
 export type StudyStatus = "completed" | "in-progress" | "pending" | "partial"
@@ -16,6 +16,8 @@ export type Study = {
   obraSocial: string
   medico: string
   pdfUrl?: string
+  pdfs?: string[]
+  studyName?: string
 }
 
 const statusConfig: Record<StudyStatus, { label: string; badgeClass: string; dotClass: string }> = {
@@ -104,16 +106,23 @@ export default function PatientStudiesBoard({
         const result = await response.json()
         const backendStudies = result?.data || []
 
-        const transformed: Study[] = backendStudies.map((s: any) => ({
-          id: s.id?.toString() || crypto.randomUUID(),
-          patientName: `${s.patient?.profile?.firstName || ""} ${s.patient?.profile?.lastName || ""}`.trim() || "Paciente",
-          dni: s.patient?.dni || "-",
-          date: formatDate(s.studyDate),
-          status: mapStatus(s.status?.name),
-          obraSocial: s.socialInsurance || "Sin obra social",
-          medico: s.biochemist ? `${s.biochemist.profile?.firstName || ""} ${s.biochemist.profile?.lastName || ""}`.trim() : "Sin asignar",
-          pdfUrl: s.pdfUrl ? `http://localhost:3000${s.pdfUrl}` : undefined,
-        }))
+        const transformed: Study[] = backendStudies.map((s: any) => {
+          const pdfs = Array.isArray(s.pdfs) ? s.pdfs : (s.pdfUrl ? [s.pdfUrl] : [])
+          const pdfLinks = pdfs.map((p: string) => p.startsWith('http') ? p : `http://localhost:3000${p}`)
+          return {
+            id: s.id?.toString() || crypto.randomUUID(),
+            patientName: `${s.patient?.profile?.firstName || ""} ${s.patient?.profile?.lastName || ""}`.trim() || "Paciente",
+            dni: s.patient?.dni || "-",
+            date: formatDate(s.studyDate),
+            status: mapStatus(s.status?.name),
+            obraSocial: s.socialInsurance || "Sin obra social",
+            // Médico: solo desde campo 'doctor'; no usar bioquímico como fallback
+            medico: s.doctor || "Sin asignar",
+            pdfUrl: pdfLinks[0],
+            pdfs: pdfLinks,
+            studyName: s.studyName || "Estudio médico"
+          }
+        })
 
         if (mounted) setStudies(transformed)
       } catch (e) {
@@ -146,142 +155,224 @@ export default function PatientStudiesBoard({
     return studies.filter((s) => s.status === activeFilter)
   }, [activeFilter, studies])
 
+  const copyLink = async (url: string) => {
+    try {
+      await navigator.clipboard.writeText(url)
+      alert('Enlace copiado al portapapeles')
+    } catch (e) {
+      console.warn('No se pudo copiar. Mostrando prompt.')
+      prompt('Copiá el enlace:', url)
+    }
+  }
+
   return (
     <div className="flex flex-col gap-6">
+      {/* Header */}
       <div className="space-y-1">
-        <p className="text-xs uppercase tracking-wide text-gray-500">Paciente</p>
-        <h1 className="text-2xl font-bold text-gray-900">{title}</h1>
-        <p className="text-sm text-gray-600">{subtitle}</p>
+        <h1 className="text-3xl font-bold text-gray-900">{title}</h1>
+        <p className="text-base text-gray-600">{subtitle}</p>
       </div>
 
+      {/* Stats Cards */}
       <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
-        {[{ label: "Estudios totales", value: stats.total }, { label: "Completados", value: stats.completed }, { label: "En proceso", value: stats.inProgress }, { label: "Pendientes", value: stats.pending + stats.partial }].map((item) => (
-          <div key={item.label} className="rounded-lg bg-white border border-gray-200 px-4 py-3 shadow-sm">
-            <p className="text-xs text-gray-500">{item.label}</p>
-            <p className="text-2xl font-semibold text-gray-900">{item.value}</p>
-          </div>
-        ))}
-      </div>
-
-      <div className="rounded-2xl border border-gray-200 bg-white shadow-sm">
-        <div className="flex flex-col gap-3 border-b border-gray-200 px-6 py-4 sm:flex-row sm:items-center sm:justify-between">
-          <div>
-            <h2 className="text-lg font-semibold text-gray-900">Mis estudios</h2>
-            <p className="text-sm text-gray-600">Descarga los resultados o revisa el estado de cada estudio.</p>
-          </div>
-          <div className="flex flex-wrap gap-2">
-            {filters.map((filter) => {
-              const isActive = activeFilter === filter.id
-              return (
-                <button
-                  key={filter.id}
-                  onClick={() => setActiveFilter(filter.id)}
-                  className={`rounded-full px-3 py-1 text-sm font-medium border transition-colors ${isActive ? "bg-blue-600 text-white border-blue-600" : "border-gray-200 text-gray-700 hover:bg-gray-50"
-                    }`}
-                >
-                  {filter.label}
-                </button>
-              )
-            })}
+        <div className="rounded-xl bg-white border-2 border-gray-200 p-5 shadow-sm hover:shadow-md transition-shadow">
+          <div className="flex items-center gap-3">
+            <div className="w-12 h-12 rounded-lg bg-blue-100 flex items-center justify-center">
+              <FileText className="w-6 h-6 text-blue-600" />
+            </div>
+            <div>
+              <p className="text-sm font-medium text-gray-600">Estudios Totales</p>
+              <p className="text-3xl font-bold text-gray-900">{stats.total}</p>
+            </div>
           </div>
         </div>
 
-        <div className="px-6 py-5">
-          {loading ? (
-            <div className="space-y-3">
-              {[1, 2, 3].map((item) => (
-                <div key={item} className="rounded-xl border border-gray-200 bg-gray-50 p-4 animate-pulse" />
-              ))}
+        <div className="rounded-xl bg-white border-2 border-gray-200 p-5 shadow-sm hover:shadow-md transition-shadow">
+          <div className="flex items-center gap-3">
+            <div className="w-12 h-12 rounded-lg bg-green-100 flex items-center justify-center">
+              <FileCheck className="w-6 h-6 text-green-600" />
             </div>
-          ) : filteredStudies.length === 0 ? (
-            <div className="rounded-lg border border-dashed border-gray-300 bg-gray-50 px-4 py-8 text-center text-sm text-gray-600">
-              {emptyHint}
+            <div>
+              <p className="text-sm font-medium text-gray-600">Completados</p>
+              <p className="text-3xl font-bold text-gray-900">{stats.completed}</p>
             </div>
-          ) : (
-            <div className="space-y-4">
-              {filteredStudies.map((study) => {
-                const status = statusConfig[study.status]
-                const isProcessing = study.status === "in-progress" || study.status === "pending" || study.status === "partial"
+          </div>
+        </div>
 
-                return (
-                  <article key={study.id} className="rounded-xl border border-gray-200 bg-white p-4 shadow-sm">
-                    <div className="flex flex-col gap-4 lg:flex-row lg:items-center lg:justify-between">
-                      <div className="flex flex-1 flex-col gap-3 md:flex-row md:items-center md:gap-6">
-                        <div>
-                          <p className="text-sm font-semibold text-gray-900">{study.patientName}</p>
-                          <p className="text-sm text-gray-600">DNI: {study.dni}</p>
-                        </div>
+        <div className="rounded-xl bg-white border-2 border-gray-200 p-5 shadow-sm hover:shadow-md transition-shadow">
+          <div className="flex items-center gap-3">
+            <div className="w-12 h-12 rounded-lg bg-orange-100 flex items-center justify-center">
+              <Clock className="w-6 h-6 text-orange-600" />
+            </div>
+            <div>
+              <p className="text-sm font-medium text-gray-600">En Proceso</p>
+              <p className="text-3xl font-bold text-gray-900">{stats.inProgress}</p>
+            </div>
+          </div>
+        </div>
 
-                        <span className={`inline-flex items-center gap-2 rounded-full px-3 py-1 text-xs font-semibold ${status.badgeClass}`}>
-                          <span className={`h-2 w-2 rounded-full ${status.dotClass}`} />
-                          {status.label}
-                        </span>
+        <div className="rounded-xl bg-white border-2 border-gray-200 p-5 shadow-sm hover:shadow-md transition-shadow">
+          <div className="flex items-center gap-3">
+            <div className="w-12 h-12 rounded-lg bg-red-100 flex items-center justify-center">
+              <AlertCircle className="w-6 h-6 text-red-600" />
+            </div>
+            <div>
+              <p className="text-sm font-medium text-gray-600">Parcial</p>
+              <p className="text-3xl font-bold text-gray-900">{stats.partial}</p>
+            </div>
+          </div>
+        </div>
+      </div>
 
-                        <div>
-                          <p className="text-xs text-gray-500">Fecha</p>
-                          <p className="text-sm text-gray-900">{study.date}</p>
-                        </div>
+      {/* Filters */}
+      <div className="bg-white rounded-xl border-2 border-gray-200 p-5 shadow-sm">
+        <div className="flex flex-wrap items-center gap-3">
+          <label className="text-base font-semibold text-gray-700">Filtrar por estado:</label>
+          {filters.map((filter) => {
+            const isActive = activeFilter === filter.id
+            return (
+              <button
+                key={filter.id}
+                onClick={() => setActiveFilter(filter.id)}
+                className={`rounded-lg px-4 py-2.5 text-base font-semibold border-2 transition-all ${isActive
+                  ? "bg-blue-600 text-white border-blue-600 shadow-md"
+                  : "bg-white border-gray-300 text-gray-700 hover:bg-gray-50 hover:border-gray-400"
+                  }`}
+              >
+                {filter.label}
+              </button>
+            )
+          })}
+        </div>
+      </div>
 
-                        <div>
-                          <p className="text-xs text-gray-500">Obra social</p>
-                          <p className="text-sm text-gray-900">{study.obraSocial}</p>
-                        </div>
+      {/* Studies List */}
+      <div className="space-y-4">
+        {loading ? (
+          <div className="space-y-4">
+            {[1, 2, 3].map((item) => (
+              <div key={item} className="rounded-xl border-2 border-gray-200 bg-gray-50 p-6 animate-pulse" />
+            ))}
+          </div>
+        ) : filteredStudies.length === 0 ? (
+          <div className="rounded-xl border-2 border-dashed border-gray-300 bg-gray-50 px-6 py-12 text-center">
+            <FileText className="w-12 h-12 text-gray-400 mx-auto mb-4" />
+            <p className="text-base font-medium text-gray-600">{emptyHint}</p>
+          </div>
+        ) : (
+          filteredStudies.map((study) => {
+            const status = statusConfig[study.status]
+            const isProcessing = study.status === "in-progress" || study.status === "pending" || study.status === "partial"
 
-                        <div>
-                          <p className="text-xs text-gray-500">Médico</p>
-                          <p className="text-sm text-gray-900">{study.medico}</p>
-                        </div>
+            return (
+              <article key={study.id} className="rounded-xl border-2 border-gray-200 bg-white p-6 shadow-sm hover:shadow-md transition-all">
+                <div className="space-y-4">
+                  {/* Header with Status */}
+                  <div className="flex items-start justify-between gap-4 pb-4 border-b border-gray-200">
+                    <div>
+                      <h3 className="text-xl font-bold text-gray-900">{study.studyName || "Estudio Médico"}</h3>
+                      <p className="text-sm text-gray-600 mt-1">Estudio ID: {study.id}</p>
+                    </div>
+                    <span className={`inline-flex items-center gap-2 rounded-lg px-3 py-2 text-sm font-bold whitespace-nowrap ${status.badgeClass}`}>
+                      <span className={`h-2.5 w-2.5 rounded-full ${status.dotClass}`} />
+                      {status.label}
+                    </span>
+                  </div>
+
+                  {/* Study Details Grid */}
+                  <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                    <div className="flex items-center gap-3">
+                      <div className="w-10 h-10 rounded-lg bg-blue-100 flex items-center justify-center flex-shrink-0">
+                        <Calendar className="w-5 h-5 text-blue-600" />
                       </div>
-
-                      <div className="flex items-center gap-2 self-start lg:self-auto">
-                        {isProcessing ? (
-                          <span className="inline-flex items-center gap-2 rounded-md bg-gray-100 px-3 py-2 text-sm text-gray-600">
-                            <Loader2 className="h-4 w-4 animate-spin" />
-                            Procesando...
-                          </span>
-                        ) : (
-                          <>
-                            <a
-                              href={study.pdfUrl || "#"}
-                              target="_blank"
-                              rel="noopener noreferrer"
-                              onClick={(e) => !study.pdfUrl && e.preventDefault()}
-                              className={`inline-flex items-center gap-2 rounded-md px-4 py-2 text-sm font-medium transition-colors ${study.pdfUrl
-                                  ? "bg-green-600 text-white hover:bg-green-700"
-                                  : "cursor-not-allowed bg-gray-200 text-gray-500"
-                                }`}
-                            >
-                              <FileText className="h-4 w-4" />
-                              {study.pdfUrl ? "Ver PDF" : "Sin PDF"}
-                            </a>
-
-                            <button
-                              type="button"
-                              className={`flex h-10 w-10 items-center justify-center rounded-md border transition-colors ${study.pdfUrl ? "border-gray-200 text-gray-600 hover:bg-gray-50" : "cursor-not-allowed border-gray-200 text-gray-400"
-                                }`}
-                              disabled={!study.pdfUrl}
-                            >
-                              <Share2 className="h-4 w-4" />
-                            </button>
-
-                            <button
-                              type="button"
-                              className={`flex h-10 w-10 items-center justify-center rounded-md border transition-colors ${study.pdfUrl ? "border-gray-200 text-gray-600 hover:bg-gray-50" : "cursor-not-allowed border-gray-200 text-gray-400"
-                                }`}
-                              disabled={!study.pdfUrl}
-                            >
-                              <Download className="h-4 w-4" />
-                            </button>
-                          </>
-                        )}
+                      <div className="flex-1 min-w-0">
+                        <p className="text-xs font-medium text-gray-500 uppercase">Fecha del Estudio</p>
+                        <p className="text-base font-semibold text-gray-900">{study.date}</p>
                       </div>
                     </div>
-                  </article>
-                )
-              })}
-            </div>
-          )}
-        </div>
+
+                    <div className="flex items-center gap-3">
+                      <div className="w-10 h-10 rounded-lg bg-green-100 flex items-center justify-center flex-shrink-0">
+                        <Building2 className="w-5 h-5 text-green-600" />
+                      </div>
+                      <div className="flex-1 min-w-0">
+                        <p className="text-xs font-medium text-gray-500 uppercase">Obra Social</p>
+                        <p className="text-base font-semibold text-gray-900 truncate">{study.obraSocial}</p>
+                      </div>
+                    </div>
+
+                    <div className="flex items-center gap-3">
+                      <div className="w-10 h-10 rounded-lg bg-purple-100 flex items-center justify-center flex-shrink-0">
+                        <UserRound className="w-5 h-5 text-purple-600" />
+                      </div>
+                      <div className="flex-1 min-w-0">
+                        <p className="text-xs font-medium text-gray-500 uppercase">Médico</p>
+                        <p className="text-base font-semibold text-gray-900 truncate">{study.medico}</p>
+                      </div>
+                    </div>
+                  </div>
+
+                  {/* Actions */}
+                  <div className="pt-4 border-t border-gray-200">
+                    {isProcessing ? (
+                      <div className="flex items-center justify-center gap-3 rounded-lg bg-amber-50 border-2 border-amber-200 px-4 py-3">
+                        <Loader2 className="h-5 w-5 animate-spin text-amber-600" />
+                        <span className="text-base font-semibold text-amber-900">
+                          {study.status === "in-progress" && "Estudio en proceso de análisis..."}
+                          {study.status === "pending" && "Estudio pendiente de revisión..."}
+                          {study.status === "partial" && "Resultados parciales disponibles pronto..."}
+                        </span>
+                      </div>
+                    ) : study.pdfs && study.pdfs.length > 0 ? (
+                      <div className="space-y-3">
+                        <p className="text-sm font-semibold text-gray-700">Documentos disponibles:</p>
+                        <div className="flex flex-wrap gap-3">
+                          {study.pdfs.map((link, idx) => (
+                            <div key={idx} className="flex items-center gap-2 bg-gradient-to-r from-blue-600 to-blue-700 text-white rounded-lg px-4 py-3 shadow-md">
+                              <FileText className="w-5 h-5" />
+                              <span className="text-sm font-semibold">PDF {idx + 1}</span>
+                              <div className="flex items-center gap-1 ml-2 border-l border-blue-400 pl-2">
+                                <a
+                                  href={link}
+                                  target="_blank"
+                                  rel="noopener noreferrer"
+                                  className="p-1.5 hover:bg-blue-500 rounded transition-colors"
+                                  title="Ver PDF"
+                                >
+                                  <FileText className="w-4 h-4" />
+                                </a>
+                                <a
+                                  href={link}
+                                  download
+                                  className="p-1.5 hover:bg-blue-500 rounded transition-colors"
+                                  title="Descargar PDF"
+                                >
+                                  <Download className="w-4 h-4" />
+                                </a>
+                                <button
+                                  onClick={() => copyLink(link)}
+                                  className="p-1.5 hover:bg-blue-500 rounded transition-colors"
+                                  title="Compartir enlace"
+                                >
+                                  <Share2 className="w-4 h-4" />
+                                </button>
+                              </div>
+                            </div>
+                          ))}
+                        </div>
+                      </div>
+                    ) : (
+                      <div className="flex items-center justify-center gap-3 rounded-lg bg-gray-50 border-2 border-gray-200 px-4 py-3">
+                        <FileText className="h-5 w-5 text-gray-400" />
+                        <span className="text-base font-medium text-gray-600">No hay documentos disponibles aún</span>
+                      </div>
+                    )}
+                  </div>
+                </div>
+              </article>
+            )
+          })
+        )}
       </div>
     </div>
   )

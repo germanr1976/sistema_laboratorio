@@ -7,6 +7,9 @@ import {
 } from "../validators/study.validators";
 import { ResponseHelper } from "../helpers/response.helper";
 import { ValidationHelper } from "../helpers/validation.helper";
+import prisma from "@/config/prisma";
+
+export { deleteAttachment } from "./deleteAttachment";
 
 /**
  * Controlador para crear un nuevo estudio
@@ -17,28 +20,49 @@ export const createStudy = async (
   res: Response
 ): Promise<void> => {
   try {
-    // Obtener el archivo subido
-    const uploadedFile = req.file;
+    // Obtener archivos subidos (soporta 'pdf' único y 'pdfs' múltiples)
+    const filesField = (req as any).files as Record<string, Express.Multer.File[]> | Express.Multer.File[] | undefined;
+    const singleFile = (req as any).file as Express.Multer.File | undefined;
+    let uploadedFiles: Express.Multer.File[] = [];
+    if (Array.isArray(filesField)) {
+      uploadedFiles = filesField;
+    } else if (filesField && typeof filesField === 'object') {
+      const f1 = (filesField as any)['pdf'] || [];
+      const f2 = (filesField as any)['pdfs'] || [];
+      uploadedFiles = [...f1, ...f2];
+    } else if (singleFile) {
+      uploadedFiles = [singleFile];
+    }
 
-    // Generar la URL del PDF si se subió un archivo
-    const pdfUrl = uploadedFile
-      ? `/uploads/pdfs/${uploadedFile.filename}`
-      : undefined;
+    let pdfUrl: string | undefined = undefined;
+    if (uploadedFiles.length > 0) {
+      pdfUrl = `/uploads/pdfs/${uploadedFiles[0]!.filename}`;
+    }
 
-    console.log('Archivo recibido:', uploadedFile);
+    console.log('Archivos recibidos:', uploadedFiles?.map(f => f.filename));
     console.log('Body recibido:', req.body);
 
     // Validar datos de entrada
     const validatedData = ValidationHelper.validate<{
       dni: string;
       studyName: string;
-      studyDate: string;
+      studyDate?: string | null;
       socialInsurance?: string;
       biochemistId?: number;
+      doctor?: string;
     }>(createStudySchema, req.body, res);
     if (!validatedData) return;
 
-    const { dni, studyName, studyDate, socialInsurance, biochemistId } = validatedData;
+    const { dni, studyName, studyDate, socialInsurance, biochemistId, doctor } = validatedData;
+
+    console.log('📝 Datos recibidos en createStudy:', {
+      dni,
+      studyName,
+      studyDate,
+      socialInsurance,
+      biochemistId,
+      doctor
+    });
 
     // Verificar que el paciente existe
     const patient = await studyService.getPatientByDni(dni);
@@ -70,18 +94,43 @@ export const createStudy = async (
     }
 
     // Crear el estudio
-    const studyData = {
+    const studyData: any = {
       userId: patient.id,
       studyName,
-      studyDate: new Date(studyDate),
-      socialInsurance,
+      socialInsurance: socialInsurance || null,
+      doctor: doctor || null,
       statusId: inProgressStatus.id,
       pdfUrl, // Incluir la URL del PDF
-      biochemistId: biochemistId || req.user?.id,
+      // Asignar al bioquímico autenticado que realiza la carga
+      biochemistId: req.user?.id ?? null,
     };
 
+    // Sin fecha en creación inicial (se definirá luego en parcial/completa)
+    studyData.studyDate = null;
+
+    console.log('💾 Guardando estudio con datos:', studyData);
+
     const study = await studyService.createStudy(studyData);
-    const formattedStudy = studyFormatter.formatStudy(study);
+
+    console.log('✅ Estudio guardado en BD:', {
+      id: study.id,
+      studyName: study.studyName,
+      studyDate: study.studyDate,
+      socialInsurance: study.socialInsurance,
+      userId: study.userId,
+      statusId: study.statusId
+    });
+
+    // Crear adjuntos si hay múltiples archivos
+    if (uploadedFiles.length > 0) {
+      await studyService.addStudyAttachments(
+        study.id,
+        uploadedFiles.map((f) => ({ url: `/uploads/pdfs/${f.filename}`, filename: f.originalname }))
+      );
+    }
+
+    const studyWithAttachments = await studyService.getStudyById(study.id);
+    const formattedStudy = studyFormatter.formatStudy(studyWithAttachments);
 
     ResponseHelper.created(res, formattedStudy, "Estudio creado exitosamente");
   } catch (error: any) {
@@ -155,8 +204,12 @@ export const getStudyById = async (
       return ResponseHelper.notFound(res, "Estudio");
     }
 
-    // Verificar permisos: solo el bioquímico asignado o admin pueden ver el estudio
-    if (study.biochemistId !== req.user?.id && req.user?.role?.name !== "ADMIN") {
+    // Verificar permisos: el paciente, bioquímico asignado o admin pueden ver el estudio
+    const isPatient = study.userId === req.user?.id;
+    const isBiochemist = study.biochemistId === req.user?.id;
+    const isAdmin = req.user?.role?.name === "ADMIN";
+
+    if (!isPatient && !isBiochemist && !isAdmin) {
       return ResponseHelper.forbidden(res, "No tienes permiso para ver este estudio");
     }
 
@@ -191,6 +244,84 @@ export const getMyStudiesAsPatient = async (
   } catch (error: any) {
     console.error("Error al obtener estudios del paciente:", error);
     ResponseHelper.serverError(res, "Error al obtener estudios", error);
+  }
+};
+
+/**
+ * Controlador para actualizar campos de un estudio
+ * Permite actualizar socialInsurance, studyDate, etc
+ */
+export const updateStudy = async (
+  req: Request,
+  res: Response
+): Promise<void> => {
+  try {
+    const { id } = req.params;
+    const studyId = parseInt(id!, 10);
+
+    if (isNaN(studyId)) {
+      return ResponseHelper.validationError(res, "ID de estudio inválido");
+    }
+
+    const { socialInsurance, studyDate, doctor } = req.body;
+
+    console.log('📝 updateStudy - Actualizando estudio', studyId, { socialInsurance, studyDate, doctor });
+
+    // Construir objeto de actualización solo con campos proporcionados
+    const updateData: any = {};
+    if (socialInsurance !== undefined) {
+      updateData.socialInsurance = socialInsurance || null;
+    }
+    if (studyDate !== undefined) {
+      updateData.studyDate = new Date(studyDate);
+    }
+    if (doctor !== undefined) {
+      updateData.doctor = doctor || null;
+    }
+
+    if (Object.keys(updateData).length === 0) {
+      return ResponseHelper.validationError(res, "No hay campos para actualizar");
+    }
+
+    const updatedStudy = await prisma.study.update({
+      where: { id: studyId },
+      data: updateData,
+      include: {
+        attachments: true,
+        biochemist: {
+          select: {
+            id: true,
+            license: true,
+            profile: {
+              select: {
+                firstName: true,
+                lastName: true,
+              },
+            },
+          },
+        },
+        patient: {
+          select: {
+            id: true,
+            dni: true,
+            profile: {
+              select: {
+                firstName: true,
+                lastName: true,
+              },
+            },
+          },
+        },
+        status: true,
+      },
+    });
+
+    console.log('✅ Estudio actualizado:', updatedStudy);
+    const formattedStudy = studyFormatter.formatStudy(updatedStudy);
+    ResponseHelper.success(res, formattedStudy, "Estudio actualizado exitosamente");
+  } catch (error: any) {
+    console.error("Error al actualizar estudio:", error);
+    ResponseHelper.serverError(res, "Error al actualizar estudio", error);
   }
 };
 
@@ -254,6 +385,72 @@ export const updateStudyStatus = async (
 };
 
 /**
+ * Controlador para subir/actualizar el PDF de un estudio existente
+ * Solo accesible por el bioquímico asignado
+ */
+export const updateStudyPdf = async (
+  req: Request,
+  res: Response
+): Promise<void> => {
+  try {
+    const { id } = req.params;
+    const studyId = parseInt(id!, 10);
+
+    if (isNaN(studyId)) {
+      return ResponseHelper.validationError(res, "ID de estudio inválido");
+    }
+
+    const filesField = (req as any).files as Record<string, Express.Multer.File[]> | Express.Multer.File[] | undefined;
+    const singleFile = (req as any).file as Express.Multer.File | undefined;
+    let uploadedFiles: Express.Multer.File[] = [];
+    if (Array.isArray(filesField)) {
+      uploadedFiles = filesField;
+    } else if (filesField && typeof filesField === 'object') {
+      const f1 = (filesField as any)['pdf'] || [];
+      const f2 = (filesField as any)['pdfs'] || [];
+      uploadedFiles = [...f1, ...f2];
+    } else if (singleFile) {
+      uploadedFiles = [singleFile];
+    }
+    if (!uploadedFiles || uploadedFiles.length === 0) {
+      return ResponseHelper.validationError(res, "Se requiere al menos un archivo PDF");
+    }
+
+    // Obtener el estudio
+    const study = await studyService.getStudyById(studyId);
+    if (!study) {
+      return ResponseHelper.notFound(res, "Estudio");
+    }
+
+    // Verificar que el usuario es el bioquímico asignado
+    if (study.biochemistId !== req.user?.id) {
+      return ResponseHelper.forbidden(
+        res,
+        "Solo el bioquímico asignado puede actualizar el PDF de este estudio"
+      );
+    }
+
+    // Actualiza compatibilidad del primer PDF
+    const firstUrl = `/uploads/pdfs/${uploadedFiles[0]!.filename}`;
+    await studyService.updateStudyPdfUrl(studyId, { pdfUrl: firstUrl });
+
+    // Agrega todos como adjuntos
+    await studyService.addStudyAttachments(
+      studyId,
+      uploadedFiles.map((f) => ({ url: `/uploads/pdfs/${f.filename}`, filename: f.originalname }))
+    );
+
+    const updated = await studyService.getStudyById(studyId);
+    const formattedStudy = studyFormatter.formatStudy(updated);
+
+    ResponseHelper.success(res, formattedStudy, "PDF(s) actualizado(s) exitosamente");
+  } catch (error: any) {
+    console.error("Error al actualizar PDF del estudio:", error);
+    ResponseHelper.serverError(res, "Error al actualizar PDF del estudio", error);
+  }
+};
+
+/**
  * Controlador para buscar un paciente por DNI
  * Solo accesible por bioquímicos autenticados
  */
@@ -275,13 +472,27 @@ export const getPatientByDni = async (
       return ResponseHelper.notFound(res, "Paciente con el DNI proporcionado");
     }
 
-    // Retornar los datos del paciente
+    // Buscar el último estudio del paciente para obtener la obra social
+    const lastStudy = await prisma.study.findFirst({
+      where: {
+        userId: patient.id,
+      },
+      select: {
+        socialInsurance: true,
+      },
+      orderBy: {
+        studyDate: 'desc',
+      },
+    });
+
+    // Retornar los datos del paciente incluyendo obra social del último estudio
     ResponseHelper.success(res, {
       id: patient.id,
       dni: dni,
       firstName: patient.profile?.firstName,
       lastName: patient.profile?.lastName,
       email: patient.email,
+      socialInsurance: lastStudy?.socialInsurance || "",
     }, "Paciente encontrado exitosamente");
   } catch (error: any) {
     console.error("Error al buscar paciente:", error);

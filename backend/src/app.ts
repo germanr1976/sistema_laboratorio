@@ -19,8 +19,9 @@ app.use(cors({
   allowedHeaders: ['Content-Type', 'Authorization'],
 }));
 
-app.use(express.json());
-app.use(express.urlencoded({ extended: true }));
+// Aumentar límites para permitir múltiples PDFs grandes
+app.use(express.json({ limit: '100mb' }));
+app.use(express.urlencoded({ limit: '100mb', extended: true }));
 
 // Servir archivos estáticos (PDFs)
 app.use('/uploads', express.static(path.join(__dirname, '../uploads')));
@@ -31,9 +32,22 @@ app.use('/api', routes);
 // Manejo de errores para multer
 app.use((err: any, _req: express.Request, res: express.Response, next: express.NextFunction) => {
   if (err instanceof multer.MulterError) {
+    const code = (err as multer.MulterError).code as string;
+    let message = 'Error al subir el archivo';
+    if (code === 'LIMIT_FILE_SIZE') {
+      message = 'El archivo excede el tamaño máximo permitido (50MB)';
+    } else if (code === 'LIMIT_FILE_COUNT') {
+      message = 'Se excedió la cantidad máxima de archivos (20)';
+    }
     return res.status(400).json({
       success: false,
-      message: 'Error al subir el archivo',
+      message,
+      error: err.message
+    });
+  } else if (err?.message?.includes('Solo se permiten archivos PDF')) {
+    return res.status(400).json({
+      success: false,
+      message: 'Solo se permiten archivos PDF',
       error: err.message
     });
   } else if (err) {

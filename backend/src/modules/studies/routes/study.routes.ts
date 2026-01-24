@@ -18,7 +18,7 @@ router.post(
   "/",
   authMiddleware,
   isBiochemist,
-  upload.single('pdf'), // Middleware de multer para manejar el archivo
+  upload.fields([{ name: 'pdf', maxCount: 1 }, { name: 'pdfs', maxCount: 20 }]),
   studyController.createStudy
 );
 
@@ -79,6 +79,18 @@ router.get(
 router.get("/:id", authMiddleware, studyController.getStudyById);
 
 /**
+ * @route   PATCH /api/studies/:id
+ * @desc    Actualizar campos de un estudio (socialInsurance, studyDate, etc)
+ * @access  Private (Biochemist)
+ */
+router.patch(
+  "/:id",
+  authMiddleware,
+  isBiochemist,
+  studyController.updateStudy
+);
+
+/**
  * @route   PATCH /api/studies/:id/status
  * @desc    Actualizar estado de un estudio
  * @access  Private (Biochemist)
@@ -88,6 +100,31 @@ router.patch(
   authMiddleware,
   isBiochemist,
   studyController.updateStudyStatus
+);
+
+/**
+ * @route   PATCH /api/studies/:id/pdf
+ * @desc    Subir/actualizar el PDF de un estudio específico
+ * @access  Private (Biochemist)
+ */
+router.patch(
+  "/:id/pdf",
+  authMiddleware,
+  isBiochemist,
+  upload.fields([{ name: 'pdf', maxCount: 1 }, { name: 'pdfs', maxCount: 20 }]),
+  studyController.updateStudyPdf
+);
+
+/**
+ * @route   DELETE /api/studies/:studyId/attachments/:attachmentId
+ * @desc    Eliminar un archivo PDF específico de un estudio
+ * @access  Private (Biochemist)
+ */
+router.delete(
+  "/:studyId/attachments/:attachmentId",
+  authMiddleware,
+  isBiochemist,
+  studyController.deleteAttachment
 );
 
 export default router;

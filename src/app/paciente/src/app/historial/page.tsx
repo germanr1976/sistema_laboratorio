@@ -32,7 +32,8 @@ export default function LabHistoryPage() {
           study: s.studyName || 'Estudio',
           date: s.studyDate,
           status: s.status?.name === "COMPLETED" ? "Completado" : s.status?.name === "PARTIAL" ? "Parcial" : "En Proceso",
-          doctor: s.biochemist ? `${s.biochemist.profile?.firstName || ''} ${s.biochemist.profile?.lastName || ''}` : 'Sin asignar',
+          // Médico: usar únicamente el campo 'doctor' del estudio
+          doctor: s.doctor || 'Sin asignar',
           pdfUrl: s.pdfUrl ? `http://localhost:3000${s.pdfUrl}` : undefined
         }))
 
@@ -160,14 +161,14 @@ export default function LabHistoryPage() {
                   </span>
                 </div>
               </div>
-                      <div className="p-6">
-                        <StudiesTable studies={filteredStudies} />
-                      </div>
-                    </div>
-                  </>
-                )}
+              <div className="p-6">
+                <StudiesTable studies={filteredStudies} />
               </div>
             </div>
-          )
-        }
+          </>
+        )}
+      </div>
+    </div>
+  )
+}
 

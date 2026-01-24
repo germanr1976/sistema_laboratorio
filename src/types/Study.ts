@@ -2,7 +2,7 @@ export interface Study {
     id: number
     userId: number
     studyName: string
-    studyDate: string | Date
+    studyDate?: string | Date | null
     socialInsurance?: string
     pdfUrl?: string
     status?: {
@@ -35,7 +35,7 @@ export interface Study {
             firstName?: string
             lastName?: string
         }
-    }
+    } | null
 }
 
 export interface StudyResponse {

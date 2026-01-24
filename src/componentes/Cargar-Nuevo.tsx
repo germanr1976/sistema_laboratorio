@@ -4,7 +4,7 @@ import type React from "react"
 
 import { useState, useRef, useEffect } from "react"
 import { useRouter } from "next/navigation"
-import type { EstudioData } from "../app/(protected)/revision/page"
+
 import { savePdf } from "../utils/estudiosStore"
 import authFetch from "@/utils/authFetch"
 
@@ -60,6 +60,17 @@ const X = ({ className }: { className?: string }) => (
 
 type EstadoEstudio = "en_proceso" | "parcial" | "completado"
 
+interface EstudioData {
+  id?: string | number
+  dni: string
+  nombreApellido: string
+  obraSocial: string
+  fecha: string
+  medico: string
+  tipoEstudio?: string
+  status?: EstadoEstudio
+}
+
 interface CargarNuevoProps {
   onCargarEstudio: (data: EstudioData, opts?: { autoComplete?: boolean }) => void
   initialId?: string
@@ -86,7 +97,7 @@ export function CargarNuevo({ onCargarEstudio, initialId, initialData }: CargarN
     obraSocial: ""
   })
 
-  // PASO 2: Datos del estudio
+  // PASO 2: Datos del estudio - siempre inicializar en "en_proceso"
   const [studyData, setStudyData] = useState({
     fecha: new Date().toISOString().split('T')[0],
     medico: "",
@@ -98,6 +109,7 @@ export function CargarNuevo({ onCargarEstudio, initialId, initialData }: CargarN
   const [pdfFile, setPdfFile] = useState<File | null>(null)
   const [pdfUrl, setPdfUrl] = useState<string | null>(null)
   const [isDragging, setIsDragging] = useState(false)
+  const [showPdfViewer, setShowPdfViewer] = useState(false)
   const fileInputRef = useRef<HTMLInputElement>(null)
   const [studyCreatedId, setStudyCreatedId] = useState<string | null>(null)
   const [editingExistingStudy, setEditingExistingStudy] = useState(false)
@@ -108,6 +120,17 @@ export function CargarNuevo({ onCargarEstudio, initialId, initialData }: CargarN
     const t = window.setInterval(() => setNow(new Date()), 1000)
     return () => window.clearInterval(t)
   }, [])
+
+  // Asegurar que estado siempre sea "en_proceso" al cargar nueva carga
+  useEffect(() => {
+    // Si no hay datos iniciales, asegurar que está en en_proceso
+    if (!initialData && !initialId) {
+      setStudyData(prev => ({
+        ...prev,
+        estado: "en_proceso"
+      }))
+    }
+  }, [initialData, initialId])
 
   // Crear URL del PDF y limpiarla cuando cambie o se desmonte
   useEffect(() => {
@@ -189,22 +212,28 @@ export function CargarNuevo({ onCargarEstudio, initialId, initialData }: CargarN
       if (response.ok) {
         const result = await response.json()
         const patient = result?.data
+        console.log('Paciente encontrado:', patient)
 
         // Estructura de respuesta esperada del backend (study.controllers.getPatientByDni):
         // { id, dni, firstName, lastName, email }
         const firstName = patient?.firstName ?? patient?.profile?.firstName ?? ""
         const lastName = patient?.lastName ?? patient?.profile?.lastName ?? ""
+        const nombreCompleto = `${firstName} ${lastName}`.trim()
+
+        console.log('Datos extraídos:', { firstName, lastName, nombreCompleto })
 
         // Paciente encontrado - autocompletar datos con seguridad
         setPatientData({
           dni: patient?.dni ?? searchDni.trim(),
-          nombreApellido: `${firstName} ${lastName}`.trim(),
+          nombreApellido: nombreCompleto || "Paciente sin nombre",
           obraSocial: patient?.socialInsurance ?? ""
         })
         setPatientFound(true)
         setIsNewPatient(false)
+        console.log('Estado actualizado: paciente encontrado')
       } else {
         // Paciente no encontrado
+        console.log('Paciente no encontrado, status:', response.status)
         setPatientData({
           dni: searchDni.trim(),
           nombreApellido: "",
@@ -212,6 +241,7 @@ export function CargarNuevo({ onCargarEstudio, initialId, initialData }: CargarN
         })
         setPatientFound(false)
         setIsNewPatient(true)
+        console.log('Estado actualizado: paciente nuevo')
       }
     } catch (e) {
       console.error('Error searching patient:', e)
@@ -228,6 +258,8 @@ export function CargarNuevo({ onCargarEstudio, initialId, initialData }: CargarN
 
   // Guardar/actualizar paciente
   const handleSavePatient = async () => {
+    console.log('handleSavePatient llamado con:', { patientData, patientFound, isNewPatient })
+
     if (!patientData.dni || !patientData.nombreApellido) {
       alert("Complete DNI y Nombre del paciente")
       return
@@ -236,6 +268,7 @@ export function CargarNuevo({ onCargarEstudio, initialId, initialData }: CargarN
     try {
       // Si el paciente ya existe (fue encontrado), solo pasar al siguiente paso
       if (patientFound) {
+        console.log('Paciente ya existe, avanzando al paso 2')
         setCurrentStep(2)
         return
       }
@@ -283,10 +316,19 @@ export function CargarNuevo({ onCargarEstudio, initialId, initialData }: CargarN
 
   // Crear estudio (sin archivo obligatorio)
   const handleCreateStudy = async () => {
-    if (!studyData.fecha || !studyData.medico) {
-      alert("Complete fecha y médico")
-      return
+    // Validar según el estado
+    if (studyData.estado !== "en_proceso") {
+      // Para parcial y completado, se requieren fecha, médico y obra social
+      if (!studyData.fecha || !studyData.medico) {
+        alert("Complete fecha y médico")
+        return
+      }
+      if (!patientData.obraSocial) {
+        alert("Complete la obra social")
+        return
+      }
     }
+    // Para en_proceso no se requiere nada especial
 
     try {
       // Preparar FormData para enviar al backend
@@ -296,6 +338,9 @@ export function CargarNuevo({ onCargarEstudio, initialId, initialData }: CargarN
       formData.append('studyDate', studyData.fecha)
       if (patientData.obraSocial) {
         formData.append('socialInsurance', patientData.obraSocial)
+      }
+      if (studyData.medico) {
+        formData.append('medico', studyData.medico)
       }
 
       const response = await authFetch('http://localhost:3000/api/studies', {
@@ -394,6 +439,9 @@ export function CargarNuevo({ onCargarEstudio, initialId, initialData }: CargarN
         formData.append('studyDate', studyData.fecha)
         if (patientData.obraSocial) {
           formData.append('socialInsurance', patientData.obraSocial)
+        }
+        if (studyData.medico) {
+          formData.append('medico', studyData.medico)
         }
         formData.append('pdf', pdfFile)
 
@@ -567,13 +615,13 @@ export function CargarNuevo({ onCargarEstudio, initialId, initialData }: CargarN
               )}
 
               {isNewPatient && !patientFound && searchDni && (
-                <div className="bg-blue-50 border border-blue-200 rounded-lg p-4 flex items-start gap-3">
-                  <div className="w-5 h-5 bg-blue-200 rounded-full flex items-center justify-center shrink-0 mt-0.5">
-                    <span className="text-blue-600 text-xs font-bold">!</span>
+                <div className="bg-amber-50 border border-amber-300 rounded-lg p-4 flex items-start gap-3">
+                  <div className="w-5 h-5 bg-amber-300 rounded-full flex items-center justify-center shrink-0 mt-0.5">
+                    <span className="text-amber-700 text-xs font-bold">!</span>
                   </div>
                   <div>
-                    <p className="text-sm font-medium text-blue-800">Paciente nuevo</p>
-                    <p className="text-sm text-blue-700">Complete los datos para registrarlo.</p>
+                    <p className="text-sm font-medium text-amber-900">Paciente no encontrado en el sistema</p>
+                    <p className="text-sm text-amber-800">Realice la carga completando los datos requeridos a continuación.</p>
                   </div>
                 </div>
               )}
@@ -583,6 +631,27 @@ export function CargarNuevo({ onCargarEstudio, initialId, initialData }: CargarN
             {(patientFound || isNewPatient) && (
               <div className="space-y-4 pt-4 border-t border-gray-200">
                 <h3 className="font-medium text-gray-900">Datos del Paciente</h3>
+
+                {/* Selector de estado */}
+                <div className="space-y-3">
+                  <label className="text-sm font-medium text-black block">
+                    Estado del Estudio <span className="text-red-500">*</span>
+                  </label>
+                  <select
+                    value={studyData.estado}
+                    onChange={(e) => setStudyData({ ...studyData, estado: e.target.value as EstadoEstudio })}
+                    className="w-full bg-white border-2 border-gray-300 rounded-lg px-4 py-3 text-black focus:outline-none focus:border-blue-600 transition-colors"
+                  >
+                    <option value="en_proceso">🟡 En Proceso (Paso 1 - Recomendado)</option>
+                    <option value="parcial">🟠 Parcial (Con datos iniciales)</option>
+                    <option value="completado">🟢 Completado (Estudio finalizado)</option>
+                  </select>
+                  <p className="text-xs text-gray-600">
+                    {studyData.estado === "en_proceso" && "✓ Registra solo DNI y nombre. Podrás agregar más detalles después."}
+                    {studyData.estado === "parcial" && "Requiere fecha y médico. Para estudios con resultados preliminares."}
+                    {studyData.estado === "completado" && "Requiere fecha, médico y PDF obligatorio. Para estudios finalizados."}
+                  </p>
+                </div>
 
                 <div className="space-y-3">
                   <label className="text-sm font-medium text-black block">DNI</label>
@@ -608,16 +677,19 @@ export function CargarNuevo({ onCargarEstudio, initialId, initialData }: CargarN
                   />
                 </div>
 
-                <div className="space-y-3">
-                  <label className="text-sm font-medium text-black block">Obra Social</label>
-                  <input
-                    type="text"
-                    value={patientData.obraSocial}
-                    onChange={(e) => setPatientData({ ...patientData, obraSocial: e.target.value })}
-                    className="w-full bg-white border-2 border-gray-300 rounded-lg px-4 py-3 text-black placeholder:text-gray-400 focus:outline-none focus:border-blue-600 transition-colors"
-                    placeholder="Ej: OSDE, Swiss Medical"
-                  />
-                </div>
+                {/* Obra Social solo aparece si NO es "en_proceso" */}
+                {studyData.estado !== "en_proceso" && (
+                  <div className="space-y-3">
+                    <label className="text-sm font-medium text-black block">Obra Social</label>
+                    <input
+                      type="text"
+                      value={patientData.obraSocial}
+                      onChange={(e) => setPatientData({ ...patientData, obraSocial: e.target.value })}
+                      className="w-full bg-white border-2 border-gray-300 rounded-lg px-4 py-3 text-black placeholder:text-gray-400 focus:outline-none focus:border-blue-600 transition-colors"
+                      placeholder="Ej: OSDE, Swiss Medical"
+                    />
+                  </div>
+                )}
 
                 <div className="flex gap-4 pt-4">
                   <button
@@ -659,61 +731,59 @@ export function CargarNuevo({ onCargarEstudio, initialId, initialData }: CargarN
 
             {/* Datos del estudio */}
             <div className="space-y-4">
-              <div className="space-y-3">
-                <label className="text-sm font-medium text-black block">
-                  Fecha del Estudio <span className="text-red-500">*</span>
-                </label>
-                <input
-                  type="date"
-                  value={studyData.fecha}
-                  onChange={(e) => setStudyData({ ...studyData, fecha: e.target.value })}
-                  className="w-full bg-white border-2 border-gray-300 rounded-lg px-4 py-3 text-black focus:outline-none focus:border-blue-600 transition-colors"
-                />
-              </div>
+              {/* Solo mostrar estos campos si NO es "en_proceso" */}
+              {studyData.estado !== "en_proceso" && (
+                <>
+                  <div className="space-y-3">
+                    <label className="text-sm font-medium text-black block">
+                      Obra Social <span className="text-red-500">*</span>
+                    </label>
+                    <input
+                      type="text"
+                      value={patientData.obraSocial}
+                      onChange={(e) => setPatientData({ ...patientData, obraSocial: e.target.value })}
+                      className="w-full bg-white border-2 border-gray-300 rounded-lg px-4 py-3 text-black placeholder:text-gray-400 focus:outline-none focus:border-blue-600 transition-colors"
+                      placeholder="Ej: OSDE, Swiss Medical"
+                    />
+                  </div>
 
-              <div className="space-y-3">
-                <label className="text-sm font-medium text-black block">
-                  Profesional/Médico <span className="text-red-500">*</span>
-                </label>
-                <input
-                  type="text"
-                  value={studyData.medico}
-                  onChange={(e) => setStudyData({ ...studyData, medico: e.target.value })}
-                  className="w-full bg-white border-2 border-gray-300 rounded-lg px-4 py-3 text-black placeholder:text-gray-400 focus:outline-none focus:border-blue-600 transition-colors"
-                  placeholder="Dr./Dra. Nombre"
-                />
-              </div>
+                  <div className="space-y-3">
+                    <label className="text-sm font-medium text-black block">
+                      Fecha del Estudio <span className="text-red-500">*</span>
+                    </label>
+                    <input
+                      type="date"
+                      value={studyData.fecha}
+                      onChange={(e) => setStudyData({ ...studyData, fecha: e.target.value })}
+                      className="w-full bg-white border-2 border-gray-300 rounded-lg px-4 py-3 text-black focus:outline-none focus:border-blue-600 transition-colors"
+                    />
+                  </div>
 
-              <div className="space-y-3">
-                <label className="text-sm font-medium text-black block">Tipo de Estudio</label>
-                <input
-                  type="text"
-                  value={studyData.tipoEstudio}
-                  onChange={(e) => setStudyData({ ...studyData, tipoEstudio: e.target.value })}
-                  className="w-full bg-white border-2 border-gray-300 rounded-lg px-4 py-3 text-black placeholder:text-gray-400 focus:outline-none focus:border-blue-600 transition-colors"
-                  placeholder="Ej: Hemograma, Perfil lipídico"
-                />
-              </div>
+                  <div className="space-y-3">
+                    <label className="text-sm font-medium text-black block">
+                      Profesional/Médico <span className="text-red-500">*</span>
+                    </label>
+                    <input
+                      type="text"
+                      value={studyData.medico}
+                      onChange={(e) => setStudyData({ ...studyData, medico: e.target.value })}
+                      className="w-full bg-white border-2 border-gray-300 rounded-lg px-4 py-3 text-black placeholder:text-gray-400 focus:outline-none focus:border-blue-600 transition-colors"
+                      placeholder="Dr./Dra. Nombre"
+                    />
+                  </div>
 
-              <div className="space-y-3">
-                <label className="text-sm font-medium text-black block">
-                  Estado del Estudio <span className="text-red-500">*</span>
-                </label>
-                <select
-                  value={studyData.estado}
-                  onChange={(e) => setStudyData({ ...studyData, estado: e.target.value as EstadoEstudio })}
-                  className="w-full bg-white border-2 border-gray-300 rounded-lg px-4 py-3 text-black focus:outline-none focus:border-blue-600 transition-colors"
-                >
-                  <option value="en_proceso">🟡 En Proceso (sin archivo aún)</option>
-                  <option value="parcial">🟠 Parcial (resultados preliminares)</option>
-                  <option value="completado">🟢 Completado (requiere archivo)</option>
-                </select>
-                <p className="text-xs text-gray-600">
-                  {studyData.estado === "en_proceso" && "El estudio se registra sin archivo. Podrá cargarlo más tarde."}
-                  {studyData.estado === "parcial" && "El estudio tiene resultados preliminares. El archivo es opcional."}
-                  {studyData.estado === "completado" && "El estudio está finalizado. Deberá cargar el archivo obligatoriamente."}
-                </p>
-              </div>
+                  <div className="space-y-3">
+                    <label className="text-sm font-medium text-black block">Tipo de Estudio</label>
+                    <input
+                      type="text"
+                      value={studyData.tipoEstudio}
+                      onChange={(e) => setStudyData({ ...studyData, tipoEstudio: e.target.value })}
+                      className="w-full bg-white border-2 border-gray-300 rounded-lg px-4 py-3 text-black placeholder:text-gray-400 focus:outline-none focus:border-blue-600 transition-colors"
+                      placeholder="Ej: Hemograma, Perfil lipídico"
+                    />
+                  </div>
+                </>
+              )}
             </div>
 
             {/* Información importante */}
@@ -828,7 +898,7 @@ export function CargarNuevo({ onCargarEstudio, initialId, initialData }: CargarN
                       <p className="text-sm text-gray-600">
                         Arrastra y suelta tu archivo aquí o haz clic para seleccionar
                       </p>
-                      <p className="text-xs text-gray-500">PDF • Máximo 10MB</p>
+                      <p className="text-xs text-gray-500">PDF • Máximo 50MB</p>
                     </div>
                   </div>
                 </div>
@@ -847,7 +917,7 @@ export function CargarNuevo({ onCargarEstudio, initialId, initialData }: CargarN
 
                   {/* Información del archivo */}
                   <div className="p-6">
-                    <div className="flex items-center justify-between">
+                    <div className="flex items-center justify-between flex-wrap gap-3">
                       <div className="flex items-center gap-4">
                         <div className="w-12 h-12 bg-blue-600 rounded-lg flex items-center justify-center">
                           <FileText className="w-6 h-6 text-white" />
@@ -857,12 +927,20 @@ export function CargarNuevo({ onCargarEstudio, initialId, initialData }: CargarN
                           <p className="text-sm text-gray-600">{(pdfFile.size / 1024 / 1024).toFixed(2)} MB</p>
                         </div>
                       </div>
-                      <button
-                        onClick={handleRemoveFile}
-                        className="w-8 h-8 bg-red-100 rounded-lg flex items-center justify-center hover:bg-red-200 transition-colors"
-                      >
-                        <X className="w-4 h-4 text-red-600" />
-                      </button>
+                      <div className="flex items-center gap-2">
+                        <button
+                          onClick={() => setShowPdfViewer(true)}
+                          className="px-3 py-2 bg-blue-600 text-white rounded-lg text-sm font-semibold hover:bg-blue-700 transition-colors"
+                        >
+                          Ver en grande
+                        </button>
+                        <button
+                          onClick={handleRemoveFile}
+                          className="w-8 h-8 bg-red-100 rounded-lg flex items-center justify-center hover:bg-red-200 transition-colors"
+                        >
+                          <X className="w-4 h-4 text-red-600" />
+                        </button>
+                      </div>
                     </div>
                   </div>
                 </div>
@@ -903,6 +981,43 @@ export function CargarNuevo({ onCargarEstudio, initialId, initialData }: CargarN
         )}
       </div>
 
+      {showPdfViewer && pdfUrl && (
+        <div className="fixed inset-0 bg-black/60 backdrop-blur-sm flex items-center justify-center z-50 px-4">
+          <div className="bg-white rounded-2xl shadow-2xl max-w-5xl w-full h-[90vh] flex flex-col">
+            <div className="flex items-center justify-between px-4 py-3 border-b border-gray-200">
+              <div>
+                <p className="text-sm font-semibold text-gray-600">Vista previa</p>
+                <p className="text-base font-bold text-gray-900 truncate">{pdfFile?.name || "Archivo PDF"}</p>
+              </div>
+              <div className="flex items-center gap-2">
+                <a
+                  href={pdfUrl}
+                  target="_blank"
+                  rel="noreferrer"
+                  className="px-3 py-2 bg-gray-100 text-gray-800 rounded-lg text-sm font-semibold hover:bg-gray-200 transition-colors"
+                >
+                  Abrir en nueva pestaña
+                </a>
+                <button
+                  onClick={() => setShowPdfViewer(false)}
+                  className="w-9 h-9 rounded-full hover:bg-gray-100 flex items-center justify-center"
+                  aria-label="Cerrar vista PDF"
+                >
+                  <X className="w-5 h-5 text-gray-700" />
+                </button>
+              </div>
+            </div>
+            <div className="flex-1 bg-gray-50">
+              <iframe
+                src={pdfUrl}
+                className="w-full h-full rounded-b-2xl"
+                title="Vista previa del PDF"
+              />
+            </div>
+          </div>
+        </div>
+      )}
+
       {showConfirm && (
         <div className="fixed inset-0 bg-black/40 backdrop-blur-sm flex items-center justify-center z-50 px-4">
           <div className="bg-white rounded-xl shadow-2xl max-w-lg w-full p-6 space-y-4">
@@ -936,9 +1051,9 @@ export function CargarNuevo({ onCargarEstudio, initialId, initialData }: CargarN
               <div className="pt-2">
                 <p className="text-xs font-semibold text-gray-500 uppercase">Archivo</p>
                 {pdfFile ? (
-                  <p className="font-medium text-black">{pdfFile.name}</p>
+                  <p className="text-sm text-gray-800">• {pdfFile.name}</p>
                 ) : (
-                  <p className="text-gray-600">No hay archivo seleccionado</p>
+                  <p className="text-gray-600">No hay archivos seleccionados</p>
                 )}
               </div>
 
