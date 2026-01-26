@@ -4,16 +4,11 @@ Application initialization and configuration
 """
 import os
 from flask import Flask
-from flask_sqlalchemy import SQLAlchemy
-from flask_login import LoginManager
 from dotenv import load_dotenv
+from extensions import db, login_manager
 
 # Load environment variables
 load_dotenv()
-
-# Initialize extensions
-db = SQLAlchemy()
-login_manager = LoginManager()
 
 def create_app():
     """Create and configure the Flask application"""
@@ -38,9 +33,9 @@ def create_app():
     
     # Create database tables
     with app.app_context():
+        from models import Usuario
         db.create_all()
         # Create default admin user if it doesn't exist
-        from models import Usuario
         admin = Usuario.query.filter_by(username='admin').first()
         if not admin:
             admin = Usuario(

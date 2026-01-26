@@ -2,7 +2,8 @@
 Initialize database with sample data
 """
 from datetime import datetime, timedelta
-from app import create_app, db
+from app import create_app
+from extensions import db
 from models import Usuario, Paciente, TipoEstudio, Estudio
 
 def init_database():
