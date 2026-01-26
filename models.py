@@ -1,7 +1,7 @@
 """
 Database models for the laboratory management system
 """
-from datetime import datetime
+from datetime import datetime, timezone
 from werkzeug.security import generate_password_hash, check_password_hash
 from flask_login import UserMixin
 from extensions import db, login_manager
@@ -21,7 +21,7 @@ class Usuario(UserMixin, db.Model):
     nombre = db.Column(db.String(100), nullable=False)
     rol = db.Column(db.String(20), default='usuario')  # admin, tecnico, usuario
     activo = db.Column(db.Boolean, default=True)
-    fecha_creacion = db.Column(db.DateTime, default=datetime.utcnow)
+    fecha_creacion = db.Column(db.DateTime, default=lambda: datetime.now(timezone.utc))
     
     # Relación con estudios
     estudios = db.relationship('Estudio', backref='usuario', lazy=True)
@@ -49,7 +49,7 @@ class Paciente(db.Model):
     telefono = db.Column(db.String(20))
     email = db.Column(db.String(120))
     direccion = db.Column(db.String(200))
-    fecha_registro = db.Column(db.DateTime, default=datetime.utcnow)
+    fecha_registro = db.Column(db.DateTime, default=lambda: datetime.now(timezone.utc))
     
     # Relación con estudios
     estudios = db.relationship('Estudio', backref='paciente', lazy=True)
@@ -85,7 +85,7 @@ class Estudio(db.Model):
     tipo_estudio_id = db.Column(db.Integer, db.ForeignKey('tipos_estudio.id'), nullable=False)
     usuario_id = db.Column(db.Integer, db.ForeignKey('usuarios.id'), nullable=False)
     
-    fecha_solicitud = db.Column(db.DateTime, default=datetime.utcnow)
+    fecha_solicitud = db.Column(db.DateTime, default=lambda: datetime.now(timezone.utc))
     fecha_muestra = db.Column(db.DateTime)
     fecha_resultado = db.Column(db.DateTime)
     
