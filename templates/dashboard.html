@@ -1,0 +1,67 @@
+{% extends "base.html" %}
+
+{% block title %}Dashboard - Sistema de Laboratorio{% endblock %}
+
+{% block content %}
+<div class="dashboard">
+    <h2>Panel de Control</h2>
+    
+    <div class="stats-grid">
+        <div class="stat-card">
+            <h3>{{ total_estudios }}</h3>
+            <p>Total Estudios</p>
+        </div>
+        <div class="stat-card pending">
+            <h3>{{ estudios_pendientes }}</h3>
+            <p>Pendientes</p>
+        </div>
+        <div class="stat-card processing">
+            <h3>{{ estudios_proceso }}</h3>
+            <p>En Proceso</p>
+        </div>
+        <div class="stat-card completed">
+            <h3>{{ estudios_completados }}</h3>
+            <p>Completados</p>
+        </div>
+    </div>
+    
+    <div class="actions">
+        <a href="{{ url_for('estudios.nuevo') }}" class="btn btn-primary">➕ Nuevo Estudio</a>
+        <a href="{{ url_for('estudios.nuevo_paciente') }}" class="btn btn-secondary">👤 Nuevo Paciente</a>
+    </div>
+    
+    <div class="recent-studies">
+        <h3>Últimos Estudios</h3>
+        <table class="table">
+            <thead>
+                <tr>
+                    <th>Orden</th>
+                    <th>Paciente</th>
+                    <th>Estudio</th>
+                    <th>Estado</th>
+                    <th>Fecha</th>
+                    <th>Acciones</th>
+                </tr>
+            </thead>
+            <tbody>
+                {% for estudio in ultimos_estudios %}
+                <tr>
+                    <td><strong>{{ estudio.numero_orden }}</strong></td>
+                    <td>{{ estudio.paciente.apellido }}, {{ estudio.paciente.nombre }}</td>
+                    <td>{{ estudio.tipo.nombre }}</td>
+                    <td><span class="badge badge-{{ estudio.estado }}">{{ estudio.estado }}</span></td>
+                    <td>{{ estudio.fecha_solicitud.strftime('%d/%m/%Y %H:%M') }}</td>
+                    <td>
+                        <a href="{{ url_for('estudios.ver', id=estudio.id) }}" class="btn-link">Ver</a>
+                    </td>
+                </tr>
+                {% else %}
+                <tr>
+                    <td colspan="6" class="text-center">No hay estudios registrados</td>
+                </tr>
+                {% endfor %}
+            </tbody>
+        </table>
+    </div>
+</div>
+{% endblock %}

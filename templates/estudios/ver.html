@@ -1,0 +1,97 @@
+{% extends "base.html" %}
+
+{% block title %}Detalle Estudio - Sistema de Laboratorio{% endblock %}
+
+{% block content %}
+<div class="page-header">
+    <h2>Estudio: {{ estudio.numero_orden }}</h2>
+    <a href="{{ url_for('estudios.listar') }}" class="btn btn-secondary">← Volver</a>
+</div>
+
+<div class="detail-container">
+    <div class="detail-section">
+        <h3>Información del Paciente</h3>
+        <table class="detail-table">
+            <tr>
+                <th>Nombre:</th>
+                <td>{{ estudio.paciente.apellido }}, {{ estudio.paciente.nombre }}</td>
+            </tr>
+            <tr>
+                <th>Documento:</th>
+                <td>{{ estudio.paciente.documento }}</td>
+            </tr>
+            <tr>
+                <th>Teléfono:</th>
+                <td>{{ estudio.paciente.telefono or 'N/A' }}</td>
+            </tr>
+            <tr>
+                <th>Email:</th>
+                <td>{{ estudio.paciente.email or 'N/A' }}</td>
+            </tr>
+        </table>
+    </div>
+    
+    <div class="detail-section">
+        <h3>Información del Estudio</h3>
+        <table class="detail-table">
+            <tr>
+                <th>Tipo:</th>
+                <td>{{ estudio.tipo.nombre }} ({{ estudio.tipo.codigo }})</td>
+            </tr>
+            <tr>
+                <th>Estado:</th>
+                <td><span class="badge badge-{{ estudio.estado }}">{{ estudio.estado }}</span></td>
+            </tr>
+            <tr>
+                <th>Prioridad:</th>
+                <td><span class="badge badge-{{ estudio.prioridad }}">{{ estudio.prioridad }}</span></td>
+            </tr>
+            <tr>
+                <th>Fecha Solicitud:</th>
+                <td>{{ estudio.fecha_solicitud.strftime('%d/%m/%Y %H:%M') }}</td>
+            </tr>
+            {% if estudio.fecha_resultado %}
+            <tr>
+                <th>Fecha Resultado:</th>
+                <td>{{ estudio.fecha_resultado.strftime('%d/%m/%Y %H:%M') }}</td>
+            </tr>
+            {% endif %}
+            <tr>
+                <th>Registrado por:</th>
+                <td>{{ estudio.usuario.nombre }}</td>
+            </tr>
+        </table>
+    </div>
+    
+    {% if estudio.observaciones %}
+    <div class="detail-section">
+        <h3>Observaciones</h3>
+        <p>{{ estudio.observaciones }}</p>
+    </div>
+    {% endif %}
+    
+    <div class="detail-section">
+        <h3>Actualizar Estado</h3>
+        <form method="POST" action="{{ url_for('estudios.actualizar', id=estudio.id) }}">
+            <div class="form-row">
+                <div class="form-group">
+                    <label for="estado">Estado</label>
+                    <select id="estado" name="estado">
+                        <option value="pendiente" {% if estudio.estado == 'pendiente' %}selected{% endif %}>Pendiente</option>
+                        <option value="en_proceso" {% if estudio.estado == 'en_proceso' %}selected{% endif %}>En Proceso</option>
+                        <option value="completado" {% if estudio.estado == 'completado' %}selected{% endif %}>Completado</option>
+                        <option value="cancelado" {% if estudio.estado == 'cancelado' %}selected{% endif %}>Cancelado</option>
+                    </select>
+                </div>
+            </div>
+            
+            <div class="form-group">
+                <label for="resultados">Resultados</label>
+                <textarea id="resultados" name="resultados" rows="6">{{ estudio.resultados or '' }}</textarea>
+            </div>
+            
+            <button type="submit" class="btn btn-primary">Actualizar</button>
+        </form>
+    </div>
+</div>
+{% endblock %}

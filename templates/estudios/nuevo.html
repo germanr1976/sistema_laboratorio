@@ -1,0 +1,60 @@
+{% extends "base.html" %}
+
+{% block title %}Nuevo Estudio - Sistema de Laboratorio{% endblock %}
+
+{% block content %}
+<div class="page-header">
+    <h2>Registrar Nuevo Estudio</h2>
+    <a href="{{ url_for('estudios.listar') }}" class="btn btn-secondary">← Volver</a>
+</div>
+
+<form method="POST" action="{{ url_for('estudios.nuevo') }}" class="form">
+    <div class="form-row">
+        <div class="form-group">
+            <label for="paciente_id">Paciente *</label>
+            <select id="paciente_id" name="paciente_id" required>
+                <option value="">Seleccione un paciente</option>
+                {% for paciente in pacientes %}
+                <option value="{{ paciente.id }}">
+                    {{ paciente.apellido }}, {{ paciente.nombre }} ({{ paciente.documento }})
+                </option>
+                {% endfor %}
+            </select>
+            <small><a href="{{ url_for('estudios.nuevo_paciente') }}">+ Registrar nuevo paciente</a></small>
+        </div>
+        
+        <div class="form-group">
+            <label for="tipo_estudio_id">Tipo de Estudio *</label>
+            <select id="tipo_estudio_id" name="tipo_estudio_id" required>
+                <option value="">Seleccione un tipo de estudio</option>
+                {% for tipo in tipos_estudio %}
+                <option value="{{ tipo.id }}">
+                    {{ tipo.codigo }} - {{ tipo.nombre }} ({{ tipo.tiempo_resultado }}hs)
+                </option>
+                {% endfor %}
+            </select>
+        </div>
+    </div>
+    
+    <div class="form-row">
+        <div class="form-group">
+            <label for="prioridad">Prioridad</label>
+            <select id="prioridad" name="prioridad">
+                <option value="normal" selected>Normal</option>
+                <option value="urgente">Urgente</option>
+                <option value="baja">Baja</option>
+            </select>
+        </div>
+    </div>
+    
+    <div class="form-group">
+        <label for="observaciones">Observaciones</label>
+        <textarea id="observaciones" name="observaciones" rows="4"></textarea>
+    </div>
+    
+    <div class="form-actions">
+        <button type="submit" class="btn btn-primary">Registrar Estudio</button>
+        <a href="{{ url_for('estudios.listar') }}" class="btn btn-secondary">Cancelar</a>
+    </div>
+</form>
+{% endblock %}

@@ -1,0 +1,66 @@
+{% extends "base.html" %}
+
+{% block title %}Estudios - Sistema de Laboratorio{% endblock %}
+
+{% block content %}
+<div class="page-header">
+    <h2>Gestión de Estudios</h2>
+    <a href="{{ url_for('estudios.nuevo') }}" class="btn btn-primary">➕ Nuevo Estudio</a>
+</div>
+
+<div class="filters">
+    <a href="{{ url_for('estudios.listar') }}" class="filter-btn {% if not estado_filtro %}active{% endif %}">Todos</a>
+    <a href="{{ url_for('estudios.listar', estado='pendiente') }}" class="filter-btn {% if estado_filtro == 'pendiente' %}active{% endif %}">Pendientes</a>
+    <a href="{{ url_for('estudios.listar', estado='en_proceso') }}" class="filter-btn {% if estado_filtro == 'en_proceso' %}active{% endif %}">En Proceso</a>
+    <a href="{{ url_for('estudios.listar', estado='completado') }}" class="filter-btn {% if estado_filtro == 'completado' %}active{% endif %}">Completados</a>
+</div>
+
+<table class="table">
+    <thead>
+        <tr>
+            <th>Orden</th>
+            <th>Paciente</th>
+            <th>Documento</th>
+            <th>Tipo de Estudio</th>
+            <th>Estado</th>
+            <th>Prioridad</th>
+            <th>Fecha Solicitud</th>
+            <th>Acciones</th>
+        </tr>
+    </thead>
+    <tbody>
+        {% for estudio in estudios.items %}
+        <tr>
+            <td><strong>{{ estudio.numero_orden }}</strong></td>
+            <td>{{ estudio.paciente.apellido }}, {{ estudio.paciente.nombre }}</td>
+            <td>{{ estudio.paciente.documento }}</td>
+            <td>{{ estudio.tipo.nombre }}</td>
+            <td><span class="badge badge-{{ estudio.estado }}">{{ estudio.estado }}</span></td>
+            <td><span class="badge badge-{{ estudio.prioridad }}">{{ estudio.prioridad }}</span></td>
+            <td>{{ estudio.fecha_solicitud.strftime('%d/%m/%Y %H:%M') }}</td>
+            <td>
+                <a href="{{ url_for('estudios.ver', id=estudio.id) }}" class="btn-link">Ver</a>
+            </td>
+        </tr>
+        {% else %}
+        <tr>
+            <td colspan="8" class="text-center">No hay estudios para mostrar</td>
+        </tr>
+        {% endfor %}
+    </tbody>
+</table>
+
+{% if estudios.pages > 1 %}
+<div class="pagination">
+    {% if estudios.has_prev %}
+    <a href="{{ url_for('estudios.listar', page=estudios.prev_num, estado=estado_filtro) }}">&laquo; Anterior</a>
+    {% endif %}
+    
+    <span>Página {{ estudios.page }} de {{ estudios.pages }}</span>
+    
+    {% if estudios.has_next %}
+    <a href="{{ url_for('estudios.listar', page=estudios.next_num, estado=estado_filtro) }}">Siguiente &raquo;</a>
+    {% endif %}
+</div>
+{% endif %}
+{% endblock %}

@@ -1,0 +1,31 @@
+{% extends "base.html" %}
+
+{% block title %}Iniciar Sesión - Sistema de Laboratorio{% endblock %}
+
+{% block content %}
+<div class="login-container">
+    <div class="login-box">
+        <h2>🧪 Sistema de Gestión de Laboratorio</h2>
+        <p class="subtitle">Inicie sesión para continuar</p>
+        
+        <form method="POST" action="{{ url_for('auth.login') }}">
+            <div class="form-group">
+                <label for="username">Usuario</label>
+                <input type="text" id="username" name="username" required autofocus>
+            </div>
+            
+            <div class="form-group">
+                <label for="password">Contraseña</label>
+                <input type="password" id="password" name="password" required>
+            </div>
+            
+            <button type="submit" class="btn btn-primary">Iniciar Sesión</button>
+        </form>
+        
+        <div class="login-info">
+            <p><strong>Usuario de prueba:</strong> admin</p>
+            <p><strong>Contraseña:</strong> admin123</p>
+        </div>
+    </div>
+</div>
+{% endblock %}

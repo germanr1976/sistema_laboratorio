@@ -1,0 +1,41 @@
+{% extends "base.html" %}
+
+{% block title %}Pacientes - Sistema de Laboratorio{% endblock %}
+
+{% block content %}
+<div class="page-header">
+    <h2>Gestión de Pacientes</h2>
+    <a href="{{ url_for('estudios.nuevo_paciente') }}" class="btn btn-primary">➕ Nuevo Paciente</a>
+</div>
+
+<table class="table">
+    <thead>
+        <tr>
+            <th>Apellido</th>
+            <th>Nombre</th>
+            <th>Documento</th>
+            <th>Teléfono</th>
+            <th>Email</th>
+            <th>Estudios</th>
+            <th>Fecha Registro</th>
+        </tr>
+    </thead>
+    <tbody>
+        {% for paciente in pacientes %}
+        <tr>
+            <td><strong>{{ paciente.apellido }}</strong></td>
+            <td>{{ paciente.nombre }}</td>
+            <td>{{ paciente.documento }}</td>
+            <td>{{ paciente.telefono or 'N/A' }}</td>
+            <td>{{ paciente.email or 'N/A' }}</td>
+            <td>{{ paciente.estudios|length }}</td>
+            <td>{{ paciente.fecha_registro.strftime('%d/%m/%Y') }}</td>
+        </tr>
+        {% else %}
+        <tr>
+            <td colspan="7" class="text-center">No hay pacientes registrados</td>
+        </tr>
+        {% endfor %}
+    </tbody>
+</table>
+{% endblock %}
