@@ -11,6 +11,7 @@ export default function Navbar() {
     const pathname = usePathname();
     const isHome = pathname === '/';
     const isAuthFlow = pathname?.startsWith('/login') || pathname?.startsWith('/registro');
+    const isRecoveryPage = pathname?.startsWith('/recuperar-contrase');
 
     useEffect(() => {
         const token = getAuthToken();
@@ -37,20 +38,22 @@ export default function Navbar() {
     return (
         <nav className="absolute top-0 left-0 right-0 z-20 bg-transparent">
             <div className="container mx-auto px-6 py-4 flex items-center justify-between">
-                {/* Logo */}
-                <div className="flex items-center gap-4">
-                    <img
-                        src="/icons/logo_lab.png"
-                        alt="Icono laboratorio"
-                        className="h-20 w-20 object-contain rounded-full border-2 border-blue-300 bg-white cursor-pointer hover:scale-105 transition-transform"
-                        onClick={() => router.push('/')}
-                    />
-                    {isAuthenticated && (
-                        <span className="text-white font-semibold text-lg hidden sm:block">
-                            Sistema de Laboratorio
-                        </span>
-                    )}
-                </div>
+                {/* Logo - Oculto en home y recuperación */}
+                {!isHome && !isRecoveryPage && (
+                    <div className="flex items-center gap-4">
+                        <img
+                            src="/icons/logo_lab.png"
+                            alt="Icono laboratorio"
+                            className="h-20 w-20 object-contain rounded-full border-2 border-blue-300 bg-white cursor-pointer hover:scale-105 transition-transform"
+                            onClick={() => router.push('/')}
+                        />
+                        {isAuthenticated && (
+                            <span className="text-white font-semibold text-lg hidden sm:block">
+                                Sistema de Laboratorio
+                            </span>
+                        )}
+                    </div>
+                )}
 
                 {/* Navigation Links */}
                 {isAuthenticated && !isHome && !isAuthFlow && (

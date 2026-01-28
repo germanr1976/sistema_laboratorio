@@ -1,14 +1,14 @@
 import bcrypt from 'bcryptjs'
 import jwt from 'jsonwebtoken'
 
-export async function hashPassword(password: string):Promise<string>{
+export async function hashPassword(password: string): Promise<string> {
     const saltRounds = parseInt(process.env.BCRYPT_SALT_ROUNDS || '12');
-    const passwordHashed = await bcrypt.hash(password,saltRounds);
+    const passwordHashed = await bcrypt.hash(password, saltRounds);
     return passwordHashed;
-} 
+}
 
-export async function comparePassword(password:string,hashedPassword:string):Promise<boolean> {
-    const isPassEquals = await bcrypt.compare(password,hashedPassword);
+export async function comparePassword(password: string, hashedPassword: string): Promise<boolean> {
+    const isPassEquals = await bcrypt.compare(password, hashedPassword);
     return isPassEquals;
 }
 
@@ -20,18 +20,53 @@ export async function generateToken(userData: {
 }): Promise<string> {
     const jwtSecret = process.env.JWT_SECRET || 'fallback-secret';
     const expiresIn = process.env.JWT_EXPIRES_IN || '24h';
-    
+
     const token = jwt.sign(userData, jwtSecret, { expiresIn } as jwt.SignOptions);
     return token;
 }
 
-export async function verifyToken(token:string): Promise<any> {
+export async function verifyToken(token: string): Promise<any> {
     const jwtSecret = process.env.JWT_SECRET || 'fallback-secret';
-    try{
-        const isTokenCorrect = jwt.verify(token,jwtSecret)
+    try {
+        const isTokenCorrect = jwt.verify(token, jwtSecret)
         return isTokenCorrect
-    }catch(error){
+    } catch (error) {
         console.error(error)
-        throw error   
+        throw error
+    }
+}
+
+/**
+ * Genera un token JWT para recuperación de contraseña (corta duración)
+ * @param userId - ID del usuario
+ * @param dni - DNI del usuario
+ * @returns Token con expiración de 1 hora
+ */
+export async function generatePasswordRecoveryToken(userId: number, dni: string): Promise<string> {
+    const jwtSecret = process.env.JWT_SECRET || 'fallback-secret';
+    const token = jwt.sign(
+        { userId, dni, type: 'password-recovery' },
+        jwtSecret,
+        { expiresIn: '1h' }
+    );
+    return token;
+}
+
+/**
+ * Verifica un token de recuperación de contraseña
+ * @param token - Token a verificar
+ * @returns Datos decodificados del token
+ */
+export async function verifyPasswordRecoveryToken(token: string): Promise<any> {
+    const jwtSecret = process.env.JWT_SECRET || 'fallback-secret';
+    try {
+        const decoded = jwt.verify(token, jwtSecret);
+        if ((decoded as any).type !== 'password-recovery') {
+            throw new Error('Token inválido: no es un token de recuperación');
+        }
+        return decoded;
+    } catch (error) {
+        console.error('Error verificando token de recuperación:', error);
+        throw error;
     }
 }

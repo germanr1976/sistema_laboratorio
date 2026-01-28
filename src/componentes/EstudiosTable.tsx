@@ -504,11 +504,10 @@ export function EstudiosTable() {
                                     <button
                                         key={pagina}
                                         onClick={() => setPaginaActual(pagina)}
-                                        className={`px-3 py-2 rounded-lg font-medium transition-colors ${
-                                            paginaActual === pagina
+                                        className={`px-3 py-2 rounded-lg font-medium transition-colors ${paginaActual === pagina
                                                 ? 'bg-blue-600 text-white'
                                                 : 'border border-gray-300 text-gray-700 hover:bg-gray-100'
-                                        }`}
+                                            }`}
                                     >
                                         {pagina}
                                     </button>

@@ -48,7 +48,6 @@ const filters: { id: StudyFilter; label: string }[] = [
   { id: "completed", label: "Completados" },
   { id: "in-progress", label: "En proceso" },
   { id: "pending", label: "Pendientes" },
-  { id: "open", label: "En curso" },
 ]
 
 type Props = {

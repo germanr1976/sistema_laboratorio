@@ -168,6 +168,9 @@ export default function LoginProfesional() {
                         >
                             Ingresar
                         </button>
+                        <Link href="/recuperar-contrasena" className="text-center text-sm text-blue-600 hover:text-blue-800 underline">
+                            ¿Olvidaste tu contraseña?
+                        </Link>
                     </form>
                     <p className="text-center text-sm mt-6">
                         ¿No tenés cuenta administrativa? {" "}
