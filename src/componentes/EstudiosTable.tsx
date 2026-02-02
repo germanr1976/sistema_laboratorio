@@ -737,7 +737,7 @@ export function EstudiosTable() {
                 <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
                     <div className="bg-white rounded-lg shadow-lg p-6 max-w-sm w-full">
                         <div className="flex items-center gap-3 mb-4">
-                            <div className="flex-shrink-0">
+                            <div className="shrink-0">
                                 <svg className="h-6 w-6 text-orange-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                                     <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 9v2m0 4v2m0 4v2M6.343 3.665c1.519-1.159 3.7-1.159 5.219 0l8.485 6.479c1.519 1.16 1.519 3.04 0 4.199l-8.485 6.479c-1.519 1.159-3.7 1.159-5.219 0l-8.485-6.479c-1.519-1.16-1.519-3.04 0-4.199L6.343 3.665z" />
                                 </svg>
