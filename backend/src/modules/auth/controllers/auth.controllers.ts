@@ -216,7 +216,7 @@ export async function registerDoctorController(req: Request, res: Response) {
 export async function registerPatientController(req: Request, res: Response) {
     try {
         console.log('📝 Registro de paciente - Datos recibidos:', JSON.stringify(req.body, null, 2));
-        
+
         const validationResultPatient = validatePatient(req.body)
         if (validationResultPatient.error) {
             console.error('❌ Error de validación:', validationResultPatient.error.details);

@@ -16,17 +16,17 @@ app.use(cors({
   origin: (origin, callback) => {
     // Permitir requests sin origin (como Postman, curl, etc.)
     if (!origin) return callback(null, true);
-    
+
     // Permitir cualquier dominio de vercel.app
     if (origin.endsWith('.vercel.app')) {
       return callback(null, true);
     }
-    
+
     // Verificar si está en la lista de orígenes permitidos
     if (allowedOrigins.includes(origin)) {
       return callback(null, true);
     }
-    
+
     // Log para debug
     console.warn(`CORS blocked origin: ${origin}`);
     // Permitir de todas formas (permitir más en producción)

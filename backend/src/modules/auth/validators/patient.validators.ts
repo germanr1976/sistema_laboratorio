@@ -8,9 +8,9 @@ const PatientSchema = Joi.object({
         Joi.date(),
         Joi.string().isoDate()
     ).required()
-    
+
 })
 
-export function validatePatient(data: any){
+export function validatePatient(data: any) {
     return PatientSchema.validate(data)
 }
