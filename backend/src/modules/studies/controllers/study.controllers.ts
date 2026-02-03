@@ -201,7 +201,7 @@ export const getStudyById = async (
   res: Response
 ): Promise<void> => {
   try {
-    const { id } = req.params;
+    const id = Array.isArray(req.params.id) ? req.params.id[0] : req.params.id;
     const studyId = parseInt(id!, 10);
 
     if (isNaN(studyId)) {
@@ -266,7 +266,7 @@ export const updateStudy = async (
   res: Response
 ): Promise<void> => {
   try {
-    const { id } = req.params;
+    const id = Array.isArray(req.params.id) ? req.params.id[0] : req.params.id;
     const studyId = parseInt(id!, 10);
 
     if (isNaN(studyId)) {
@@ -344,7 +344,7 @@ export const updateStudyStatus = async (
   res: Response
 ): Promise<void> => {
   try {
-    const { id } = req.params;
+    const id = Array.isArray(req.params.id) ? req.params.id[0] : req.params.id;
     const studyId = parseInt(id!, 10);
 
     if (isNaN(studyId)) {
@@ -403,7 +403,7 @@ export const updateStudyPdf = async (
   res: Response
 ): Promise<void> => {
   try {
-    const { id } = req.params;
+    const id = Array.isArray(req.params.id) ? req.params.id[0] : req.params.id;
     const studyId = parseInt(id!, 10);
 
     if (isNaN(studyId)) {
@@ -469,7 +469,7 @@ export const getPatientByDni = async (
   res: Response
 ): Promise<void> => {
   try {
-    const { dni } = req.params;
+    const dni = Array.isArray(req.params.dni) ? req.params.dni[0] : req.params.dni;
 
     if (!dni || dni.trim() === "") {
       return ResponseHelper.validationError(res, "DNI es requerido");
@@ -519,7 +519,7 @@ export const cancelStudy = async (
   res: Response
 ): Promise<void> => {
   try {
-    const { id } = req.params;
+    const id = Array.isArray(req.params.id) ? req.params.id[0] : req.params.id;
     const studyId = parseInt(id!, 10);
 
     if (isNaN(studyId)) {
