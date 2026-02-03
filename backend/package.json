@@ -6,8 +6,8 @@
   "scripts": {
     "dev": "tsx watch src/server.ts",
     "seed": "tsx src/seed.ts",
-    "build": "tsc && tsc-alias",
-    "build:production": "npx prisma generate && npx prisma migrate deploy && npm run build",
+    "build": "npx prisma generate && npx prisma migrate deploy && tsc && tsc-alias",
+    "build:production": "npm run build",
     "start": "node dist/server.js"
   },
   "keywords": [],
