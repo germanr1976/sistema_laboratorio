@@ -1,32 +1,18 @@
 {
-  "name": "laboratorioo",
+  "name": "laboratorioo-workspace",
   "version": "0.1.0",
   "private": true,
+  "workspaces": [
+    "backend",
+    "frontend"
+  ],
   "scripts": {
-    "dev": "next dev -p 3001 --webpack",
-    "build": "next build --webpack",
-    "start": "next start",
-    "lint": "eslint"
-  },
-  "dependencies": {
-    "@prisma/client": "^6.16.2",
-    "date-fns": "^4.1.0",
-    "lucide-react": "^0.562.0",
-    "next": "16.0.0",
-    "react": "19.2.0",
-    "react-datepicker": "^8.8.0",
-    "react-dom": "19.2.0",
-    "react-hot-toast": "^2.6.0"
+    "dev:frontend": "cd frontend && npm run dev",
+    "dev:backend": "cd backend && npm run dev",
+    "dev": "concurrently \"npm run dev:backend\" \"npm run dev:frontend\"",
+    "install:all": "npm install && cd backend && npm install && cd ../frontend && npm install"
   },
   "devDependencies": {
-    "@tailwindcss/postcss": "^4",
-    "@types/node": "^20",
-    "@types/react": "^19",
-    "@types/react-dom": "^19",
-    "eslint": "^9",
-    "eslint-config-next": "16.0.0",
-    "prisma": "^6.16.2",
-    "tailwindcss": "^4",
-    "typescript": "^5"
+    "concurrently": "^8.2.2"
   }
 }
