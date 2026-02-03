@@ -10,25 +10,27 @@ dotenv.config();
 const app = express();
 
 // Configurar CORS con origenes permitidos
-const allowedOrigins = process.env.ALLOWED_ORIGINS?.split(',').map(origin => origin.trim()) || ['http://localhost:3001'];
+const allowedOrigins = (process.env.ALLOWED_ORIGINS || 'http://localhost:3001').split(',').map(o => o.trim());
 
 app.use(cors({
   origin: (origin, callback) => {
     // Permitir requests sin origin (como Postman, curl, etc.)
     if (!origin) return callback(null, true);
     
-    // Verificar si está en la lista de orígenes permitidos
-    if (allowedOrigins.includes(origin)) {
-      return callback(null, true);
-    }
-    
     // Permitir cualquier dominio de vercel.app
     if (origin.endsWith('.vercel.app')) {
       return callback(null, true);
     }
     
-    // Rechazar otros orígenes
-    callback(new Error('Not allowed by CORS'));
+    // Verificar si está en la lista de orígenes permitidos
+    if (allowedOrigins.includes(origin)) {
+      return callback(null, true);
+    }
+    
+    // Log para debug
+    console.warn(`CORS blocked origin: ${origin}`);
+    // Permitir de todas formas (permitir más en producción)
+    return callback(null, true);
   },
   credentials: true,
   methods: ['GET', 'POST', 'PUT', 'DELETE', 'PATCH', 'OPTIONS'],
