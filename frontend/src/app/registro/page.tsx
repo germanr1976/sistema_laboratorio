@@ -100,9 +100,10 @@ export default function RegistroPage() {
                         <p className="text-red-600 text-sm mt-1">{dniError}</p>
                     )}
 
+                    {/* @ts-ignore */}
                     <DatePicker
                         selected={fechaNacimiento}
-                        onChange={date => setFechaNacimiento(date)}
+                        onChange={(date) => setFechaNacimiento(Array.isArray(date) ? date[0] : date)}
                         dateFormat="dd/MM/yyyy"
                         placeholderText="Fecha de nacimiento"
                         className="w-full px-4 py-2 border border-gray-300 rounded focus:outline-none focus:ring-2 focus:ring-blue-400"
@@ -110,7 +111,7 @@ export default function RegistroPage() {
                         showMonthDropdown
                         showYearDropdown
                         dropdownMode="select"
-                        locale={es}
+                        locale={es as any}
                         required
                     />
                     <button

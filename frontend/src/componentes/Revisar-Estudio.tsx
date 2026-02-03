@@ -1,7 +1,7 @@
 "use client"
 
 import { useEffect, useState } from "react"
-import type { EstudioData } from "../app/(protected)/revision/page"
+import type { Study } from "../types/Study"
 import { getPdf } from "../utils/estudiosStore"
 
 const ArrowLeft = ({ className }: { className?: string }) => (
@@ -9,6 +9,15 @@ const ArrowLeft = ({ className }: { className?: string }) => (
     <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 12H5M12 19l-7-7 7-7" />
   </svg>
 )
+
+// Extensión temporal del tipo Study para compatibilidad con datos antiguos
+type EstudioData = Study & {
+  nombreApellido?: string
+  dni?: string
+  fecha?: string
+  obraSocial?: string
+  medico?: string
+}
 
 interface RevisarEstudioProps {
   estudioData: EstudioData
@@ -48,7 +57,7 @@ export function RevisarEstudio({ estudioData, onVolver, onCompletado, onParcial 
 
         // Si tiene ID, intentar cargar desde IndexedDB (para compatibilidad con datos antiguos)
         if (estudioData.id) {
-          const blob = await getPdf(estudioData.id)
+          const blob = await getPdf(String(estudioData.id))
           if (blob) {
             objectUrl = URL.createObjectURL(blob)
             setPdfUrl(objectUrl)

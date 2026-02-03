@@ -2,7 +2,7 @@
 "use client"
 
 import { useSearchParams } from 'next/navigation'
-import { useState, useEffect } from 'react'
+import { useState, useEffect, Suspense } from 'react'
 import { EstudioForm } from '../../../componentes/EstudioForm'
 import authFetch from '../../../utils/authFetch'
 
@@ -25,7 +25,7 @@ interface EstudioExistente {
     estado?: 'completado' | 'en_proceso' | 'parcial'
 }
 
-export default function Page() {
+function CargarNuevoContent() {
     const searchParams = useSearchParams()
     const [estudioExistente, setEstudioExistente] = useState<EstudioExistente | null>(null)
     const [loading, setLoading] = useState(false)
@@ -134,5 +134,20 @@ export default function Page() {
                 />
             </div>
         </div>
+    )
+}
+
+export default function Page() {
+    return (
+        <Suspense fallback={
+            <div className="min-h-screen bg-gray-100 flex items-center justify-center">
+                <div className="text-center">
+                    <div className="inline-block animate-spin rounded-full h-12 w-12 border-b-2 border-blue-500"></div>
+                    <p className="mt-4 text-gray-600">Cargando...</p>
+                </div>
+            </div>
+        }>
+            <CargarNuevoContent />
+        </Suspense>
     )
 }
