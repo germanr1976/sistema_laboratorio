@@ -6,6 +6,8 @@ import { StudiesTable } from "../../componentes/Historial-Fecha"
 import authFetch from "../../../../../utils/authFetch"
 import type { Study } from "../../utils/tipos"
 
+const API_URL = process.env.NEXT_PUBLIC_API_URL || "http://localhost:3000"
+
 export default function LabHistoryPage() {
   const [startDate, setStartDate] = useState("")
   const [endDate, setEndDate] = useState("")
@@ -16,7 +18,7 @@ export default function LabHistoryPage() {
   useEffect(() => {
     const loadStudies = async () => {
       try {
-        const response = await authFetch('http://localhost:3000/api/studies/patient/me')
+        const response = await authFetch(`${API_URL}/api/studies/patient/me`)
         if (!response.ok) {
           console.error('Error fetching studies:', response.statusText)
           setLoading(false)
@@ -34,7 +36,7 @@ export default function LabHistoryPage() {
           status: s.status?.name === "COMPLETED" ? "Completado" : s.status?.name === "PARTIAL" ? "Parcial" : "En Proceso",
           // Médico: usar únicamente el campo 'doctor' del estudio
           doctor: s.doctor || 'Sin asignar',
-          pdfUrl: s.pdfUrl ? `http://localhost:3000${s.pdfUrl}` : undefined
+          pdfUrl: s.pdfUrl ? `${API_URL}${s.pdfUrl}` : undefined
         }))
 
         setAllStudies(transformedStudies)

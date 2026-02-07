@@ -20,6 +20,8 @@ export type Study = {
   studyName?: string
 }
 
+const API_URL = process.env.NEXT_PUBLIC_API_URL || "http://localhost:3000"
+
 const statusConfig: Record<StudyStatus, { label: string; badgeClass: string; dotClass: string }> = {
   "completed": {
     label: "Completado",
@@ -97,7 +99,7 @@ export default function PatientStudiesBoard({
     let mounted = true
     const loadStudies = async () => {
       try {
-        const response = await authFetch("http://localhost:3000/api/studies/patient/me")
+        const response = await authFetch(`${API_URL}/api/studies/patient/me`)
         if (!response.ok) {
           console.error("Error fetching studies:", response.statusText)
           return
@@ -107,7 +109,7 @@ export default function PatientStudiesBoard({
 
         const transformed: Study[] = backendStudies.map((s: any) => {
           const pdfs = Array.isArray(s.pdfs) ? s.pdfs : (s.pdfUrl ? [s.pdfUrl] : [])
-          const pdfLinks = pdfs.map((p: string) => p.startsWith('http') ? p : `http://localhost:3000${p}`)
+          const pdfLinks = pdfs.map((p: string) => p.startsWith('http') ? p : `${API_URL}${p}`)
           return {
             id: s.id?.toString() || crypto.randomUUID(),
             patientName: `${s.patient?.profile?.firstName || ""} ${s.patient?.profile?.lastName || ""}`.trim() || "Paciente",
