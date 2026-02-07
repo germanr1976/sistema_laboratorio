@@ -8,6 +8,8 @@ import { useRouter } from "next/navigation"
 import { savePdf } from "../utils/estudiosStore"
 import authFetch from "../utils/authFetch"
 
+const API_URL = process.env.NEXT_PUBLIC_API_URL || "http://localhost:3000"
+
 const Upload = ({ className }: { className?: string }) => (
   <svg className={className} fill="none" stroke="currentColor" viewBox="0 0 24 24">
     <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4" />
@@ -343,7 +345,7 @@ export function CargarNuevo({ onCargarEstudio, initialId, initialData }: CargarN
         formData.append('medico', studyData.medico)
       }
 
-      const response = await authFetch('http://localhost:3000/api/studies', {
+      const response = await authFetch(`${API_URL}/api/studies`, {
         method: 'POST',
         body: formData
       })
