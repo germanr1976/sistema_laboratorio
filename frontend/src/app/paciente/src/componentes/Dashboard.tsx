@@ -4,6 +4,8 @@ import { useEffect, useState } from "react"
 import { getPdf, deletePdf } from "../utils/estudiosStore"
 import { Trash2 } from "lucide-react"
 
+const API_URL = process.env.NEXT_PUBLIC_API_URL || "http://localhost:3000"
+
 // Simple authFetch implementation using fetch and localStorage token
 async function authFetch(input: RequestInfo, init?: RequestInit) {
   const token = localStorage.getItem('token')
