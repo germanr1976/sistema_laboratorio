@@ -207,7 +207,7 @@ export function CargarNuevo({ onCargarEstudio, initialId, initialData }: CargarN
 
     try {
       // Buscar en el backend
-      const response = await authFetch(`http://localhost:3000/api/studies/patient/${searchDni.trim()}`)
+      const response = await authFetch(`${API_URL}/api/studies/patient/${searchDni.trim()}`)
 
       if (response.ok) {
         const result = await response.json()
@@ -277,7 +277,7 @@ export function CargarNuevo({ onCargarEstudio, initialId, initialData }: CargarN
       const [firstName, ...lastNameParts] = patientData.nombreApellido.split(' ')
       const lastName = lastNameParts.join(' ') || firstName
 
-      const response = await authFetch('http://localhost:3000/api/auth/register-patient', {
+      const response = await authFetch(`${API_URL}/api/auth/register-patient`, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json'
@@ -446,7 +446,7 @@ export function CargarNuevo({ onCargarEstudio, initialId, initialData }: CargarN
         formData.append('pdf', pdfFile)
 
         // Actualizar el estudio existente o crear uno nuevo con PDF
-        const response = await authFetch('http://localhost:3000/api/studies', {
+        const response = await authFetch(`${API_URL}/api/studies`, {
           method: 'POST',
           body: formData
         })
@@ -468,7 +468,7 @@ export function CargarNuevo({ onCargarEstudio, initialId, initialData }: CargarN
           completado: 'COMPLETED'
         }
 
-        const response = await authFetch(`http://localhost:3000/api/studies/${studyCreatedId}/status`, {
+        const response = await authFetch(`${API_URL}/api/studies/${studyCreatedId}/status`, {
           method: 'PUT',
           headers: {
             'Content-Type': 'application/json'

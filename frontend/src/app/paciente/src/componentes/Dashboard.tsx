@@ -47,7 +47,7 @@ export default function Dashboard({
   useEffect(() => {
     const loadStudies = async () => {
       try {
-        const response = await authFetch('http://localhost:3000/api/studies/patient/me')
+        const response = await authFetch(`${API_URL}/api/studies/patient/me`)
         if (!response.ok) {
           console.error('Error fetching studies:', response.statusText)
           return
@@ -68,7 +68,7 @@ export default function Dashboard({
             fecha: new Date(lastCompleted.studyDate).toLocaleDateString('es-ES'),
             obraSocial: lastCompleted.socialInsurance || '',
             medico: lastCompleted.biochemist ? `${lastCompleted.biochemist.profile?.firstName} ${lastCompleted.biochemist.profile?.lastName}` : '',
-            pdfUrl: lastCompleted.pdfUrl ? `http://localhost:3000${lastCompleted.pdfUrl}` : undefined
+            pdfUrl: lastCompleted.pdfUrl ? `${API_URL}${lastCompleted.pdfUrl}` : undefined
           })
         }
       } catch (e) {

@@ -121,7 +121,7 @@ export function EstudioForm({
 
         const buscarPaciente = async () => {
             try {
-                const response = await authFetch(`http://localhost:3000/api/studies/patient/${dni.trim()}`)
+                const response = await authFetch(`${API_URL}/api/studies/patient/${dni.trim()}`)
                 if (response.ok) {
                     const result = await response.json()
                     const patient = result?.data
@@ -210,8 +210,8 @@ export function EstudioForm({
         const fullUrl = url.startsWith('http')
             ? url
             : url.startsWith('/uploads')
-                ? `http://localhost:3000${url}`
-                : `http://localhost:3000/uploads/pdfs/${url}`
+                ? `${API_URL}${url}`
+                : `${API_URL}/uploads/pdfs/${url}`
         setPreviewUrl(fullUrl)
         setPreviewName(name || 'Estudio PDF')
     }
@@ -236,7 +236,7 @@ export function EstudioForm({
         try {
             showToastMessage('Eliminando archivo...', 'info');
             const response = await authFetch(
-                `http://localhost:3000/api/studies/${studyId}/attachments/${attachmentId}`,
+                `${API_URL}/api/studies/${studyId}/attachments/${attachmentId}`,
                 { method: 'DELETE' }
             );
 
@@ -369,7 +369,7 @@ export function EstudioForm({
 
                 if (!modoEdicion) {
                     // Buscar si el paciente ya existe
-                    const buscarResponse = await authFetch(`http://localhost:3000/api/studies/patient/${dni}`)
+                    const buscarResponse = await authFetch(`${API_URL}/api/studies/patient/${dni}`)
 
                     if (buscarResponse.ok) {
                         const pacienteData = await buscarResponse.json()
@@ -382,7 +382,7 @@ export function EstudioForm({
                         const [nombre, ...apellidos] = nombreApellido.split(' ')
                         const apellido = apellidos.join(' ') || nombre
 
-                        const crearPacienteResponse = await authFetch('http://localhost:3000/api/auth/register-patient', {
+                        const crearPacienteResponse = await authFetch(`${API_URL}/api/auth/register-patient`, {
                             method: 'POST',
                             headers: { 'Content-Type': 'application/json' },
                             body: JSON.stringify({
@@ -448,7 +448,7 @@ export function EstudioForm({
                         console.log(pair[0] + ':', pair[1]);
                     }
 
-                    const response = await authFetch('http://localhost:3000/api/studies', {
+                    const response = await authFetch(`${API_URL}/api/studies`, {
                         method: 'POST',
                         body: formData,
                     })
@@ -500,7 +500,7 @@ export function EstudioForm({
                         const statusName = mapEstadoToStatusName(estado)
                         if (createdId && statusName) {
                             try {
-                                const respStatus = await authFetch(`http://localhost:3000/api/studies/${createdId}/status`, {
+                                const respStatus = await authFetch(`${API_URL}/api/studies/${createdId}/status`, {
                                     method: 'PATCH',
                                     headers: { 'Content-Type': 'application/json' },
                                     body: JSON.stringify({ statusName }),
@@ -558,7 +558,7 @@ export function EstudioForm({
                     // Actualizar estado si corresponde
                     if (permitirCambioEstado && statusName) {
                         try {
-                            const respStatus = await authFetch(`http://localhost:3000/api/studies/${targetId}/status`, {
+                            const respStatus = await authFetch(`${API_URL}/api/studies/${targetId}/status`, {
                                 method: 'PATCH',
                                 headers: { 'Content-Type': 'application/json' },
                                 body: JSON.stringify({ statusName }),
@@ -579,7 +579,7 @@ export function EstudioForm({
                     if (Object.keys(updatePayload).length > 0) {
                         try {
                             console.log('📝 Actualizando campos del estudio:', updatePayload)
-                            const respUpdate = await authFetch(`http://localhost:3000/api/studies/${targetId}`, {
+                            const respUpdate = await authFetch(`${API_URL}/api/studies/${targetId}`, {
                                 method: 'PATCH',
                                 headers: { 'Content-Type': 'application/json' },
                                 body: JSON.stringify(updatePayload),
@@ -602,7 +602,7 @@ export function EstudioForm({
                         pdfs.forEach((file) => fd.append('pdfs', file))
 
                         try {
-                            const respPdf = await authFetch(`http://localhost:3000/api/studies/${targetId}/pdf`, {
+                            const respPdf = await authFetch(`${API_URL}/api/studies/${targetId}/pdf`, {
                                 method: 'PATCH',
                                 body: fd,
                             })
