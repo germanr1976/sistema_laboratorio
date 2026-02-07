@@ -17,7 +17,9 @@ export function Sidebar() {
     const pathname = usePathname()
     const [estudiosParciales, setEstudiosParciales] = useState<EstudioParcial[]>([])
     const [isOpen, setIsOpen] = useState(false)
-    const { logout } = useAuth()
+    const { logout, userData } = useAuth()
+    const [userName, setUserName] = useState<string>('Bioquímico')
+    const [userInitials, setUserInitials] = useState<string>('BQ')
 
     const handleClearDrafts = () => {
         try {
@@ -53,6 +55,29 @@ export function Sidebar() {
         window.addEventListener('storage', cargarEstudios)
         return () => window.removeEventListener('storage', cargarEstudios)
     }, [pathname])
+
+    useEffect(() => {
+        if (!userData) return
+
+        const profile = userData.profile || {}
+        const firstName = (profile.firstName || '').toString().trim()
+        const lastName = (profile.lastName || '').toString().trim()
+        const fullName = `${firstName} ${lastName}`.trim()
+        const fallbackName = userData.nombreApellido || userData.nombre || userData.email || userData.dni || 'Bioquímico'
+        const resolvedName = fullName || fallbackName
+
+        setUserName(resolvedName)
+
+        const initials = resolvedName
+            .split(' ')
+            .filter(Boolean)
+            .map((n: string) => n[0])
+            .join('')
+            .toUpperCase()
+            .slice(0, 2)
+
+        setUserInitials(initials || 'BQ')
+    }, [userData])
 
     const navItems = [
         {
@@ -162,10 +187,10 @@ export function Sidebar() {
                 <div className="p-4 border-t border-slate-700 space-y-2">
                     <div className="flex items-center gap-3 px-3 py-2">
                         <div className="w-8 h-8 rounded-full bg-linear-to-br from-blue-500 to-blue-600 flex items-center justify-center shrink-0">
-                            <span className="text-sm font-semibold text-white">BQ</span>
+                            <span className="text-sm font-semibold text-white">{userInitials}</span>
                         </div>
                         <div className="flex-1 min-w-0">
-                            <p className="text-base font-semibold text-white truncate">Bioquímico</p>
+                            <p className="text-base font-semibold text-white truncate">{userName}</p>
                             <p className="text-sm text-slate-300">En línea</p>
                         </div>
                     </div>
