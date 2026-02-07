@@ -6,6 +6,8 @@ import { useState, useEffect, Suspense } from 'react'
 import { EstudioForm } from '../../../componentes/EstudioForm'
 import authFetch from '../../../utils/authFetch'
 
+const API_URL = process.env.NEXT_PUBLIC_API_URL || "http://localhost:3000"
+
 const toDateInput = (value?: string | null) => {
     if (!value) return ''
     // Evitar desfases por zona horaria: tomar solo la parte de fecha
@@ -68,7 +70,7 @@ function CargarNuevoContent() {
 
         const loadFromBackend = async () => {
             try {
-                const response = await authFetch(`http://localhost:3000/api/studies/${id}`)
+                const response = await authFetch(`${API_URL}/api/studies/${id}`)
                 if (!response.ok) {
                     if (response.status === 401) {
                         console.warn('No autorizado: revisa sesión/token')

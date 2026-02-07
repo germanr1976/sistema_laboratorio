@@ -22,6 +22,8 @@ import {
 import Toast from './Toast'
 import { cancelStudy } from '../utils/studiesApi'
 
+const API_URL = process.env.NEXT_PUBLIC_API_URL || "http://localhost:3000"
+
 interface Estudio {
     id: string | number
     nombreApellido: string
@@ -61,7 +63,7 @@ export function EstudiosTable() {
 
         try {
             // Intentar cargar desde el backend primero
-            const response = await authFetch('http://localhost:3000/api/studies/biochemist/me')
+            const response = await authFetch(`${API_URL}/api/studies/biochemist/me`)
 
             if (response.ok) {
                 const result = await response.json()

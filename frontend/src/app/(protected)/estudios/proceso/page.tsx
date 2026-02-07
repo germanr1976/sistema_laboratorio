@@ -6,6 +6,8 @@ import authFetch from '../../../../utils/authFetch'
 import { cardClasses, leftColClasses, nameClasses, metaClasses, rightActionsClasses, btnPrimary, badgeEnProceso, iconBtn } from '../../../../utils/uiClasses'
 import { Trash2, Share2, Download } from 'lucide-react'
 
+const API_URL = process.env.NEXT_PUBLIC_API_URL || "http://localhost:3000"
+
 type Meta = {
     id?: number | string
     studyName?: string
@@ -45,7 +47,7 @@ export default function ProcesoPage() {
 
         async function load() {
             try {
-                const response = await authFetch('http://localhost:3000/api/studies/biochemist/me')
+                const response = await authFetch(`${API_URL}/api/studies/biochemist/me`)
                 if (!response.ok) {
                     throw new Error('Error al cargar estudios')
                 }
@@ -92,7 +94,7 @@ export default function ProcesoPage() {
         if (!id) return
         if (!confirm('¿Eliminar estudio en proceso?')) return
         try {
-            const response = await authFetch(`http://localhost:3000/api/studies/${id}`, {
+            const response = await authFetch(`${API_URL}/api/studies/${id}`, {
                 method: 'DELETE'
             })
             if (response.ok) {

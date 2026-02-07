@@ -5,6 +5,8 @@ import authFetch from "../../../../utils/authFetch"
 import { Share2, Download, Trash2 } from "lucide-react"
 import { cardClasses, leftColClasses, nameClasses, metaClasses, rightActionsClasses, btnPdf, btnNoFile, iconBtn, badgeCompletado } from "../../../../utils/uiClasses"
 
+const API_URL = process.env.NEXT_PUBLIC_API_URL || "http://localhost:3000"
+
 type EstudioMeta = {
     id?: number | string
     studyName?: string
@@ -45,7 +47,7 @@ export default function CompletadosPage() {
 
         async function load() {
             try {
-                const response = await authFetch('http://localhost:3000/api/studies/biochemist/me')
+                const response = await authFetch(`${API_URL}/api/studies/biochemist/me`)
 
                 if (!response.ok) {
                     throw new Error('Error al cargar estudios')
@@ -88,7 +90,7 @@ export default function CompletadosPage() {
 
         if (confirm('¿Estás seguro de que deseas eliminar este estudio?')) {
             try {
-                const response = await authFetch(`http://localhost:3000/api/studies/${id}`, {
+                const response = await authFetch(`${API_URL}/api/studies/${id}`, {
                     method: 'DELETE'
                 })
 
@@ -119,7 +121,7 @@ export default function CompletadosPage() {
                         const dni = e.patient?.dni || e.patient?.profile?.documentNumber || 'Sin DNI'
                         const fecha = e.studyDate ? new Date(e.studyDate).toLocaleDateString('es-AR') : 'Sin fecha'
                         const obraSocial = e.socialInsurance || 'Sin obra social'
-                        const pdfUrl = e.pdfUrl ? `http://localhost:3000${e.pdfUrl}` : null
+                        const pdfUrl = e.pdfUrl ? `${API_URL}${e.pdfUrl}` : null
                         const estudioNombre = e.studyName || 'Sin nombre'
 
                         return (
