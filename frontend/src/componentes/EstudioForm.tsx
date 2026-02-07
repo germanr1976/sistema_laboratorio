@@ -20,6 +20,8 @@ import {
 } from '../utils/uiClasses'
 import { Loader2, X, FileText, Upload, CheckCircle2, Clock, FileEdit, Save, Eye } from 'lucide-react'
 
+const API_URL = process.env.NEXT_PUBLIC_API_URL || "http://localhost:3000"
+
 type EstadoEstudio = "en_proceso" | "parcial" | "completado"
 
 interface EstudioFormProps {
