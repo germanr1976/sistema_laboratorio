@@ -142,20 +142,60 @@ export const addStudyAttachments = async (
   });
 };
 
-export const getStudiesByPatient = async (userId: number) => {
-  return await prisma.study.findMany({
-    where: {
-      userId,
-    },
-    include: {
-      biochemist: { include: { profile: true } },
-      status: true,
-      attachments: true,
-    },
-    orderBy: {
-      createdAt: "desc",
-    },
-  });
+export const getStudiesByPatient = async (
+  userId: number,
+  page = 1,
+  limit = 10
+) => {
+  const safePage = Number.isFinite(page) && page > 0 ? page : 1;
+  const safeLimit = Number.isFinite(limit) && limit > 0 ? Math.min(limit, 100) : 10;
+  const skip = (safePage - 1) * safeLimit;
+
+  const [items, total, grouped] = await prisma.$transaction([
+    prisma.study.findMany({
+      where: { userId },
+      include: {
+        patient: { include: { profile: true } },
+        biochemist: { include: { profile: true } },
+        status: true,
+        attachments: true,
+      },
+      orderBy: {
+        createdAt: "desc",
+      },
+      skip,
+      take: safeLimit,
+    }),
+    prisma.study.count({ where: { userId } }),
+    prisma.study.groupBy({
+      by: ["statusId"],
+      where: { userId },
+      _count: { _all: true },
+    }),
+  ]);
+
+  const statusIds = grouped.map((g) => g.statusId);
+  const statuses = statusIds.length
+    ? await prisma.status.findMany({
+        where: { id: { in: statusIds } },
+        select: { id: true, name: true },
+      })
+    : [];
+
+  const statusMap = new Map(statuses.map((s) => [s.id, s.name]));
+  const summary = grouped.reduce<Record<string, number>>((acc, g) => {
+    const name = statusMap.get(g.statusId) || "UNKNOWN";
+    acc[name] = g._count._all;
+    return acc;
+  }, {});
+
+  return {
+    items,
+    total,
+    summary,
+    page: safePage,
+    limit: safeLimit,
+  };
 };
 
 export const deleteStudy = async (studyId: number) => {

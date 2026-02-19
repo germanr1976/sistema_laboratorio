@@ -247,10 +247,27 @@ export const getMyStudiesAsPatient = async (
       return ResponseHelper.unauthorized(res, "Usuario no autenticado");
     }
 
-    const studies = await studyService.getStudiesByPatient(patientId);
-    const formattedStudies = studies.map(studyFormatter.formatStudy);
+    const page = parseInt(req.query.page as string, 10) || 1;
+    const limit = parseInt(req.query.limit as string, 10) || 10;
 
-    ResponseHelper.success(res, formattedStudies, "Estudios obtenidos exitosamente");
+    const result = await studyService.getStudiesByPatient(patientId, page, limit);
+    const formattedStudies = result.items.map(studyFormatter.formatStudy);
+    const totalPages = result.total === 0 ? 0 : Math.ceil(result.total / result.limit);
+
+    ResponseHelper.success(
+      res,
+      {
+        items: formattedStudies,
+        pagination: {
+          page: result.page,
+          limit: result.limit,
+          total: result.total,
+          totalPages,
+        },
+        summary: result.summary,
+      },
+      "Estudios obtenidos exitosamente"
+    );
   } catch (error: any) {
     console.error("Error al obtener estudios del paciente:", error);
     ResponseHelper.serverError(res, "Error al obtener estudios", error);
