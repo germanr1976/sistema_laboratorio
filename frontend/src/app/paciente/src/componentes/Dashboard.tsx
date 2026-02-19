@@ -156,7 +156,7 @@ export default function Dashboard({
                   </p>
                 </div>
 
-                <span className="px-3 py-1 rounded-full text-xs bg-green-500 text-white min-w-[95px] text-center">
+                <span className="px-3 py-1 rounded-full text-xs bg-green-500 text-white min-w-23.75 text-center">
                   Completado
                 </span>
 
@@ -164,7 +164,7 @@ export default function Dashboard({
                   <a
                     href={localUltimo.pdfUrl}
                     target="_blank"
-                    className="bg-green-500 hover:bg-green-600 text-white px-4 py-2 rounded text-sm min-w-[90px] text-center"
+                    className="bg-green-500 hover:bg-green-600 text-white px-4 py-2 rounded text-sm min-w-22.5 text-center"
                   >
                     Ver PDF
                   </a>

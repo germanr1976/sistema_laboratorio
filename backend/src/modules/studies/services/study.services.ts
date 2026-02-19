@@ -170,22 +170,31 @@ export const getStudiesByPatient = async (
     prisma.study.groupBy({
       by: ["statusId"],
       where: { userId },
-      _count: { _all: true },
+      orderBy: {
+        statusId: "asc",
+      },
+      _count: {
+        _all: true,
+      },
     }),
   ]);
 
   const statusIds = grouped.map((g) => g.statusId);
   const statuses = statusIds.length
     ? await prisma.status.findMany({
-        where: { id: { in: statusIds } },
-        select: { id: true, name: true },
-      })
+      where: { id: { in: statusIds } },
+      select: { id: true, name: true },
+    })
     : [];
 
   const statusMap = new Map(statuses.map((s) => [s.id, s.name]));
   const summary = grouped.reduce<Record<string, number>>((acc, g) => {
     const name = statusMap.get(g.statusId) || "UNKNOWN";
-    acc[name] = g._count._all;
+    const count =
+      typeof g._count === "object" && g._count && "_all" in g._count
+        ? g._count._all ?? 0
+        : 0;
+    acc[name] = count;
     return acc;
   }, {});
 

@@ -28,10 +28,10 @@ export default function HomePage() {
     }
 
     return (
-        <main className="min-h-screen flex flex-col items-center justify-center bg-gradient-to-br from-blue-50 via-slate-50 to-gray-50 relative overflow-hidden z-10">
+        <main className="min-h-screen flex flex-col items-center justify-center bg-linear-to-br from-blue-50 via-slate-50 to-gray-50 relative overflow-hidden z-10">
             {/* Fondo azul inclinado solo en el home */}
             <div
-                className="absolute top-0 left-0 w-full h-[400px] bg-gradient-to-br from-blue-500 to-blue-600 -z-10"
+                className="absolute top-0 left-0 w-full h-100 bg-linear-to-br from-blue-500 to-blue-600 -z-10"
                 style={{ clipPath: 'polygon(0 0, 100% 0, 100% 70%, 0 100%)' }}
             />
 
@@ -55,7 +55,7 @@ export default function HomePage() {
                             <span role="img" aria-label="user">👤</span>
                         </button>
                         <p className="text-center text-gray-700 font-medium text-sm">Paciente</p>
-                        <p className="text-center text-gray-500 text-xs max-w-[120px]">Consulta tus resultados</p>
+                        <p className="text-center text-gray-500 text-xs max-w-30">Consulta tus resultados</p>
                     </div>
                     <div className="flex flex-col items-center gap-3">
                         <button
@@ -66,7 +66,7 @@ export default function HomePage() {
                             <span role="img" aria-label="shield">🛡️</span>
                         </button>
                         <p className="text-center text-gray-700 font-medium text-sm">Profesional</p>
-                        <p className="text-center text-gray-500 text-xs max-w-[120px]">Gestión de estudios</p>
+                        <p className="text-center text-gray-500 text-xs max-w-30">Gestión de estudios</p>
                     </div>
                 </div>
 

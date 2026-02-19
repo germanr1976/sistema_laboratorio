@@ -92,7 +92,7 @@ export default function LoginProfesional() {
             <main className="min-h-screen flex flex-col items-center justify-center bg-white relative overflow-hidden z-10">
                 {/* Fondo azul inclinado */}
                 <div
-                    className="absolute top-0 left-0 w-full h-[400px] bg-blue-500 -z-10"
+                    className="absolute top-0 left-0 w-full h-100 bg-blue-500 -z-10"
                     style={{ clipPath: "polygon(0 0, 100% 0, 100% 70%, 0 100%)" }}
                 />
                 <section className="bg-white rounded-2xl shadow-xl p-8 max-w-md w-full mx-auto mt-16 flex flex-col items-center">

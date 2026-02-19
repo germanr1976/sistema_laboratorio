@@ -470,7 +470,7 @@ export function EstudiosTable() {
                             value={busquedaNombre}
                             onChange={(e) => setBusquedaNombre(e.target.value)}
                             placeholder="Por nombre o apellido"
-                            className="px-3.5 py-2.5 border border-gray-300 rounded-lg bg-white text-gray-900 text-base focus:ring-2 focus:ring-blue-500 focus:border-transparent min-w-[200px]"
+                            className="px-3.5 py-2.5 border border-gray-300 rounded-lg bg-white text-gray-900 text-base focus:ring-2 focus:ring-blue-500 focus:border-transparent min-w-50"
                         />
                         {busquedaNombre && (
                             <button
@@ -487,7 +487,7 @@ export function EstudiosTable() {
                             value={busquedaDni}
                             onChange={(e) => setBusquedaDni(e.target.value)}
                             placeholder="Ingrese DNI del paciente"
-                            className="px-3.5 py-2.5 border border-gray-300 rounded-lg bg-white text-gray-900 text-base focus:ring-2 focus:ring-blue-500 focus:border-transparent min-w-[200px]"
+                            className="px-3.5 py-2.5 border border-gray-300 rounded-lg bg-white text-gray-900 text-base focus:ring-2 focus:ring-blue-500 focus:border-transparent min-w-50"
                         />
                         {busquedaDni && (
                             <button

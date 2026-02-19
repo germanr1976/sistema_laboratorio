@@ -283,7 +283,7 @@ export default function PatientStudiesBoard({
                   {/* Study Details Grid */}
                   <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
                     <div className="flex items-center gap-3">
-                      <div className="w-10 h-10 rounded-lg bg-blue-100 flex items-center justify-center flex-shrink-0">
+                      <div className="w-10 h-10 rounded-lg bg-blue-100 flex items-center justify-center shrink-0">
                         <Calendar className="w-5 h-5 text-blue-600" />
                       </div>
                       <div className="flex-1 min-w-0">
@@ -293,7 +293,7 @@ export default function PatientStudiesBoard({
                     </div>
 
                     <div className="flex items-center gap-3">
-                      <div className="w-10 h-10 rounded-lg bg-green-100 flex items-center justify-center flex-shrink-0">
+                      <div className="w-10 h-10 rounded-lg bg-green-100 flex items-center justify-center shrink-0">
                         <Building2 className="w-5 h-5 text-green-600" />
                       </div>
                       <div className="flex-1 min-w-0">
@@ -303,7 +303,7 @@ export default function PatientStudiesBoard({
                     </div>
 
                     <div className="flex items-center gap-3">
-                      <div className="w-10 h-10 rounded-lg bg-purple-100 flex items-center justify-center flex-shrink-0">
+                      <div className="w-10 h-10 rounded-lg bg-purple-100 flex items-center justify-center shrink-0">
                         <UserRound className="w-5 h-5 text-purple-600" />
                       </div>
                       <div className="flex-1 min-w-0">
@@ -329,7 +329,7 @@ export default function PatientStudiesBoard({
                         <p className="text-sm font-semibold text-gray-700">Documentos disponibles:</p>
                         <div className="flex flex-wrap gap-3">
                           {study.pdfs.map((link, idx) => (
-                            <div key={idx} className="flex items-center gap-2 bg-gradient-to-r from-blue-600 to-blue-700 text-white rounded-lg px-4 py-3 shadow-md">
+                            <div key={idx} className="flex items-center gap-2 bg-linear-to-r from-blue-600 to-blue-700 text-white rounded-lg px-4 py-3 shadow-md">
                               <FileText className="w-5 h-5" />
                               <span className="text-sm font-semibold">PDF {idx + 1}</span>
                               <div className="flex items-center gap-1 ml-2 border-l border-blue-400 pl-2">

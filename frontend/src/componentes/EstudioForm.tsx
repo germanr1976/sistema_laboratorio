@@ -864,7 +864,7 @@ export function EstudioForm({
                                             className="flex items-center gap-2 px-3 py-2 bg-gray-100 rounded-lg text-sm"
                                         >
                                             <FileText className="w-4 h-4 text-gray-600" />
-                                            <span className="truncate max-w-[200px]">{attachment.filename || attachment.url}</span>
+                                            <span className="truncate max-w-50">{attachment.filename || attachment.url}</span>
                                             <button
                                                 type="button"
                                                 onClick={() => openPreviewFromUrl(attachment.url, attachment.filename)}
@@ -981,7 +981,7 @@ export function EstudioForm({
             {previewUrl && (
                 <div className="fixed inset-0 z-50 flex items-center justify-center">
                     <div className="absolute inset-0 bg-black/60" onClick={closePreview} />
-                    <div className="relative bg-white rounded-lg shadow-lg w-[92vw] max-w-[1100px] h-[85vh] overflow-hidden z-10">
+                    <div className="relative bg-white rounded-lg shadow-lg w-[92vw] max-w-275 h-[85vh] overflow-hidden z-10">
                         <div className="flex items-center justify-between px-4 py-2 border-b">
                             <span className="font-medium text-gray-900 truncate">{previewName || 'Vista PDF'}</span>
                             <button onClick={closePreview} className="p-1 rounded hover:bg-gray-100">
