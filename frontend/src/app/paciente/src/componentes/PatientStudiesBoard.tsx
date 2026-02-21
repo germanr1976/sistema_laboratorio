@@ -105,7 +105,12 @@ export default function PatientStudiesBoard({
           return
         }
         const result = await response.json()
-        const backendStudies = result?.data || []
+        const backendStudiesRaw = result?.data?.items ?? result?.items ?? result?.data ?? []
+        const backendStudies = Array.isArray(backendStudiesRaw) ? backendStudiesRaw : []
+
+        if (!Array.isArray(backendStudiesRaw)) {
+          console.warn("Respuesta inesperada en /patient/me, se esperaba array:", result)
+        }
 
         const transformed: Study[] = backendStudies.map((s: any) => {
           const pdfs = Array.isArray(s.pdfs) ? s.pdfs : (s.pdfUrl ? [s.pdfUrl] : [])

@@ -438,8 +438,88 @@ export function EstudiosTable() {
 
             {/* Filtros */}
             <div className="bg-white rounded-lg border border-gray-200 p-4">
-                <div className="space-y-4">
-                    {/* Primera fila: Estado + Nombre del paciente + DNI */}
+                {/* Mobile */}
+                <div className="md:hidden space-y-3">
+                    <div>
+                        <label className="block text-sm font-semibold text-gray-700 mb-1">Estado</label>
+                        <select
+                            value={filtroEstado}
+                            onChange={(e) => setFiltroEstado(e.target.value as any)}
+                            className="w-full px-3 py-2.5 border border-gray-300 rounded-lg bg-white text-gray-900 text-sm focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                        >
+                            <option value="todos">Todos ({estudios.length})</option>
+                            <option value="completado">Completados ({estudios.filter(e => (e.estado || e.status) === 'completado').length})</option>
+                            <option value="en_proceso">En Proceso ({estudios.filter(e => (e.estado || e.status) === 'en_proceso').length})</option>
+                            <option value="parcial">Parciales ({estudios.filter(e => (e.estado || e.status) === 'parcial').length})</option>
+                            <option value="anulado">Anulados ({estudios.filter(e => (e.estado || e.status) === 'anulado').length})</option>
+                        </select>
+                    </div>
+
+                    <label className="inline-flex items-center gap-2 text-sm font-semibold text-gray-700">
+                        <input
+                            type="checkbox"
+                            checked={mostrarAnulados}
+                            onChange={(e) => setMostrarAnulados(e.target.checked)}
+                            className="h-4 w-4 text-blue-600 border-gray-300 rounded focus:ring-blue-500"
+                        />
+                        Mostrar anulados
+                    </label>
+
+                    <div>
+                        <label className="block text-sm font-semibold text-gray-700 mb-1">Paciente</label>
+                        <input
+                            type="text"
+                            value={busquedaNombre}
+                            onChange={(e) => setBusquedaNombre(e.target.value)}
+                            placeholder="Nombre o apellido"
+                            className="w-full px-3 py-2.5 border border-gray-300 rounded-lg bg-white text-gray-900 text-sm focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                        />
+                    </div>
+
+                    <div>
+                        <label className="block text-sm font-semibold text-gray-700 mb-1">DNI</label>
+                        <input
+                            type="text"
+                            value={busquedaDni}
+                            onChange={(e) => setBusquedaDni(e.target.value)}
+                            placeholder="Ingrese DNI"
+                            className="w-full px-3 py-2.5 border border-gray-300 rounded-lg bg-white text-gray-900 text-sm focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                        />
+                    </div>
+
+                    <div className="grid grid-cols-2 gap-2">
+                        <input
+                            type="date"
+                            value={fechaInicio}
+                            onChange={(e) => setFechaInicio(e.target.value)}
+                            className="w-full px-3 py-2.5 border border-gray-300 rounded-lg bg-white text-gray-900 text-sm focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                        />
+                        <input
+                            type="date"
+                            value={fechaFin}
+                            onChange={(e) => setFechaFin(e.target.value)}
+                            className="w-full px-3 py-2.5 border border-gray-300 rounded-lg bg-white text-gray-900 text-sm focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                            min={fechaInicio}
+                        />
+                    </div>
+
+                    {(busquedaNombre || busquedaDni || fechaInicio || fechaFin) && (
+                        <button
+                            onClick={() => {
+                                setBusquedaNombre('')
+                                setBusquedaDni('')
+                                setFechaInicio('')
+                                setFechaFin('')
+                            }}
+                            className="w-full px-3 py-2.5 text-sm text-gray-700 bg-gray-100 hover:bg-gray-200 rounded-lg transition-colors"
+                        >
+                            Limpiar filtros
+                        </button>
+                    )}
+                </div>
+
+                {/* Desktop */}
+                <div className="hidden md:block space-y-4">
                     <div className="flex items-center gap-4 flex-wrap">
                         <label className="text-base font-semibold text-gray-700">Filtrar por estado:</label>
                         <select
@@ -499,7 +579,6 @@ export function EstudiosTable() {
                         )}
                     </div>
 
-                    {/* Segunda fila: Rango de fechas */}
                     <div className="border-t border-gray-200 pt-4">
                         <div className="flex items-center gap-4 flex-wrap">
                             <label className="text-base font-semibold text-gray-700">Rango de fechas:</label>
@@ -653,18 +732,18 @@ export function EstudiosTable() {
                                         <>
                                             <Link
                                                 href={`/cargar-nuevo?id=${estudio.id}`}
-                                                className="p-2 text-amber-600 hover:bg-amber-50 rounded transition-colors"
+                                                className="px-2.5 py-1.5 text-xs font-semibold text-amber-700 bg-amber-100 hover:bg-amber-200 rounded transition-colors"
                                                 title="Cambiar estado"
                                             >
-                                                <Edit2 className="w-4 h-4" />
+                                                Cambiar
                                             </Link>
                                             {(estudio.estado || estudio.status) === 'en_proceso' && (
                                                 <button
                                                     onClick={() => anularEstudio(estudio.id)}
-                                                    className="p-2 text-orange-600 hover:bg-orange-50 rounded transition-colors"
+                                                    className="px-2.5 py-1.5 text-xs font-semibold text-orange-700 bg-orange-100 hover:bg-orange-200 rounded transition-colors"
                                                     title="Anular estudio"
                                                 >
-                                                    <Ban className="w-4 h-4" />
+                                                    Anular
                                                 </button>
                                             )}
                                         </>
@@ -679,12 +758,13 @@ export function EstudiosTable() {
                             </div>
 
                             {/* Detalles */}
-                            <div className="space-y-1 text-base text-gray-600">
-                                <p>📅 {estudio.fechaEstudio ? estudio.fechaEstudio : '-'}</p>
-                                <p>🏥 {estudio.obraSocial || '-'}</p>
-                                <p>👨‍⚕️ {estudio.medico || '-'}</p>
-                                <p className="flex items-center gap-1">
-                                    <FileText className="w-5 h-5" /> {estudio.pdfs?.length || 0} PDF(s)
+                            <div className="space-y-1.5 text-sm text-gray-700">
+                                <p><span className="font-semibold text-gray-900">Fecha:</span> {estudio.fechaEstudio ? estudio.fechaEstudio : '-'}</p>
+                                <p><span className="font-semibold text-gray-900">Obra social:</span> {estudio.obraSocial || '-'}</p>
+                                <p><span className="font-semibold text-gray-900">Médico:</span> {estudio.medico || '-'}</p>
+                                <p className="flex items-center gap-1 text-gray-800">
+                                    <FileText className="w-4 h-4" />
+                                    <span className="font-semibold">{estudio.pdfs?.length || 0} PDF(s)</span>
                                 </p>
                             </div>
                         </div>

@@ -266,46 +266,59 @@ export function EstudioForm({
         setShowToast(true)
     }
 
+    const showValidationAlert = (message: string) => {
+        showToastMessage(message, 'error')
+    }
+
+    const getEstadoLabel = (est: EstadoEstudio): string => {
+        if (est === 'en_proceso') return 'En Proceso'
+        if (est === 'parcial') return 'Parcial'
+        return 'Completado'
+    }
+
+    const getMissingRequiredFields = (): string[] => {
+        const missing: string[] = []
+
+        if (!fechaEstudio?.trim()) {
+            missing.push('Fecha del estudio')
+        }
+
+        if (estado !== 'en_proceso') {
+            if (!obraSocial.trim()) {
+                missing.push('Obra social')
+            }
+            if (!medico.trim()) {
+                missing.push('Médico')
+            }
+        }
+
+        if (estado === 'completado') {
+            const existingAttachmentsCount = (estudioExistente?.attachments?.length || 0) + (estudioExistente?.pdfs?.length || 0)
+            const hasAnyPdf = pdfs.length > 0 || existingAttachmentsCount > 0
+
+            if (!hasAnyPdf) {
+                missing.push('PDF del estudio')
+            }
+        }
+
+        return missing
+    }
+
     const handleSubmit = async (e: React.FormEvent) => {
         e.preventDefault()
         setIsSubmitting(true)
 
-        console.log('🔵 ENVIANDO FORMULARIO - Valores actuales:')
-        console.log('Estado:', estado)
-        console.log('Fecha Estudio:', fechaEstudio)
-        console.log('Obra Social:', obraSocial)
-        console.log('Médico:', medico)
-        console.log('DNI:', dni)
-        console.log('Nombre:', nombreApellido)
-
         try {
             // Validaciones básicas siempre requeridas
             if (!nombreApellido.trim() || !dni.trim()) {
-                showToastMessage('Complete DNI y Nombre del paciente', 'error')
+                showValidationAlert('Complete DNI y Nombre del paciente')
                 setIsSubmitting(false)
                 return
             }
 
-            // Validaciones según estado
-            if (estado !== 'en_proceso') {
-                // Para parcial y completado, requiere todos los campos
-                if (!fechaEstudio || !obraSocial.trim() || !medico.trim()) {
-                    showToastMessage('Complete todos los campos requeridos (Fecha, Obra Social y Médico)', 'error')
-                    setIsSubmitting(false)
-                    return
-                }
-            }
-
-            // Si es nuevo y el estado es "completado", requiere PDF obligatorio
-            if (!modoEdicion && estado === 'completado' && pdfs.length === 0) {
-                showToastMessage('Debe cargar al menos un PDF para estudios completados', 'error')
-                setIsSubmitting(false)
-                return
-            }
-
-            // Si se está cambiando de estado desde "en_proceso" a parcial/completado, requiere PDF
-            if (modoEdicion && permitirCambioEstado && estado !== 'en_proceso' && pdfs.length === 0 && (!estudioExistente?.attachments || estudioExistente.attachments.length === 0)) {
-                showToastMessage('Debe cargar al menos un PDF al cambiar de estado', 'error')
+            const missingRequiredFields = getMissingRequiredFields()
+            if (missingRequiredFields.length > 0) {
+                showValidationAlert(`Faltan campos requeridos para ${getEstadoLabel(estado)}: ${missingRequiredFields.join(', ')}`)
                 setIsSubmitting(false)
                 return
             }
@@ -376,10 +389,8 @@ export function EstudioForm({
                     if (buscarResponse.ok) {
                         const pacienteData = await buscarResponse.json()
                         pacienteId = pacienteData.data?.id
-                        console.log('Paciente encontrado:', pacienteData.data)
                     } else if (buscarResponse.status === 404) {
                         // El paciente no existe, crearlo
-                        console.log('Paciente no encontrado, creando nuevo...')
 
                         const [nombre, ...apellidos] = nombreApellido.split(' ')
                         const apellido = apellidos.join(' ') || nombre
@@ -398,7 +409,6 @@ export function EstudioForm({
                         if (crearPacienteResponse.ok) {
                             const nuevoPaciente = await crearPacienteResponse.json()
                             pacienteId = nuevoPaciente.data?.user?.id
-                            console.log('Paciente creado:', nuevoPaciente.data)
                         } else {
                             const errorData = await crearPacienteResponse.json()
                             throw new Error(`No se pudo crear el paciente: ${errorData.message}`)
@@ -411,10 +421,15 @@ export function EstudioForm({
                 // Paso 2: Crear o actualizar estudio
                 if (!modoEdicion) {
                     // Validaciones fuertes según estado
+                    if (!fechaEstudio?.trim()) {
+                        throw new Error('La fecha del estudio es obligatoria')
+                    }
                     if (estado !== 'en_proceso') {
-                        if (!fechaEstudio) throw new Error('La fecha del estudio es obligatoria en Parcial/Completo')
-                        if (!medico) throw new Error('El médico es obligatorio en Parcial/Completo')
-                        if (!obraSocial) throw new Error('La obra social es obligatoria en Parcial/Completo')
+                        if (!medico.trim()) throw new Error('El médico es obligatorio en Parcial/Completo')
+                        if (!obraSocial.trim()) throw new Error('La obra social es obligatoria en Parcial/Completo')
+                    }
+                    if (estado === 'completado' && pdfs.length === 0) {
+                        throw new Error('Debe cargar al menos un PDF para estado Completado')
                     }
 
                     // Crear el estudio
@@ -425,7 +440,6 @@ export function EstudioForm({
                     formData.append('studyName', nombreApellido)
                     // Usar la fecha del formulario o fecha actual si está vacía
                     const fechaFinal = fechaEstudio || todayLocal()
-                    console.log('📅 Guardando estudio con fecha:', fechaFinal, 'Estado:', estado)
                     formData.append('studyDate', fechaFinal)
 
                     // Campos opcionales - Enviar siempre, incluso en "en_proceso"
@@ -444,23 +458,13 @@ export function EstudioForm({
                         })
                     }
 
-                    console.log('Creando estudio para paciente:', pacienteId)
-                    console.log('FormData entries:');
-                    for (let pair of formData.entries()) {
-                        console.log(pair[0] + ':', pair[1]);
-                    }
-
                     const response = await authFetch(`${API_URL}/api/studies`, {
                         method: 'POST',
                         body: formData,
                     })
 
-                    console.log('Response status:', response.status, response.statusText)
-
                     if (response.ok) {
                         const result = await response.json()
-                        console.log('Respuesta completa del backend:', result)
-                        console.log('result?.data:', result?.data)
                         showToastMessage('Estudio guardado en la base de datos exitosamente', 'success')
 
                         // Actualizar estado si corresponde
@@ -475,26 +479,20 @@ export function EstudioForm({
                                 // Actualizar con los datos que devuelve el backend
                                 // Intentar acceder a data en diferentes estructuras
                                 const backendData = result?.data || result || {};
-                                console.log('📤 Datos devueltos por backend:', backendData);
-                                console.log('📤 doctor field:', backendData.doctor);
                                 metas[idx].backendId = createdId
                                 metas[idx].serverId = createdId
                                 // Actualizar los campos que devuelve el backend
                                 if (backendData.studyDate) {
                                     metas[idx].fechaEstudio = backendData.studyDate
-                                    console.log('✅ Actualizando fechaEstudio:', backendData.studyDate)
                                 }
                                 if (backendData.doctor) {
                                     metas[idx].medico = backendData.doctor
-                                    console.log('✅ Actualizando medico:', backendData.doctor)
                                     setMedico(backendData.doctor) // Actualizar estado del componente
                                 }
                                 if (backendData.socialInsurance) {
                                     metas[idx].obraSocial = backendData.socialInsurance
-                                    console.log('✅ Actualizando obraSocial:', backendData.socialInsurance)
                                 }
                                 localStorage.setItem('estudios_metadata', JSON.stringify(metas))
-                                console.log('💾 localStorage actualizado con datos del backend')
                             }
                         } catch (e) {
                             console.warn('No se pudo actualizar backendId en metadata local', e)
@@ -536,10 +534,17 @@ export function EstudioForm({
                     const statusName = mapEstadoToStatusName(estado)
 
                     // Validaciones fuertes según estado
+                    if (!fechaEstudio?.trim()) {
+                        throw new Error('La fecha del estudio es obligatoria')
+                    }
                     if (estado !== 'en_proceso') {
-                        if (!fechaEstudio) throw new Error('La fecha del estudio es obligatoria en Parcial/Completo')
-                        if (!medico) throw new Error('El médico es obligatorio en Parcial/Completo')
-                        if (!obraSocial) throw new Error('La obra social es obligatoria en Parcial/Completo')
+                        if (!medico.trim()) throw new Error('El médico es obligatorio en Parcial/Completo')
+                        if (!obraSocial.trim()) throw new Error('La obra social es obligatoria en Parcial/Completo')
+                    }
+                    if (estado === 'completado') {
+                        const existingAttachmentsCount = (estudioExistente?.attachments?.length || 0) + (estudioExistente?.pdfs?.length || 0)
+                        const hasAnyPdf = pdfs.length > 0 || existingAttachmentsCount > 0
+                        if (!hasAnyPdf) throw new Error('Debe cargar al menos un PDF para estado Completado')
                     }
 
                     // Actualizar campos de estudio (obra social, médico, fecha)
@@ -666,7 +671,7 @@ export function EstudioForm({
                 <h1 className="text-3xl font-bold text-gray-900 mb-2">Cargar Nuevo Estudio</h1>
                 <p className="text-gray-600">Completa el formulario para registrar un nuevo estudio</p>
             </div>
-            <form onSubmit={handleSubmit} className="space-y-6 max-w-4xl mx-auto">
+            <form onSubmit={handleSubmit} noValidate className="space-y-6 max-w-4xl mx-auto">
                 {/* Toast */}
                 {showToast && (
                     <Toast

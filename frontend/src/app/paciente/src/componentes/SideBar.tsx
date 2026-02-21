@@ -80,7 +80,7 @@ export function Sidebar({ className = "" }: SidebarProps) {
   ]
 
   return (
-    <div className={`flex min-h-screen w-64 flex-col bg-gradient-to-b from-slate-900 to-slate-800 border-r border-slate-700 ${className}`}>
+    <div className={`flex h-screen w-64 flex-col bg-linear-to-b from-slate-900 to-slate-800 border-r border-slate-700 ${className}`}>
       {/* User Profile Section */}
       <div className="p-4 border-b border-slate-700">
         <div className="flex items-center gap-3">
@@ -96,7 +96,7 @@ export function Sidebar({ className = "" }: SidebarProps) {
       </div>
 
       {/* Main Navigation */}
-      <nav className="flex-1 p-4 space-y-1">
+      <nav className="flex-1 overflow-y-auto p-4 space-y-1">
         {menuItems.map((item) => (
           <div key={item.id}>
             {item.hasSubmenu ? (

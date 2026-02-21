@@ -30,7 +30,7 @@ export default function LoginProfesional() {
             return;
         }
         try {
-            const base = process.env.NEXT_PUBLIC_API_URL ?? '';
+            const base = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:3000';
             const res = await fetch(`${base}/api/auth/login`, {
                 method: 'POST',
                 headers: {
