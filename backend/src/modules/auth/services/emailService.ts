@@ -3,13 +3,38 @@ import dotenv from "dotenv";
 
 dotenv.config();
 
-const transporter = nodemailer.createTransport({
-    service: process.env.EMAIL_SERVICE || "gmail",
-    auth: {
-        user: process.env.EMAIL_USER,
-        pass: process.env.EMAIL_PASSWORD
+function buildTransporter() {
+    const emailUser = (process.env.EMAIL_USER || '').trim();
+    const emailPassword = (process.env.EMAIL_PASSWORD || '').trim();
+
+    if (!emailUser || !emailPassword) {
+        throw new Error('SMTP no configurado: faltan EMAIL_USER y/o EMAIL_PASSWORD');
     }
-});
+
+    const smtpHost = (process.env.SMTP_HOST || '').trim();
+    const smtpPort = Number(process.env.SMTP_PORT || 587);
+    const smtpSecure = String(process.env.SMTP_SECURE || 'false').toLowerCase() === 'true';
+
+    if (smtpHost) {
+        return nodemailer.createTransport({
+            host: smtpHost,
+            port: Number.isFinite(smtpPort) ? smtpPort : 587,
+            secure: smtpSecure,
+            auth: {
+                user: emailUser,
+                pass: emailPassword,
+            },
+        });
+    }
+
+    return nodemailer.createTransport({
+        service: process.env.EMAIL_SERVICE || "gmail",
+        auth: {
+            user: emailUser,
+            pass: emailPassword,
+        },
+    });
+}
 
 /**
  * Envía correo de recuperación de contraseña
@@ -18,6 +43,8 @@ const transporter = nodemailer.createTransport({
  */
 export async function enviarCorreoRecuperacion(destinatario: string, token: string) {
     try {
+        const transporter = buildTransporter();
+
         // Construir URL completamente segura sin caracteres especiales
         const baseUrl = process.env.APP_FRONTEND_URL || 'http://localhost:3001';
         const encodedToken = encodeURIComponent(token);
