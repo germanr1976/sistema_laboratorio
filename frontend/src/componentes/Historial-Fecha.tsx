@@ -1,25 +1,16 @@
 "use client"
 
-import { Eye, Download } from "lucide-react"
+import { Eye, Download, CircleOff } from "lucide-react"
 import type { Study } from "../utils/tipos"
+import { getStatusBadgeClass } from "../utils/uiClasses"
 
 interface StudiesTableProps {
   studies: Study[]
+  onCancelStudy?: (studyId: string) => void | Promise<void>
+  cancellingStudyId?: string | null
 }
 
-export function StudiesTable({ studies }: StudiesTableProps) {
-  const getStatusStyles = (status: string) => {
-    switch (status) {
-      case "Completado":
-        return "bg-green-100 text-green-800 border-green-200"
-      case "Parcial":
-        return "bg-gray-100 text-gray-800 border-gray-300"
-      case "En Proceso":
-        return "bg-blue-100 text-blue-800 border-blue-200"
-      default:
-        return "bg-gray-100 text-gray-800 border-gray-200"
-    }
-  }
+export function StudiesTable({ studies, onCancelStudy, cancellingStudyId = null }: StudiesTableProps) {
 
   const formatDate = (dateString: string) => {
     const date = new Date(dateString)
@@ -40,13 +31,13 @@ export function StudiesTable({ studies }: StudiesTableProps) {
 
   return (
     <div className="overflow-x-auto rounded-md border border-gray-200">
-      <table className="w-full text-sm">
+      <table className="w-full text-sm table-auto">
         <thead className="border-b border-gray-200 bg-gray-50">
           <tr>
-            <th className="px-4 py-3 text-left font-medium text-gray-700">ID</th>
-            <th className="px-4 py-3 text-left font-medium text-gray-700">Paciente</th>
-            <th className="px-4 py-3 text-left font-medium text-gray-700">Obra social</th>
             <th className="px-4 py-3 text-left font-medium text-gray-700">Fecha</th>
+            <th className="px-4 py-3 text-left font-medium text-gray-700">Paciente</th>
+            <th className="px-4 py-3 text-left font-medium text-gray-700">DNI</th>
+            <th className="px-4 py-3 text-left font-medium text-gray-700">Obra social</th>
             <th className="px-4 py-3 text-left font-medium text-gray-700">Estado</th>
             <th className="px-4 py-3 text-left font-medium text-gray-700">Médico</th>
             <th className="px-4 py-3 text-right font-medium text-gray-700">Acciones</th>
@@ -55,13 +46,13 @@ export function StudiesTable({ studies }: StudiesTableProps) {
         <tbody className="divide-y divide-gray-200">
           {studies.map((study) => (
             <tr key={study.id} className="hover:bg-gray-50">
-              <td className="px-4 py-3 font-medium text-gray-900">{study.id}</td>
-              <td className="px-4 py-3 text-gray-900">{study.patientName}</td>
-              <td className="px-4 py-3 text-gray-900">{study.study}</td>
               <td className="px-4 py-3 text-gray-900">{formatDate(study.date)}</td>
+              <td className="px-4 py-3 text-gray-900">{study.patientName}</td>
+              <td className="px-4 py-3 text-gray-900">{study.dni || "-"}</td>
+              <td className="px-4 py-3 text-gray-900">{study.obraSocial || study.study || "Sin obra social"}</td>
               <td className="px-4 py-3">
                 <span
-                  className={`inline-flex rounded-full border px-2.5 py-0.5 text-xs font-semibold ${getStatusStyles(study.status)}`}
+                  className={getStatusBadgeClass(study.status)}
                 >
                   {study.status}
                 </span>
@@ -69,14 +60,41 @@ export function StudiesTable({ studies }: StudiesTableProps) {
               <td className="px-4 py-3 text-gray-600">{study.doctor}</td>
               <td className="px-4 py-3">
                 <div className="flex justify-end gap-2">
-                  {study.status !== "En Proceso" && (
-                    <button className="rounded-md p-2 text-gray-600 hover:bg-gray-100 hover:text-gray-900">
+                  {study.pdfUrl && (
+                    <a
+                      href={study.pdfUrl}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      className="rounded-md p-2 text-gray-600 hover:bg-gray-100 hover:text-gray-900"
+                      title="Ver PDF"
+                    >
                       <Eye className="h-4 w-4" />
+                    </a>
+                  )}
+                  {study.pdfUrl ? (
+                    <a
+                      href={study.pdfUrl}
+                      download
+                      className="rounded-md p-2 text-gray-600 hover:bg-gray-100 hover:text-gray-900"
+                      title="Descargar PDF"
+                    >
+                      <Download className="h-4 w-4" />
+                    </a>
+                  ) : (
+                    <span className="text-xs text-gray-500">Sin PDF</span>
+                  )}
+
+                  {onCancelStudy && study.status !== "Anulado" && (
+                    <button
+                      type="button"
+                      onClick={() => onCancelStudy(study.id)}
+                      disabled={cancellingStudyId === study.id}
+                      className="rounded-md p-2 text-red-600 hover:bg-red-50 hover:text-red-700 disabled:opacity-60 disabled:cursor-not-allowed"
+                      title="Anular estudio"
+                    >
+                      <CircleOff className="h-4 w-4" />
                     </button>
                   )}
-                  <button className="rounded-md p-2 text-gray-600 hover:bg-gray-100 hover:text-gray-900">
-                    <Download className="h-4 w-4" />
-                  </button>
                 </div>
               </td>
             </tr>

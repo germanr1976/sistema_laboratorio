@@ -11,10 +11,10 @@ export default function RootLayout({
 }) {
   return (
     <html lang="en">
-      <body className="font-sans min-h-screen">
-        <div className="flex">
-          <Sidebar />
-          <div className="flex-1 flex flex-col">
+      <body className="font-sans h-screen overflow-hidden">
+        <div className="flex h-screen overflow-hidden">
+          <Sidebar className="shrink-0" />
+          <div className="flex-1 flex flex-col overflow-hidden">
             {/* Header global, siempre visible */}
             <div className="bg-white border-b border-gray-200 px-8 py-4 flex items-center justify-between">
               <h1 className="text-2xl font-bold text-gray-900">¡Bienvenido!</h1>
@@ -23,7 +23,7 @@ export default function RootLayout({
                 <span className="text-gray-600">Jueves 11 de septiembre 2025</span>
               </div>
             </div>
-            <main className="flex-1 bg-gray-50 p-8">
+            <main className="flex-1 overflow-y-auto bg-gray-50 p-8">
               {children}
             </main>
           </div>

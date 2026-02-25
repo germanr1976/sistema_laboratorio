@@ -102,8 +102,13 @@ export function Sidebar({ className = "" }: SidebarProps) {
       {/* Logo Section */}
       <div className="p-4 border-b border-gray-200 flex justify-center">
         <img
-          src="/icons/logo_lab.png"
+          src="/logo_lab.png"
           alt="Icono laboratorio"
+          onError={(e) => {
+            const target = e.currentTarget
+            target.onerror = null
+            target.src = "data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='80' height='80' viewBox='0 0 80 80'%3E%3Ccircle cx='40' cy='40' r='38' fill='%23ffffff' stroke='%233b82f6' stroke-width='4'/%3E%3Ctext x='40' y='47' text-anchor='middle' font-size='20' font-family='Arial' fill='%233b82f6'%3ELAB%3C/text%3E%3C/svg%3E"
+          }}
           className="h-16 w-16 object-contain rounded-full border-2 border-blue-300 bg-white cursor-pointer hover:scale-105 transition-transform"
           onClick={() => router.push("/")}
         />

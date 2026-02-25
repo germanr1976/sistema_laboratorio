@@ -30,7 +30,7 @@ export default function LoginProfesional() {
             return;
         }
         try {
-            const base = process.env.NEXT_PUBLIC_API_URL ?? '';
+            const base = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:3000';
             const res = await fetch(`${base}/api/auth/login`, {
                 method: 'POST',
                 headers: {
@@ -168,7 +168,7 @@ export default function LoginProfesional() {
                         >
                             Ingresar
                         </button>
-                        <Link href="/recuperar-contrasena" className="text-center text-sm text-blue-600 hover:text-blue-800 underline">
+                        <Link href="/recuperar-contrasena?tipo=profesional" className="text-center text-sm text-blue-600 hover:text-blue-800 underline">
                             ¿Olvidaste tu contraseña?
                         </Link>
                     </form>

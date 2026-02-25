@@ -33,6 +33,31 @@ export async function loginController(req: Request, res: Response) {
         } else {
             switch (user.role.name) {
                 case 'PATIENT':
+                    const patientEmail = user.email ?? '';
+                    const hasPendingMarker = patientEmail.endsWith('@pending.local');
+
+                    if (hasPendingMarker || !user.email || !user.password) {
+                        return res.status(403).json({
+                            success: false,
+                            message: 'Debes completar tu registro de paciente para poder iniciar sesión'
+                        });
+                    }
+
+                    if (!password) {
+                        return res.status(400).json({
+                            success: false,
+                            message: 'Password requerida'
+                        });
+                    }
+
+                    const patientPasswordVerify = await comparePassword(password, user.password)
+                    if (!patientPasswordVerify) {
+                        return res.status(401).json({
+                            success: false,
+                            message: 'Error en la contraseña'
+                        })
+                    }
+
                     const tokenGenerated = await generateToken({
                         userId: user.id,
                         dni: user.dni,
@@ -231,16 +256,101 @@ export async function registerPatientController(req: Request, res: Response) {
         const lastName: string = validatedData.lastName;
         const dni: string = validatedData.dni;
         const birthDate: string = validatedData.birthDate;
+        const email: string | undefined = validatedData.email;
+        const password: string | undefined = validatedData.password;
 
         const existingPatientByDni = await prisma.user.findUnique({
-            where: { dni }
+            where: { dni },
+            include: { profile: true, role: true }
         });
         if (existingPatientByDni) {
+            if (existingPatientByDni.role.name !== 'PATIENT') {
+                return res.status(409).json({
+                    success: false,
+                    message: 'DNI/CURP ya registrado'
+                })
+            }
+
+            if (email || password) {
+                if (!email || !password) {
+                    return res.status(400).json({
+                        success: false,
+                        message: 'Email y contraseña son requeridos para completar el registro'
+                    })
+                }
+
+                if (email !== existingPatientByDni.email) {
+                    const existingUserByEmail = await prisma.user.findUnique({
+                        where: { email }
+                    });
+
+                    if (existingUserByEmail && existingUserByEmail.id !== existingPatientByDni.id) {
+                        return res.status(409).json({
+                            success: false,
+                            message: 'Email ya registrado'
+                        })
+                    }
+                }
+
+                const hashedPassword = await hashPassword(password);
+
+                const updated = await prisma.$transaction(async (tx: any) => {
+                    const updatedUser = await tx.user.update({
+                        where: { id: existingPatientByDni.id },
+                        data: {
+                            email,
+                            password: hashedPassword
+                        }
+                    });
+
+                    const updatedProfile = await tx.profile.update({
+                        where: { userId: existingPatientByDni.id },
+                        data: {
+                            firstName,
+                            lastName,
+                            birthDate
+                        }
+                    });
+
+                    return { user: updatedUser, profile: updatedProfile };
+                });
+
+                return res.status(200).json({
+                    success: true,
+                    message: 'Paciente actualizado exitosamente',
+                    data: {
+                        id: updated.user.id,
+                        role: 'PATIENT',
+                        email: updated.user.email,
+                        profile: {
+                            firstName: updated.profile.firstName,
+                            lastName: updated.profile.lastName,
+                            birthDate: updated.profile.birthDate
+                        }
+                    },
+                });
+            }
+
             return res.status(409).json({
                 success: false,
                 message: 'DNI/CURP ya registrado'
             })
         }
+
+        if (email) {
+            const existingUserByEmail = await prisma.user.findUnique({
+                where: { email }
+            });
+            if (existingUserByEmail) {
+                return res.status(409).json({
+                    success: false,
+                    message: 'Email ya registrado'
+                })
+            }
+        }
+
+        const hashedPassword = password ? await hashPassword(password) : null;
+
         const patientRole = await prisma.role.findUnique({
             where: { name: 'PATIENT' }
         });
@@ -254,6 +364,8 @@ export async function registerPatientController(req: Request, res: Response) {
             const newPatientUser = await tx.user.create({
                 data: {
                     dni,
+                    email,
+                    password: hashedPassword,
                     roleId: patientRole?.id
                 }
             });
@@ -273,6 +385,7 @@ export async function registerPatientController(req: Request, res: Response) {
             data: {
                 id: result.user.id,
                 role: 'PATIENT',
+                email: result.user.email,
                 profile: {
                     firstName: result.profile.firstName,
                     lastName: result.profile.lastName,
@@ -306,6 +419,8 @@ export async function requestPasswordRecoveryController(req: Request, res: Respo
             });
         }
 
+        const genericMessage = 'Si el email existe en nuestro sistema, recibirás un enlace de recuperación';
+
         // Buscar usuario por email
         const user = await prisma.user.findUnique({
             where: { email },
@@ -316,20 +431,35 @@ export async function requestPasswordRecoveryController(req: Request, res: Respo
             // Por seguridad, no revelamos si el email existe o no
             return res.status(200).json({
                 success: true,
-                message: 'Si el email existe en nuestro sistema, recibirás un enlace de recuperación'
+                message: genericMessage
             });
         }
 
         // Generar token de recuperación
         const recoveryToken = await generatePasswordRecoveryToken(user.id, user.dni);
+        const baseUrl = process.env.APP_FRONTEND_URL || 'http://localhost:3001';
+        const recoveryLink = `${baseUrl}/recuperar-contrasena?token=${encodeURIComponent(recoveryToken)}`;
 
-        // Enviar correo con el token
-        await enviarCorreoRecuperacion(email, recoveryToken);
+        // Enviar correo con el token (si falla SMTP no romper el endpoint)
+        let emailSent = false;
+        try {
+            await enviarCorreoRecuperacion(email, recoveryToken);
+            emailSent = true;
+        } catch (emailError) {
+            console.error('No se pudo enviar correo de recuperación:', emailError);
+        }
 
-        return res.status(200).json({
+        const responsePayload: any = {
             success: true,
-            message: 'Se ha enviado un enlace de recuperación a tu email'
-        });
+            message: genericMessage
+        };
+
+        if (!emailSent && process.env.NODE_ENV !== 'production') {
+            responsePayload.debugRecoveryLink = recoveryLink;
+            responsePayload.message = 'No se pudo enviar el correo en este entorno. Usa el link de recuperación de debug.';
+        }
+
+        return res.status(200).json(responsePayload);
 
     } catch (error) {
         console.error('Error en solicitud de recuperación de contraseña:', error);

@@ -7,6 +7,7 @@ import { useRouter } from "next/navigation"
 
 import { savePdf } from "../utils/estudiosStore"
 import authFetch from "../utils/authFetch"
+import Toast from "./Toast"
 
 const API_URL = process.env.NEXT_PUBLIC_API_URL || "http://localhost:3000"
 
@@ -116,8 +117,18 @@ export function CargarNuevo({ onCargarEstudio, initialId, initialData }: CargarN
   const [studyCreatedId, setStudyCreatedId] = useState<string | null>(null)
   const [editingExistingStudy, setEditingExistingStudy] = useState(false)
   const [showConfirm, setShowConfirm] = useState(false)
+  const [showToast, setShowToast] = useState(false)
+  const [toastMessage, setToastMessage] = useState("")
+  const [toastType, setToastType] = useState<"success" | "error" | "info">("info")
 
   const [now, setNow] = useState<Date>(new Date())
+
+  const showToastMessage = (message: string, type: "success" | "error" | "info" = "info") => {
+    setToastMessage(message)
+    setToastType(type)
+    setShowToast(true)
+  }
+
   useEffect(() => {
     const t = window.setInterval(() => setNow(new Date()), 1000)
     return () => window.clearInterval(t)
@@ -203,7 +214,7 @@ export function CargarNuevo({ onCargarEstudio, initialId, initialData }: CargarN
   }, [initialId, initialData])
   const handleSearchPatient = async () => {
     if (!searchDni.trim()) {
-      alert("Ingrese un DNI para buscar")
+      showToastMessage("Ingrese un DNI para buscar", "error")
       return
     }
 
@@ -263,7 +274,7 @@ export function CargarNuevo({ onCargarEstudio, initialId, initialData }: CargarN
     console.log('handleSavePatient llamado con:', { patientData, patientFound, isNewPatient })
 
     if (!patientData.dni || !patientData.nombreApellido) {
-      alert("Complete DNI y Nombre del paciente")
+      showToastMessage("Complete DNI y Nombre del paciente", "error")
       return
     }
 
@@ -312,7 +323,7 @@ export function CargarNuevo({ onCargarEstudio, initialId, initialData }: CargarN
       setCurrentStep(2)
     } catch (e: any) {
       console.error('Error saving patient:', e)
-      alert(e.message || 'Error al guardar paciente')
+      showToastMessage(e.message || 'Error al guardar paciente', 'error')
     }
   }
 
@@ -322,11 +333,11 @@ export function CargarNuevo({ onCargarEstudio, initialId, initialData }: CargarN
     if (studyData.estado !== "en_proceso") {
       // Para parcial y completado, se requieren fecha, médico y obra social
       if (!studyData.fecha || !studyData.medico) {
-        alert("Complete fecha y médico")
+        showToastMessage("Complete fecha y médico", "error")
         return
       }
       if (!patientData.obraSocial) {
-        alert("Complete la obra social")
+        showToastMessage("Complete la obra social", "error")
         return
       }
     }
@@ -362,15 +373,15 @@ export function CargarNuevo({ onCargarEstudio, initialId, initialData }: CargarN
 
       // Si el estado es "en_proceso", podemos finalizar aquí
       if (studyData.estado === "en_proceso") {
-        alert("✓ Estudio creado exitosamente en estado: EN PROCESO")
-        router.push('/dashboard')
+        showToastMessage("✓ Estudio creado exitosamente en estado: EN PROCESO", "success")
+        setTimeout(() => router.push('/dashboard'), 900)
       } else {
         // Si es parcial o completado, pasar al paso 3 para subir archivo
         setCurrentStep(3)
       }
     } catch (e: any) {
       console.error('Error creating study:', e)
-      alert(e.message || 'Error al crear estudio')
+      showToastMessage(e.message || 'Error al crear estudio', 'error')
     }
   }
 
@@ -379,7 +390,7 @@ export function CargarNuevo({ onCargarEstudio, initialId, initialData }: CargarN
     if (file && file.type === "application/pdf") {
       setPdfFile(file)
     } else if (file) {
-      alert("Por favor, selecciona un archivo PDF")
+      showToastMessage("Por favor, selecciona un archivo PDF", "error")
     }
   }
 
@@ -414,7 +425,7 @@ export function CargarNuevo({ onCargarEstudio, initialId, initialData }: CargarN
 
   const handleRequestFinish = () => {
     if (studyData.estado === "completado" && !pdfFile) {
-      alert("El archivo es obligatorio para estudios completados")
+      showToastMessage("El archivo es obligatorio para estudios completados", "error")
       return
     }
     setShowConfirm(true)
@@ -423,12 +434,12 @@ export function CargarNuevo({ onCargarEstudio, initialId, initialData }: CargarN
   // Finalizar con archivo
   const handleFinishWithFile = async () => {
     if (!pdfFile && studyData.estado === "completado") {
-      alert("El archivo es obligatorio para estudios completados")
+      showToastMessage("El archivo es obligatorio para estudios completados", "error")
       return
     }
 
     if (!studyCreatedId) {
-      alert("Error: No se encontró el ID del estudio")
+      showToastMessage("Error: No se pudo identificar el estudio", "error")
       return
     }
 
@@ -485,11 +496,11 @@ export function CargarNuevo({ onCargarEstudio, initialId, initialData }: CargarN
         }
       }
 
-      alert(`✓ Estudio finalizado exitosamente con estado: ${studyData.estado.toUpperCase()}`)
-      router.push('/dashboard')
+      showToastMessage(`✓ Estudio finalizado exitosamente con estado: ${studyData.estado.toUpperCase()}`, "success")
+      setTimeout(() => router.push('/dashboard'), 900)
     } catch (e: any) {
       console.error('Error finishing study:', e)
-      alert(e.message || 'Error al finalizar estudio')
+      showToastMessage(e.message || 'Error al finalizar estudio', 'error')
     }
   }
 
@@ -507,6 +518,15 @@ export function CargarNuevo({ onCargarEstudio, initialId, initialData }: CargarN
 
   return (
     <div className="min-h-screen bg-gray-50 w-full text-black">
+      {showToast && (
+        <Toast
+          message={toastMessage}
+          type={toastType}
+          onClose={() => setShowToast(false)}
+          duration={4200}
+        />
+      )}
+
       {/* Header fijo con fecha y hora */}
       <div className="sticky top-0 z-10 bg-white border-b border-gray-300 px-8 py-4 shadow-sm">
         <div className="flex items-center justify-between">

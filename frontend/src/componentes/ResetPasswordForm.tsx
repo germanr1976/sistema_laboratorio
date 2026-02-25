@@ -5,9 +5,10 @@ import Toast from './Toast';
 
 interface ResetPasswordFormProps {
     token: string;
+    loginHref: string;
 }
 
-export default function ResetPasswordForm({ token }: ResetPasswordFormProps) {
+export default function ResetPasswordForm({ token, loginHref }: ResetPasswordFormProps) {
     const [formData, setFormData] = useState({
         newPassword: '',
         confirmPassword: ''
@@ -67,7 +68,8 @@ export default function ResetPasswordForm({ token }: ResetPasswordFormProps) {
 
         setLoading(true);
         try {
-            const response = await fetch(`${process.env.NEXT_PUBLIC_BACKEND_URL}/api/auth/reset-password`, {
+            const base = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:3000';
+            const response = await fetch(`${base}/api/auth/reset-password`, {
                 method: 'POST',
                 headers: {
                     'Content-Type': 'application/json',
@@ -85,7 +87,7 @@ export default function ResetPasswordForm({ token }: ResetPasswordFormProps) {
                 setSuccess(true);
                 setToast({ type: 'success', message: data.message });
                 setTimeout(() => {
-                    window.location.href = '/login-profesional';
+                    window.location.href = loginHref;
                 }, 2000);
             } else {
                 setToast({ type: 'error', message: data.message || 'Error al restablecer contraseña' });
@@ -184,7 +186,7 @@ export default function ResetPasswordForm({ token }: ResetPasswordFormProps) {
                 </button>
 
                 <a
-                    href="/login-profesional"
+                    href={loginHref}
                     className="block text-center text-blue-600 hover:text-blue-800 text-sm mt-4"
                 >
                     Volver al Login

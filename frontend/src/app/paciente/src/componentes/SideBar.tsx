@@ -3,7 +3,7 @@
 import { useState, useEffect } from "react"
 import Link from "next/link"
 import { usePathname } from "next/navigation"
-import { Home, BarChart3, ChevronDown, ChevronRight, User, Settings, HelpCircle, LogOut } from "lucide-react"
+import { Home, User, Settings, HelpCircle, LogOut, FilePlus2 } from "lucide-react"
 
 interface SidebarProps {
   className?: string
@@ -12,10 +12,6 @@ interface SidebarProps {
 export function Sidebar({ className = "" }: SidebarProps) {
   const pathname = usePathname()
   const basePath = "/paciente"
-  const studiesPaths = [`${basePath}/completados`, `${basePath}/pendientes`, `${basePath}/parciales`]
-  const [isEstudiosOpen, setIsEstudiosOpen] = useState(
-    studiesPaths.some((p) => pathname?.startsWith(p))
-  )
   const [userName, setUserName] = useState<string>("Paciente")
   const [userInitials, setUserInitials] = useState<string>("P")
   const [userDni, setUserDni] = useState<string>("")
@@ -59,17 +55,8 @@ export function Sidebar({ className = "" }: SidebarProps) {
   }, [])
 
   const menuItems = [
-    { id: "dashboard", label: "Dashboard", icon: Home, href: `${basePath}/dashboard` },
-    {
-      id: "estudios",
-      label: "Mis estudios",
-      icon: BarChart3,
-      hasSubmenu: true,
-      submenu: [
-        { id: "completados", label: "Últimos estudios", href: `${basePath}/completados` },
-        { id: "pendientes", label: "Pendientes", href: `${basePath}/pendientes` },
-      ],
-    },
+    { id: "dashboard", label: "Mis estudios", icon: Home, href: `${basePath}/dashboard` },
+    { id: "solicitar-estudio", label: "Solicitar estudio", icon: FilePlus2, href: `${basePath}/solicitar-estudio` },
     { id: "historial", label: "Historial", icon: User, href: `${basePath}/historial` },
   ]
 
@@ -80,7 +67,7 @@ export function Sidebar({ className = "" }: SidebarProps) {
   ]
 
   return (
-    <div className={`flex min-h-screen w-64 flex-col bg-gradient-to-b from-slate-900 to-slate-800 border-r border-slate-700 ${className}`}>
+    <div className={`flex h-screen w-64 flex-col bg-linear-to-b from-slate-900 to-slate-800 border-r border-slate-700 ${className}`}>
       {/* User Profile Section */}
       <div className="p-4 border-b border-slate-700">
         <div className="flex items-center gap-3">
@@ -96,54 +83,17 @@ export function Sidebar({ className = "" }: SidebarProps) {
       </div>
 
       {/* Main Navigation */}
-      <nav className="flex-1 p-4 space-y-1">
+      <nav className="flex-1 overflow-y-auto p-4 space-y-1">
         {menuItems.map((item) => (
-          <div key={item.id}>
-            {item.hasSubmenu ? (
-              <div>
-                <Link
-                  href="#"
-                  onClick={(e) => {
-                    e.preventDefault()
-                    setIsEstudiosOpen(!isEstudiosOpen)
-                  }}
-                  className={`w-full flex items-center rounded-md px-2 py-2 text-left 
-                    ${isEstudiosOpen ? "bg-blue-600 text-white" : "text-slate-300 hover:bg-slate-700/50 hover:text-white"}`}
-                >
-                  <item.icon className="mr-3 h-4 w-4" />
-                  {item.label}
-                  {isEstudiosOpen ? (
-                    <ChevronDown className="ml-auto h-4 w-4" />
-                  ) : (
-                    <ChevronRight className="ml-auto h-4 w-4" />
-                  )}
-                </Link>
-                {isEstudiosOpen && (
-                  <div className="ml-7 mt-1 space-y-1">
-                    {item.submenu?.map((subItem) => (
-                      <Link
-                        key={subItem.label}
-                        href={subItem.href}
-                        className={`block w-full text-sm px-2 py-1 rounded-md text-left 
-                          ${pathname === subItem.href ? "bg-blue-600 text-white" : "text-slate-300 hover:bg-slate-700/50 hover:text-white"}`}
-                      >
-                        {subItem.label}
-                      </Link>
-                    ))}
-                  </div>
-                )}
-              </div>
-            ) : (
-              <Link
-                href={item.href || "#"}
-                className={`flex items-center px-2 py-2 rounded-md text-left 
-                  ${pathname === item.href ? "bg-blue-600 text-white" : "text-slate-300 hover:bg-slate-700/50 hover:text-white"}`}
-              >
-                <item.icon className="mr-3 h-4 w-4" />
-                {item.label}
-              </Link>
-            )}
-          </div>
+          <Link
+            key={item.id}
+            href={item.href || "#"}
+            className={`flex items-center px-2 py-2 rounded-md text-left 
+              ${pathname === item.href ? "bg-blue-600 text-white" : "text-slate-300 hover:bg-slate-700/50 hover:text-white"}`}
+          >
+            <item.icon className="mr-3 h-4 w-4" />
+            {item.label}
+          </Link>
         ))}
       </nav>
 

@@ -2,9 +2,10 @@
 
 import Link from 'next/link'
 import { usePathname, useRouter } from 'next/navigation'
-import { FileEdit, FilePlus, FolderOpen, LogOut, Menu, X } from 'lucide-react'
+import { FileEdit, FilePlus, FolderOpen, History, LogOut, Menu, X, ClipboardList } from 'lucide-react'
 import { useState, useEffect } from 'react'
 import { useAuth } from '../utils/useAuth'
+import authFetch from '../utils/authFetch'
 
 interface EstudioParcial {
     id: string | number
@@ -14,12 +15,15 @@ interface EstudioParcial {
 }
 
 export function Sidebar() {
+    const AUTO_REFRESH_MS = 45000
+    const API_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:3000'
     const pathname = usePathname()
     const [estudiosParciales, setEstudiosParciales] = useState<EstudioParcial[]>([])
     const [isOpen, setIsOpen] = useState(false)
     const { logout, userData } = useAuth()
     const [userName, setUserName] = useState<string>('Bioquímico')
     const [userInitials, setUserInitials] = useState<string>('BQ')
+    const [pendingRequestsCount, setPendingRequestsCount] = useState(0)
 
     const handleClearDrafts = () => {
         try {
@@ -79,6 +83,29 @@ export function Sidebar() {
         setUserInitials(initials || 'BQ')
     }, [userData])
 
+    useEffect(() => {
+        const loadPendingRequests = async () => {
+            try {
+                const response = await authFetch(`${API_URL}/api/study-requests?status=PENDING`)
+                const data = await response.json().catch(() => ({}))
+                if (!response.ok) {
+                    setPendingRequestsCount(0)
+                    return
+                }
+                const count = Number(data?.count)
+                setPendingRequestsCount(Number.isFinite(count) ? count : 0)
+            } catch (error) {
+                console.error('Error cargando solicitudes pendientes:', error)
+                setPendingRequestsCount(0)
+            }
+        }
+
+        loadPendingRequests()
+        const intervalId = window.setInterval(loadPendingRequests, AUTO_REFRESH_MS)
+
+        return () => window.clearInterval(intervalId)
+    }, [pathname, API_URL])
+
     const navItems = [
         {
             label: 'Gestionar Estudios',
@@ -89,6 +116,16 @@ export function Sidebar() {
             label: 'Cargar Nuevo Estudio',
             href: '/cargar-nuevo',
             icon: FilePlus,
+        },
+        {
+            label: 'Historial',
+            href: '/historial',
+            icon: History,
+        },
+        {
+            label: 'Solicitudes',
+            href: '/solicitudes',
+            icon: ClipboardList,
         },
     ]
 
@@ -141,7 +178,12 @@ export function Sidebar() {
                                         }`}
                                 >
                                     <Icon className="w-5 h-5" />
-                                    {item.label}
+                                    <span className="flex-1">{item.label}</span>
+                                    {item.href === '/solicitudes' && pendingRequestsCount > 0 && (
+                                        <span className={`ml-auto inline-flex min-w-6 h-6 items-center justify-center rounded-full px-2 text-xs font-bold ${active ? 'bg-white text-blue-700' : 'bg-amber-500 text-white'}`}>
+                                            {pendingRequestsCount}
+                                        </span>
+                                    )}
                                 </Link>
                             )
                         })}
