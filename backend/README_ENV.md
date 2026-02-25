@@ -37,6 +37,16 @@ Email SMTP (producción/local):
 	- SMTP_HOST=smtp.tu-proveedor.com
 	- SMTP_PORT=587
 	- SMTP_SECURE=false
+	- SMTP_TIMEOUT_MS=20000
+
+Recomendado en Render con Gmail:
+
+	- EMAIL_SERVICE=gmail
+	- EMAIL_USER=tu-correo@gmail.com
+	- EMAIL_PASSWORD=app-password-de-16-caracteres
+	- SMTP_HOST=smtp.gmail.com
+	- SMTP_PORT=587
+	- SMTP_SECURE=false
 
 Si EMAIL_USER o EMAIL_PASSWORD están vacíos, el backend no podrá enviar emails de recuperación.
 
