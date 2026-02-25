@@ -2,19 +2,29 @@
 
 import Link from "next/link";
 import React, { useState } from "react";
+import { useRouter } from 'next/navigation';
 import DatePicker from "react-datepicker";
 import "react-datepicker/dist/react-datepicker.css";
 import { es } from "date-fns/locale";
+import { toast } from "react-hot-toast";
 
 export default function RegistroPage() {
+    const router = useRouter();
     const [dni, setDni] = useState("");
     const [nombre, setNombre] = useState("");
+    const [email, setEmail] = useState("");
+    const [password, setPassword] = useState("");
+    const [confirmPassword, setConfirmPassword] = useState("");
+    const [showPassword, setShowPassword] = useState(false);
+    const [showConfirmPassword, setShowConfirmPassword] = useState(false);
     const [dniError, setDniError] = useState("");
     const [nombreError, setNombreError] = useState("");
+    const [passwordError, setPasswordError] = useState("");
+    const [loading, setLoading] = useState(false);
     const [fechaNacimiento, setFechaNacimiento] = useState<Date | null>(null);
     const DNI_MAX = 8;
 
-    const handleSubmit = (e: React.FormEvent) => {
+    const handleSubmit = async (e: React.FormEvent) => {
         e.preventDefault();
         // Validaciones
         let ok = true;
@@ -26,10 +36,64 @@ export default function RegistroPage() {
             setDniError('El DNI debe tener al menos 8 dígitos');
             ok = false;
         }
+        if (!password) {
+            setPasswordError('Ingrese contraseña');
+            ok = false;
+        } else if (password.length < 8) {
+            setPasswordError('La contraseña debe tener al menos 8 caracteres');
+            ok = false;
+        } else {
+            setPasswordError('');
+        }
+        if (password !== confirmPassword) {
+            setPasswordError('Las contraseñas no coinciden');
+            ok = false;
+        }
+        if (!fechaNacimiento) {
+            toast.error('Seleccione fecha de nacimiento');
+            ok = false;
+        }
         if (!ok) return;
 
-        // Aquí iría la lógica de registro
-        alert(`Registrado: ${nombre} (${dni}, ${fechaNacimiento ? fechaNacimiento.toLocaleDateString() : ""})`);
+        const [firstName, ...lastNameParts] = nombre.trim().split(/\s+/);
+        const lastName = lastNameParts.join(' ') || firstName;
+
+        try {
+            setLoading(true);
+            toast.loading('Registrando...');
+            const base = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:3000';
+            const response = await fetch(`${base}/api/auth/register-patient`, {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                    'Accept': 'application/json',
+                },
+                body: JSON.stringify({
+                    firstName,
+                    lastName,
+                    dni,
+                    email,
+                    password,
+                    birthDate: fechaNacimiento?.toISOString().split('T')[0]
+                })
+            });
+
+            const data = await response.json().catch(() => ({}));
+            if (!response.ok) {
+                toast.dismiss();
+                toast.error(data?.message || `Error ${response.status}`);
+                setLoading(false);
+                return;
+            }
+
+            toast.dismiss();
+            toast.success('Registro exitoso. Ya podés iniciar sesión');
+            router.push('/login-paciente');
+        } catch (error: any) {
+            toast.dismiss();
+            toast.error(error?.message || 'Error al conectar con el servidor');
+            setLoading(false);
+        }
     };
 
     return (
@@ -114,11 +178,61 @@ export default function RegistroPage() {
                         locale={es as any}
                         required
                     />
+                    <input
+                        type="email"
+                        placeholder="Email"
+                        value={email}
+                        onChange={e => setEmail(e.target.value)}
+                        className="w-full px-4 py-2 border border-gray-300 rounded focus:outline-none focus:ring-2 focus:ring-blue-400"
+                        required
+                    />
+                    <div className="relative w-full">
+                        <input
+                            type={showPassword ? "text" : "password"}
+                            placeholder="Contraseña (mín. 8 caracteres)"
+                            value={password}
+                            onChange={e => setPassword(e.target.value)}
+                            className="w-full px-4 py-2 border border-gray-300 rounded focus:outline-none focus:ring-2 focus:ring-blue-400 pr-10"
+                            required
+                        />
+                        <button
+                            type="button"
+                            onClick={() => setShowPassword((v) => !v)}
+                            className="absolute right-2 top-1/2 -translate-y-1/2 text-gray-500 focus:outline-none"
+                            tabIndex={-1}
+                            aria-label={showPassword ? "Ocultar contraseña" : "Mostrar contraseña"}
+                        >
+                            {showPassword ? '👁️' : '👁️‍🗨️'}
+                        </button>
+                    </div>
+                    <div className="relative w-full">
+                        <input
+                            type={showConfirmPassword ? "text" : "password"}
+                            placeholder="Confirmar contraseña"
+                            value={confirmPassword}
+                            onChange={e => setConfirmPassword(e.target.value)}
+                            className="w-full px-4 py-2 border border-gray-300 rounded focus:outline-none focus:ring-2 focus:ring-blue-400 pr-10"
+                            required
+                        />
+                        <button
+                            type="button"
+                            onClick={() => setShowConfirmPassword((v) => !v)}
+                            className="absolute right-2 top-1/2 -translate-y-1/2 text-gray-500 focus:outline-none"
+                            tabIndex={-1}
+                            aria-label={showConfirmPassword ? "Ocultar contraseña" : "Mostrar contraseña"}
+                        >
+                            {showConfirmPassword ? '👁️' : '👁️‍🗨️'}
+                        </button>
+                    </div>
+                    {passwordError && (
+                        <p className="text-red-600 text-sm mt-1">{passwordError}</p>
+                    )}
                     <button
                         type="submit"
-                        className="w-full bg-blue-500 text-white font-semibold py-2 rounded hover:bg-blue-600 transition"
+                        disabled={loading}
+                        className={`w-full ${loading ? 'bg-gray-400' : 'bg-blue-500 hover:bg-blue-600'} text-white font-semibold py-2 rounded transition`}
                     >
-                        Registrarme
+                        {loading ? 'Registrando...' : 'Registrarme'}
                     </button>
                 </form>
                 <Link href="/login-paciente" className="text-blue-500 underline mt-4">Volver al login de paciente</Link>

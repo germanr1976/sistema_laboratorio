@@ -3,11 +3,17 @@
 import React, { useState } from 'react';
 import Toast from './Toast';
 
-export default function RequestPasswordRecoveryForm() {
+interface RequestPasswordRecoveryFormProps {
+    loginHref: string;
+    roleLabel: string;
+}
+
+export default function RequestPasswordRecoveryForm({ loginHref, roleLabel }: RequestPasswordRecoveryFormProps) {
     const [email, setEmail] = useState('');
     const [loading, setLoading] = useState(false);
     const [toast, setToast] = useState<{ type: 'success' | 'error'; message: string } | null>(null);
     const [sent, setSent] = useState(false);
+    const [debugRecoveryLink, setDebugRecoveryLink] = useState<string | null>(null);
 
     const validateEmail = (email: string): boolean => {
         const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
@@ -29,7 +35,8 @@ export default function RequestPasswordRecoveryForm() {
 
         setLoading(true);
         try {
-            const response = await fetch(`${process.env.NEXT_PUBLIC_BACKEND_URL}/api/auth/request-password-recovery`, {
+            const base = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:3000';
+            const response = await fetch(`${base}/api/auth/request-password-recovery`, {
                 method: 'POST',
                 headers: {
                     'Content-Type': 'application/json',
@@ -39,8 +46,14 @@ export default function RequestPasswordRecoveryForm() {
 
             const data = await response.json();
 
+            if (!response.ok) {
+                setToast({ type: 'error', message: data?.message || 'No se pudo procesar la solicitud' });
+                return;
+            }
+
             // Por seguridad, siempre mostramos el mismo mensaje
             setToast({ type: 'success', message: data.message });
+            setDebugRecoveryLink(typeof data?.debugRecoveryLink === 'string' ? data.debugRecoveryLink : null);
             setSent(true);
             setEmail('');
         } catch (error) {
@@ -66,8 +79,21 @@ export default function RequestPasswordRecoveryForm() {
                 <p className="text-sm text-gray-500 mb-6">
                     Por favor revisa tu carpeta de spam si no lo ves en unos minutos.
                 </p>
+                {debugRecoveryLink && (
+                    <div className="mb-6 rounded-lg border border-amber-200 bg-amber-50 p-3 text-left">
+                        <p className="text-sm text-amber-800 mb-2">
+                            Entorno local sin email configurado. Usá este enlace de recuperación:
+                        </p>
+                        <a
+                            href={debugRecoveryLink}
+                            className="text-sm text-blue-700 underline break-all"
+                        >
+                            {debugRecoveryLink}
+                        </a>
+                    </div>
+                )}
                 <a
-                    href="/login-profesional"
+                    href={loginHref}
                     className="inline-block bg-blue-600 text-white px-6 py-2 rounded-lg hover:bg-blue-700 transition"
                 >
                     Volver al Login
@@ -95,7 +121,7 @@ export default function RequestPasswordRecoveryForm() {
                 </div>
 
                 <p className="text-sm text-gray-600 bg-blue-50 p-3 rounded">
-                    Ingresa el email asociado a tu cuenta de profesional. Recibirás un enlace para restablecer tu contraseña.
+                    Ingresa el email asociado a tu cuenta de {roleLabel}. Recibirás un enlace para restablecer tu contraseña.
                 </p>
 
                 <button
@@ -107,7 +133,7 @@ export default function RequestPasswordRecoveryForm() {
                 </button>
 
                 <a
-                    href="/login-profesional"
+                    href={loginHref}
                     className="block text-center text-blue-600 hover:text-blue-800 text-sm mt-4"
                 >
                     Volver al Login

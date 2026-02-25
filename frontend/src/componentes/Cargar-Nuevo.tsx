@@ -439,7 +439,7 @@ export function CargarNuevo({ onCargarEstudio, initialId, initialData }: CargarN
     }
 
     if (!studyCreatedId) {
-      showToastMessage("Error: No se encontró el ID del estudio", "error")
+      showToastMessage("Error: No se pudo identificar el estudio", "error")
       return
     }
 

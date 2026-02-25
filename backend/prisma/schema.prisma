@@ -19,6 +19,8 @@ model User {
   profile         Profile?
   assignedStudies Study[]  @relation("StudyBiochemist")
   patientStudies  Study[]  @relation("StudyPatient")
+  studyRequests   StudyRequest[] @relation("StudyRequestPatient")
+  validatedRequests StudyRequest[] @relation("StudyRequestValidator")
   role            Role     @relation(fields: [roleId], references: [id])
 
   @@index([roleId])
@@ -58,11 +60,45 @@ model Study {
   status          Status   @relation(fields: [statusId], references: [id])
   patient         User     @relation("StudyPatient", fields: [userId], references: [id], onDelete: Cascade)
   attachments     StudyAttachment[]
+  convertedFromRequests StudyRequest[]
 
   @@index([userId])
   @@index([biochemistId])
   @@index([statusId])
   @@index([studyDate])
+}
+
+enum StudyRequestStatus {
+  PENDING
+  VALIDATED
+  REJECTED
+  CONVERTED
+}
+
+model StudyRequest {
+  id                  Int                @id @default(autoincrement())
+  patientId           Int?
+  dni                 String             @db.VarChar(18)
+  requestedDate       DateTime
+  doctorName          String             @db.VarChar(255)
+  insuranceName       String             @db.VarChar(255)
+  medicalOrderPhotoUrl String?           @db.VarChar(500)
+  observations        String?
+  status              StudyRequestStatus @default(PENDING)
+  createdAt           DateTime           @default(now())
+  validatedAt         DateTime?
+  validatedByUserId   Int?
+  convertedStudyId    Int?
+
+  patient             User?              @relation("StudyRequestPatient", fields: [patientId], references: [id], onDelete: SetNull)
+  validatedBy         User?              @relation("StudyRequestValidator", fields: [validatedByUserId], references: [id], onDelete: SetNull)
+  convertedStudy      Study?             @relation(fields: [convertedStudyId], references: [id], onDelete: SetNull)
+
+  @@index([dni])
+  @@index([status])
+  @@index([patientId])
+  @@index([validatedByUserId])
+  @@index([convertedStudyId])
 }
 
 model Status {

@@ -68,6 +68,12 @@ app.use((err: any, _req: express.Request, res: express.Response, next: express.N
       message: 'Solo se permiten archivos PDF',
       error: err.message
     });
+  } else if (err?.message?.includes('Solo se permiten imágenes')) {
+    return res.status(400).json({
+      success: false,
+      message: 'Solo se permiten imágenes',
+      error: err.message
+    });
   } else if (err) {
     return res.status(500).json({
       success: false,

@@ -88,16 +88,12 @@ export default function Dashboard({
     const ok = confirm("¿Eliminar estudio?")
     if (!ok) return
 
-    const raw = localStorage.getItem("estudios_metadata")
-    const metas = raw ? JSON.parse(raw) : []
-    const filtered = metas.filter((m: any) => m.id !== id)
-
-    localStorage.setItem("estudios_metadata", JSON.stringify(filtered))
     await deletePdf(id)
 
-    setLocalTotales(filtered.length)
-    setLocalCompletados(filtered.filter((m: any) => m.status === "completado").length)
-    setLocalParciales(filtered.filter((m: any) => m.status === "parcial").length)
+    // Este dashboard se alimenta desde backend autenticado; evitamos usar estado global local
+    setLocalUltimo(null)
+    setLocalTotales((prev) => Math.max(0, prev - 1))
+    setLocalCompletados((prev) => Math.max(0, prev - 1))
   }
 
   /* =========================
@@ -146,7 +142,7 @@ export default function Dashboard({
               <div className="grid grid-cols-[1fr_auto_auto_auto] items-center gap-4 py-4">
                 <div>
                   <p className="font-semibold text-gray-900">
-                  Matias Der
+                    Matias Der
                   </p>
                   <p className="text-sm text-gray-700">
                     DNI {localUltimo.dni}
@@ -182,9 +178,9 @@ export default function Dashboard({
                 </button>
               </div>
 
-            
 
-            
+
+
 
             </div>
           ) : (

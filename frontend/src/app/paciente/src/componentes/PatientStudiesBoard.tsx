@@ -3,9 +3,10 @@
 import { useEffect, useMemo, useState } from "react"
 import { Download, FileText, Loader2, Share2, Calendar, Building2, UserRound, FileCheck, Clock, AlertCircle } from "lucide-react"
 import authFetch from "../../../../utils/authFetch"
+import { getStatusBadgeClass } from "../../../../utils/uiClasses"
 
-export type StudyStatus = "completed" | "in-progress" | "pending" | "partial"
-export type StudyFilter = "all" | StudyStatus | "open"
+export type StudyStatus = "completed" | "in-progress" | "partial"
+export type StudyFilter = "all" | StudyStatus
 
 export type Study = {
   id: string
@@ -22,26 +23,18 @@ export type Study = {
 
 const API_URL = process.env.NEXT_PUBLIC_API_URL || "http://localhost:3000"
 
-const statusConfig: Record<StudyStatus, { label: string; badgeClass: string; dotClass: string }> = {
+const statusConfig: Record<StudyStatus, { label: string; dotClass: string }> = {
   "completed": {
     label: "Completado",
-    badgeClass: "bg-green-100 text-green-700",
-    dotClass: "bg-green-500",
+    dotClass: "bg-green-600",
   },
   "in-progress": {
     label: "En proceso",
-    badgeClass: "bg-orange-100 text-orange-700",
-    dotClass: "bg-orange-500",
-  },
-  "pending": {
-    label: "Pendiente",
-    badgeClass: "bg-red-100 text-red-700",
-    dotClass: "bg-red-500",
+    dotClass: "bg-blue-600",
   },
   "partial": {
     label: "Parcial",
-    badgeClass: "bg-yellow-100 text-yellow-700",
-    dotClass: "bg-yellow-500",
+    dotClass: "bg-amber-600",
   },
 }
 
@@ -49,7 +42,7 @@ const filters: { id: StudyFilter; label: string }[] = [
   { id: "all", label: "Todos" },
   { id: "completed", label: "Completados" },
   { id: "in-progress", label: "En proceso" },
-  { id: "pending", label: "Pendientes" },
+  { id: "partial", label: "Parciales" },
 ]
 
 type Props = {
@@ -67,7 +60,7 @@ function formatDate(value?: string) {
 }
 
 function mapStatus(name?: string): StudyStatus {
-  if (!name) return "pending"
+  if (!name) return "in-progress"
   const normalized = name.toUpperCase()
 
   // Log para debugging
@@ -78,11 +71,11 @@ function mapStatus(name?: string): StudyStatus {
   if (normalized === "COMPLETED" || normalized === "COMPLETADO") return "completed"
   if (normalized === "IN_PROGRESS" || normalized === "EN_PROCESO" || normalized === "INPROGRESS") return "in-progress"
   if (normalized === "PARTIAL" || normalized === "PARCIAL") return "partial"
-  if (normalized === "PENDING" || normalized === "PENDIENTE") return "pending"
+  if (normalized === "PENDING" || normalized === "PENDIENTE") return "in-progress"
 
   // Si no coincide con ninguno, asumimos que es el estado por defecto
   console.warn("Estado desconocido:", name)
-  return "pending"
+  return "in-progress"
 }
 
 export default function PatientStudiesBoard({
@@ -145,19 +138,17 @@ export default function PatientStudiesBoard({
   }, [])
 
   const stats = useMemo(() => {
-    const totals = { total: studies.length, completed: 0, inProgress: 0, pending: 0, partial: 0 }
+    const totals = { total: studies.length, completed: 0, inProgress: 0, partial: 0 }
     studies.forEach((s) => {
       if (s.status === "completed") totals.completed += 1
       else if (s.status === "in-progress") totals.inProgress += 1
       else if (s.status === "partial") totals.partial += 1
-      else totals.pending += 1
     })
     return totals
   }, [studies])
 
   const filteredStudies = useMemo(() => {
     if (activeFilter === "all") return studies
-    if (activeFilter === "open") return studies.filter((s) => s.status !== "completed")
     return studies.filter((s) => s.status === activeFilter)
   }, [activeFilter, studies])
 
@@ -207,8 +198,8 @@ export default function PatientStudiesBoard({
 
         <div className="rounded-xl bg-white border-2 border-gray-200 p-5 shadow-sm hover:shadow-md transition-shadow">
           <div className="flex items-center gap-3">
-            <div className="w-12 h-12 rounded-lg bg-orange-100 flex items-center justify-center">
-              <Clock className="w-6 h-6 text-orange-600" />
+            <div className="w-12 h-12 rounded-lg bg-blue-100 flex items-center justify-center">
+              <Clock className="w-6 h-6 text-blue-600" />
             </div>
             <div>
               <p className="text-sm font-medium text-gray-600">En Proceso</p>
@@ -219,8 +210,8 @@ export default function PatientStudiesBoard({
 
         <div className="rounded-xl bg-white border-2 border-gray-200 p-5 shadow-sm hover:shadow-md transition-shadow">
           <div className="flex items-center gap-3">
-            <div className="w-12 h-12 rounded-lg bg-red-100 flex items-center justify-center">
-              <AlertCircle className="w-6 h-6 text-red-600" />
+            <div className="w-12 h-12 rounded-lg bg-amber-100 flex items-center justify-center">
+              <AlertCircle className="w-6 h-6 text-amber-600" />
             </div>
             <div>
               <p className="text-sm font-medium text-gray-600">Parcial</p>
@@ -268,7 +259,7 @@ export default function PatientStudiesBoard({
         ) : (
           filteredStudies.map((study) => {
             const status = statusConfig[study.status]
-            const isProcessing = study.status === "in-progress" || study.status === "pending" || study.status === "partial"
+            const isProcessing = study.status === "in-progress" || study.status === "partial"
 
             return (
               <article key={study.id} className="rounded-xl border-2 border-gray-200 bg-white p-6 shadow-sm hover:shadow-md transition-all">
@@ -277,9 +268,8 @@ export default function PatientStudiesBoard({
                   <div className="flex items-start justify-between gap-4 pb-4 border-b border-gray-200">
                     <div>
                       <h3 className="text-xl font-bold text-gray-900">{study.studyName || "Estudio Médico"}</h3>
-                      <p className="text-sm text-gray-600 mt-1">Estudio ID: {study.id}</p>
                     </div>
-                    <span className={`inline-flex items-center gap-2 rounded-lg px-3 py-2 text-sm font-bold whitespace-nowrap ${status.badgeClass}`}>
+                    <span className={`${getStatusBadgeClass(study.status)} inline-flex items-center gap-2 rounded-full px-3 py-1.5 text-sm font-bold whitespace-nowrap`}>
                       <span className={`h-2.5 w-2.5 rounded-full ${status.dotClass}`} />
                       {status.label}
                     </span>
@@ -325,7 +315,6 @@ export default function PatientStudiesBoard({
                         <Loader2 className="h-5 w-5 animate-spin text-amber-600" />
                         <span className="text-base font-semibold text-amber-900">
                           {study.status === "in-progress" && "Estudio en proceso de análisis..."}
-                          {study.status === "pending" && "Estudio pendiente de revisión..."}
                           {study.status === "partial" && "Resultados parciales disponibles pronto..."}
                         </span>
                       </div>

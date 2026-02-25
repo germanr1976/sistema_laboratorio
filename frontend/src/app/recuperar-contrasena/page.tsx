@@ -7,6 +7,9 @@ import RequestPasswordRecoveryForm from '../../componentes/RequestPasswordRecove
 
 function RecuperarContrasenaContent() {
     const searchParams = useSearchParams();
+    const tipo = searchParams.get('tipo');
+    const loginHref = tipo === 'paciente' ? '/login-paciente' : '/login-profesional';
+    const roleLabel = tipo === 'paciente' ? 'paciente' : 'profesional';
     // Intentar obtener el token de múltiples formas para máxima compatibilidad
     let token = searchParams.get('token');
 
@@ -49,7 +52,7 @@ function RecuperarContrasenaContent() {
                     <p className="text-center text-gray-600 mb-6">
                         Ingresa tu email para recibir un enlace de recuperación
                     </p>
-                    <RequestPasswordRecoveryForm />
+                    <RequestPasswordRecoveryForm loginHref={loginHref} roleLabel={roleLabel} />
                 </div>
             </div>
         );
@@ -63,7 +66,7 @@ function RecuperarContrasenaContent() {
                 <p className="text-center text-gray-600 mb-6">
                     Ingresa tu nueva contraseña para recuperar acceso a tu cuenta
                 </p>
-                <ResetPasswordForm token={token!} />
+                <ResetPasswordForm token={token!} loginHref={loginHref} />
             </div>
         </div>
     );

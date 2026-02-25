@@ -168,7 +168,7 @@ export default function LoginProfesional() {
                         >
                             Ingresar
                         </button>
-                        <Link href="/recuperar-contrasena" className="text-center text-sm text-blue-600 hover:text-blue-800 underline">
+                        <Link href="/recuperar-contrasena?tipo=profesional" className="text-center text-sm text-blue-600 hover:text-blue-800 underline">
                             ¿Olvidaste tu contraseña?
                         </Link>
                     </form>

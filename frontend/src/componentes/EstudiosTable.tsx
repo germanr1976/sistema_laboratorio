@@ -3,7 +3,7 @@
 import Link from 'next/link'
 import { useEffect, useState } from 'react'
 import authFetch from '../utils/authFetch'
-import { FileText, Plus, Trash2, Edit2, Download, Ban } from 'lucide-react'
+import { FileText, Plus, Trash2, Edit2, Download, CircleOff } from 'lucide-react'
 import Clock from './Clock'
 import {
     cardClasses,
@@ -50,8 +50,7 @@ export function EstudiosTable() {
     const [showToast, setShowToast] = useState(false)
     const [toastMessage, setToastMessage] = useState('')
     const [toastType, setToastType] = useState<'success' | 'error' | 'info'>('info')
-    const [showConfirmacion, setShowConfirmacion] = useState(false)
-    const [estudioAAnular, setEstudioAAnular] = useState<string | number | null>(null)
+    const [cancellingStudyId, setCancellingStudyId] = useState<string | number | null>(null)
 
     // Cargar estudios al montar el componente
     useEffect(() => {
@@ -158,64 +157,27 @@ export function EstudiosTable() {
     }
 
     const anularEstudio = async (id: string | number) => {
-        console.log('🔔 anularEstudio llamado con ID:', id, 'tipo:', typeof id)
-        // Mostrar modal de confirmación personalizado
-        setEstudioAAnular(id)
-        setShowConfirmacion(true)
-    }
-
-    const confirmarAnulacion = async () => {
-        if (!estudioAAnular) return
+        const confirmed = window.confirm('¿Querés anular este estudio?')
+        if (!confirmed) return
 
         try {
+            setCancellingStudyId(id)
             mostrarToast('Anulando estudio...', 'info')
 
-            // Usar directamente el ID del estudio que ya es el backendId
-            const estudio = estudios.find((e: any) => e.id === estudioAAnular)
-
-            if (!estudio) {
-                console.error('❌ No se encontró el estudio con ID:', estudioAAnular)
-                mostrarToast('No se encontró el estudio', 'error')
-                setShowConfirmacion(false)
-                setEstudioAAnular(null)
-                return
+            const studyId = Number(id)
+            if (!Number.isFinite(studyId)) {
+                throw new Error('ID de estudio inválido para anulación')
             }
 
-            console.log('🚀 Intentando anular estudio:', {
-                estudioAAnular,
-                estudioEncontrado: estudio,
-                idParaAPI: estudio.id,
-                tipoId: typeof estudio.id
-            })
-
-            // Convertir a número si es string
-            const studyId = typeof estudio.id === 'string' ? parseInt(estudio.id) : estudio.id
-
-            console.log('📡 Llamando a cancelStudy con ID:', studyId, 'tipo:', typeof studyId)
-
-            const response = await cancelStudy(studyId)
-
-            console.log('✅ Respuesta de cancelStudy:', response)
-
-            if (response) {
-                mostrarToast('Estudio anulado exitosamente', 'success')
-                // Recargar estudios del backend
-                await cargarEstudios()
-            }
-            setShowConfirmacion(false)
-            setEstudioAAnular(null)
+            await cancelStudy(studyId)
+            mostrarToast('Estudio anulado exitosamente', 'success')
+            await cargarEstudios()
         } catch (error: any) {
             console.error('❌ Error anulando estudio:', error)
-            console.error('❌ Stack:', error.stack)
             mostrarToast(error.message || 'Error al anular el estudio', 'error')
-            setShowConfirmacion(false)
-            setEstudioAAnular(null)
+        } finally {
+            setCancellingStudyId(null)
         }
-    }
-
-    const cancelarAnulacion = () => {
-        setShowConfirmacion(false)
-        setEstudioAAnular(null)
     }
 
     const getEstadoBadgeClass = (estado?: string) => {
@@ -284,7 +246,7 @@ export function EstudiosTable() {
 
     const renderEstadoBadge = (estado?: string) => {
         return (
-            <div className={`inline-flex items-center gap-1.5 px-3 py-1.5 rounded text-sm font-semibold text-white ${getEstadoBadgeClass(estado)}`}>
+            <div className={`${getEstadoBadgeClass(estado)} inline-flex items-center gap-1.5 px-3 py-1.5 text-sm font-semibold`}>
                 {getEstadoIcon(estado)}
                 <span>{getEstadoLabel(estado)}</span>
             </div>
@@ -661,16 +623,17 @@ export function EstudiosTable() {
                                                         <Edit2 className="w-4 h-4" />
                                                         Cambiar Estado
                                                     </Link>
-                                                    {(estudio.estado || estudio.status) === 'en_proceso' && (
-                                                        <button
-                                                            onClick={() => anularEstudio(estudio.id)}
-                                                            className="p-2.5 text-orange-600 hover:bg-orange-50 rounded transition-colors"
-                                                            title="Anular estudio"
-                                                        >
-                                                            <Ban className="w-5 h-5" />
-                                                        </button>
-                                                    )}
                                                 </>
+                                            )}
+                                            {(estudio.estado || estudio.status) !== 'anulado' && (
+                                                <button
+                                                    onClick={() => anularEstudio(estudio.id)}
+                                                    disabled={cancellingStudyId === estudio.id}
+                                                    className="rounded-md p-2 text-red-600 hover:bg-red-50 hover:text-red-700 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+                                                    title="Anular estudio"
+                                                >
+                                                    <CircleOff className="w-4 h-4" />
+                                                </button>
                                             )}
                                         </div>
                                     </td>
@@ -737,16 +700,18 @@ export function EstudiosTable() {
                                             >
                                                 Cambiar
                                             </Link>
-                                            {(estudio.estado || estudio.status) === 'en_proceso' && (
-                                                <button
-                                                    onClick={() => anularEstudio(estudio.id)}
-                                                    className="px-2.5 py-1.5 text-xs font-semibold text-orange-700 bg-orange-100 hover:bg-orange-200 rounded transition-colors"
-                                                    title="Anular estudio"
-                                                >
-                                                    Anular
-                                                </button>
-                                            )}
                                         </>
+                                    )}
+                                    {(estudio.estado || estudio.status) !== 'anulado' && (
+                                        <button
+                                            onClick={() => anularEstudio(estudio.id)}
+                                            disabled={cancellingStudyId === estudio.id}
+                                            className="inline-flex items-center gap-1.5 px-2.5 py-1.5 text-xs font-semibold text-red-700 bg-red-50 hover:bg-red-100 rounded transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+                                            title="Anular estudio"
+                                        >
+                                            <CircleOff className="w-3.5 h-3.5" />
+                                            Anular
+                                        </button>
                                     )}
                                 </div>
                             </div>
@@ -814,40 +779,6 @@ export function EstudiosTable() {
                 )
             }
 
-            {/* Modal de confirmación para anular estudio */}
-            {showConfirmacion && (
-                <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
-                    <div className="bg-white rounded-lg shadow-lg p-6 max-w-sm w-full">
-                        <div className="flex items-center gap-3 mb-4">
-                            <div className="shrink-0">
-                                <svg className="h-6 w-6 text-orange-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 9v2m0 4v2m0 4v2M6.343 3.665c1.519-1.159 3.7-1.159 5.219 0l8.485 6.479c1.519 1.16 1.519 3.04 0 4.199l-8.485 6.479c-1.519 1.159-3.7 1.159-5.219 0l-8.485-6.479c-1.519-1.16-1.519-3.04 0-4.199L6.343 3.665z" />
-                                </svg>
-                            </div>
-                            <h3 className="text-lg font-semibold text-gray-900">¿Anular este estudio?</h3>
-                        </div>
-
-                        <p className="text-gray-600 mb-6">
-                            ¿Estás seguro de que deseas anular este estudio? Esta acción no se puede deshacer.
-                        </p>
-
-                        <div className="flex gap-3 justify-end">
-                            <button
-                                onClick={cancelarAnulacion}
-                                className="px-4 py-2 text-gray-700 border border-gray-300 rounded-lg hover:bg-gray-50 font-medium transition-colors"
-                            >
-                                Cancelar
-                            </button>
-                            <button
-                                onClick={confirmarAnulacion}
-                                className="px-4 py-2 bg-orange-600 text-white rounded-lg hover:bg-orange-700 font-medium transition-colors"
-                            >
-                                Sí, Anular
-                            </button>
-                        </div>
-                    </div>
-                </div>
-            )}
         </div >
     )
 }

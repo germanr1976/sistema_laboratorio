@@ -8,11 +8,32 @@ export const btnPrimary = 'px-4 py-2 bg-red-600 hover:bg-red-700 text-white font
 export const btnPdf = 'bg-green-500 hover:bg-green-600 text-white px-4 py-2 rounded font-semibold whitespace-nowrap'
 export const btnNoFile = 'px-4 py-2 rounded border text-sm text-gray-500 whitespace-nowrap'
 export const iconBtn = 'p-2 rounded border text-gray-500 hover:bg-gray-100'
-export const badgeBase = 'flex items-center justify-center w-28 h-8 text-sm font-semibold rounded-full whitespace-nowrap'
-export const badgeCompletado = `${badgeBase} bg-green-500 text-white`
-export const badgeParcial = `${badgeBase} bg-yellow-500 text-white`
-export const badgeEnProceso = `${badgeBase} bg-blue-500 text-white`
-export const badgeAnulado = `${badgeBase} bg-gray-400 text-white`
+export const badgeBase = 'inline-flex items-center gap-1.5 rounded-full border px-2.5 py-0.5 text-xs font-semibold whitespace-nowrap'
+export const badgeCompletado = `${badgeBase} bg-green-100 text-green-800 border-green-200`
+export const badgeParcial = `${badgeBase} bg-amber-100 text-amber-800 border-amber-200`
+export const badgeEnProceso = `${badgeBase} bg-blue-100 text-blue-800 border-blue-200`
+export const badgeAnulado = `${badgeBase} bg-red-100 text-red-800 border-red-200`
+
+export const getStatusBadgeClass = (status?: string) => {
+    switch ((status || '').toLowerCase()) {
+        case 'completado':
+        case 'completed':
+            return badgeCompletado
+        case 'parcial':
+        case 'partial':
+            return badgeParcial
+        case 'en proceso':
+        case 'en_proceso':
+        case 'in_progress':
+        case 'in-progress':
+            return badgeEnProceso
+        case 'anulado':
+        case 'cancelled':
+            return badgeAnulado
+        default:
+            return `${badgeBase} bg-gray-100 text-gray-800 border-gray-200`
+    }
+}
 
 export default {
     cardClasses,
@@ -28,4 +49,5 @@ export default {
     badgeParcial,
     badgeEnProceso,
     badgeAnulado,
+    getStatusBadgeClass,
 }

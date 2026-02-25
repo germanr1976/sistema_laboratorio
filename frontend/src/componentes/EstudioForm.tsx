@@ -743,24 +743,6 @@ export function EstudioForm({
                             </div>
                         )}
 
-                        {/* Nombre y Apellido */}
-                        <div>
-                            <label htmlFor="nombreApellido" className="block text-sm font-medium text-gray-700 mb-2">
-                                Nombre y Apellido
-                            </label>
-                            <input
-                                id="nombreApellido"
-                                type="text"
-                                placeholder="Juan Pérez"
-                                value={nombreApellido}
-                                onChange={(e) => setNombreApellido(e.target.value)}
-                                disabled={camposDeshabilitados || pacienteEncontrado}
-                                required
-                                className={`w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent ${camposDeshabilitados || pacienteEncontrado ? 'bg-gray-100 cursor-not-allowed' : 'bg-white'
-                                    } text-gray-900`}
-                            />
-                        </div>
-
                         {/* DNI */}
                         <div>
                             <label htmlFor="dni" className="block text-sm font-medium text-gray-700 mb-2">
@@ -783,6 +765,24 @@ export function EstudioForm({
                             {!pacienteEncontrado && dni.length >= 7 && !modoEdicion && (
                                 <p className="text-xs text-amber-700 mt-1">⚠ Paciente no encontrado en el sistema - Realice la carga completando los datos</p>
                             )}
+                        </div>
+
+                        {/* Nombre y Apellido */}
+                        <div>
+                            <label htmlFor="nombreApellido" className="block text-sm font-medium text-gray-700 mb-2">
+                                Nombre y Apellido
+                            </label>
+                            <input
+                                id="nombreApellido"
+                                type="text"
+                                placeholder="Juan Pérez"
+                                value={nombreApellido}
+                                onChange={(e) => setNombreApellido(e.target.value)}
+                                disabled={camposDeshabilitados || pacienteEncontrado}
+                                required
+                                className={`w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent ${camposDeshabilitados || pacienteEncontrado ? 'bg-gray-100 cursor-not-allowed' : 'bg-white'
+                                    } text-gray-900`}
+                            />
                         </div>
 
                         {/* Fecha del Estudio */}

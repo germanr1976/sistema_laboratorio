@@ -188,7 +188,7 @@ export default function LabHistoryPage() {
 
             <div className="rounded-lg border border-gray-200 bg-white shadow-sm">
               <div className="border-b border-gray-200 p-6">
-                <div className="flex items-center justify-between">
+                <div className="flex flex-col items-start justify-between gap-3 sm:flex-row sm:items-center">
                   <div>
                     <h2 className="flex items-center gap-2 text-xl font-semibold text-gray-900">
                       <FileText className="h-5 w-5" />
@@ -196,7 +196,7 @@ export default function LabHistoryPage() {
                     </h2>
                     <p className="mt-1 text-sm text-gray-600">Se encontraron {filteredStudies.length} estudios</p>
                   </div>
-                  <div className="flex items-center gap-3">
+                  <div className="flex w-full flex-wrap items-center gap-3 sm:w-auto sm:justify-end">
                     <label htmlFor="sort-order" className="text-sm font-medium text-gray-700">
                       Ordenar:
                     </label>

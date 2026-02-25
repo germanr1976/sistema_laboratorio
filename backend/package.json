@@ -6,6 +6,7 @@
   "scripts": {
     "dev": "tsx watch src/server.ts",
     "seed": "tsx src/seed.ts",
+    "backfill:patients": "tsx scripts/backfill-patient-registration.ts",
     "build": "npx prisma generate && npx prisma migrate deploy && tsc && tsc-alias",
     "build:production": "npm run build",
     "start": "node dist/server.js"

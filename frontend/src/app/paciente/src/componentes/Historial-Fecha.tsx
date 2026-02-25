@@ -4,6 +4,7 @@ import { useState } from "react"
 import { Eye, Download } from "lucide-react"
 import type { Study } from "../utils/tipos"
 import Toast from "../../../../componentes/Toast"
+import { getStatusBadgeClass } from "../../../../utils/uiClasses"
 
 interface StudiesTableProps {
   studies: Study[]
@@ -20,7 +21,7 @@ export function StudiesTable({ studies }: StudiesTableProps) {
     setShowToast(true)
   }
 
-  const downloadPdf = async (pdfUrl: string, studyId: string) => {
+  const downloadPdf = async (pdfUrl: string) => {
     try {
       const response = await fetch(pdfUrl)
       if (!response.ok) throw new Error("No se pudo descargar el archivo")
@@ -29,7 +30,7 @@ export function StudiesTable({ studies }: StudiesTableProps) {
       const blobUrl = URL.createObjectURL(blob)
       const link = document.createElement("a")
       link.href = blobUrl
-      link.download = `estudio-${studyId}.pdf`
+      link.download = "estudio-laboratorio.pdf"
       document.body.appendChild(link)
       link.click()
       link.remove()
@@ -38,19 +39,6 @@ export function StudiesTable({ studies }: StudiesTableProps) {
     } catch (error) {
       console.error("Error descargando PDF:", error)
       showToastMessage("No se pudo descargar el PDF", "error")
-    }
-  }
-
-  const getStatusStyles = (status: string) => {
-    switch (status) {
-      case "Completado":
-        return "bg-green-100 text-green-800 border-green-200"
-      case "Parcial":
-        return "bg-gray-100 text-gray-800 border-gray-300"
-      case "En Proceso":
-        return "bg-blue-100 text-blue-800 border-blue-200"
-      default:
-        return "bg-gray-100 text-gray-800 border-gray-200"
     }
   }
 
@@ -99,7 +87,7 @@ export function StudiesTable({ studies }: StudiesTableProps) {
                 <td className="px-4 py-3 text-gray-900">{study.obraSocial}</td>
                 <td className="px-4 py-3">
                   <span
-                    className={`inline-flex rounded-full border px-2.5 py-0.5 text-xs font-semibold ${getStatusStyles(study.status)}`}
+                    className={getStatusBadgeClass(study.status)}
                   >
                     {study.status}
                   </span>
@@ -120,7 +108,7 @@ export function StudiesTable({ studies }: StudiesTableProps) {
                         </a>
                         <button
                           type="button"
-                          onClick={() => downloadPdf(study.pdfUrl!, study.id)}
+                          onClick={() => downloadPdf(study.pdfUrl!)}
                           className="rounded-md p-2 text-gray-600 hover:bg-gray-100 hover:text-gray-900"
                           title="Descargar PDF"
                         >

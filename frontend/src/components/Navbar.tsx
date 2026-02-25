@@ -26,7 +26,7 @@ export default function Navbar() {
     };
 
     // No mostrar navbar en rutas con Sidebar
-    const hiddenRoutes = ['/dashboard', '/estudios', '/historial', '/configuraciones', '/ayuda', '/cargar-nuevo', '/revision', '/paciente'];
+    const hiddenRoutes = ['/dashboard', '/estudios', '/historial', '/configuraciones', '/ayuda', '/cargar-nuevo', '/revision', '/solicitudes', '/paciente'];
     const shouldHideNavbar = hiddenRoutes.some(route => pathname?.startsWith(route));
 
     if (shouldHideNavbar) {
