@@ -41,6 +41,20 @@ const statusClass: Record<StudyRequestStatus, string> = {
     CONVERTED: "bg-green-100 text-green-800 border-green-200",
 };
 
+const formatDateOnly = (value: string) => {
+    const match = value.match(/^(\d{4})-(\d{2})-(\d{2})/);
+    if (match) {
+        return `${match[3]}/${match[2]}/${match[1]}`;
+    }
+
+    const parsed = new Date(value);
+    if (Number.isNaN(parsed.getTime())) {
+        return value;
+    }
+
+    return parsed.toLocaleDateString("es-AR", { timeZone: "UTC" });
+};
+
 export default function SolicitudesPage() {
     const AUTO_REFRESH_MS = 45000;
     const [dniFilter, setDniFilter] = useState("");
@@ -271,7 +285,7 @@ export default function SolicitudesPage() {
                                         <tr key={row.id}>
                                             <td className="px-3 py-2 text-gray-900">{row.dni}</td>
                                             <td className="px-3 py-2 text-gray-900">{patientName}</td>
-                                            <td className="px-3 py-2 text-gray-900">{new Date(row.requestedDate).toLocaleDateString("es-AR")}</td>
+                                            <td className="px-3 py-2 text-gray-900">{formatDateOnly(row.requestedDate)}</td>
                                             <td className="px-3 py-2 text-gray-900">{row.doctorName}</td>
                                             <td className="px-3 py-2 text-gray-900">{row.insuranceName}</td>
                                             <td className="px-3 py-2">
