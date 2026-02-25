@@ -2,6 +2,7 @@
 
 import React, { useState } from 'react';
 import Toast from './Toast';
+import { resolveApiBaseUrl } from '../utils/apiBaseUrl';
 
 interface ResetPasswordFormProps {
     token: string;
@@ -68,7 +69,15 @@ export default function ResetPasswordForm({ token, loginHref }: ResetPasswordFor
 
         setLoading(true);
         try {
-            const base = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:3000';
+            const base = resolveApiBaseUrl();
+            if (!base) {
+                setToast({
+                    type: 'error',
+                    message: 'Configuración inválida: NEXT_PUBLIC_API_URL no está definida correctamente'
+                });
+                return;
+            }
+
             const response = await fetch(`${base}/api/auth/reset-password`, {
                 method: 'POST',
                 headers: {
@@ -81,16 +90,24 @@ export default function ResetPasswordForm({ token, loginHref }: ResetPasswordFor
                 })
             });
 
-            const data = await response.json();
+            const raw = await response.text();
+            let data: any = {};
+            if (raw) {
+                try {
+                    data = JSON.parse(raw);
+                } catch {
+                    data = {};
+                }
+            }
 
             if (response.ok) {
                 setSuccess(true);
-                setToast({ type: 'success', message: data.message });
+                setToast({ type: 'success', message: data?.message || 'Contraseña restablecida correctamente' });
                 setTimeout(() => {
                     window.location.href = loginHref;
                 }, 2000);
             } else {
-                setToast({ type: 'error', message: data.message || 'Error al restablecer contraseña' });
+                setToast({ type: 'error', message: data?.message || `Error ${response.status} al restablecer contraseña` });
             }
         } catch (error) {
             console.error('Error:', error);

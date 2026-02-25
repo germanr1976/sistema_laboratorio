@@ -2,6 +2,7 @@
 
 import React, { useState } from 'react';
 import Toast from './Toast';
+import { resolveApiBaseUrl } from '../utils/apiBaseUrl';
 
 interface RequestPasswordRecoveryFormProps {
     loginHref: string;
@@ -35,7 +36,15 @@ export default function RequestPasswordRecoveryForm({ loginHref, roleLabel }: Re
 
         setLoading(true);
         try {
-            const base = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:3000';
+            const base = resolveApiBaseUrl();
+            if (!base) {
+                setToast({
+                    type: 'error',
+                    message: 'Configuración inválida: NEXT_PUBLIC_API_URL no está definida correctamente'
+                });
+                return;
+            }
+
             const response = await fetch(`${base}/api/auth/request-password-recovery`, {
                 method: 'POST',
                 headers: {
@@ -44,7 +53,15 @@ export default function RequestPasswordRecoveryForm({ loginHref, roleLabel }: Re
                 body: JSON.stringify({ email })
             });
 
-            const data = await response.json();
+            const raw = await response.text();
+            let data: any = {};
+            if (raw) {
+                try {
+                    data = JSON.parse(raw);
+                } catch {
+                    data = {};
+                }
+            }
 
             if (!response.ok) {
                 setToast({ type: 'error', message: data?.message || 'No se pudo procesar la solicitud' });
