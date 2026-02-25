@@ -50,6 +50,13 @@ Recomendado en Render con Gmail:
 
 Si EMAIL_USER o EMAIL_PASSWORD están vacíos, el backend no podrá enviar emails de recuperación.
 
+Fallback de recuperación (útil si SMTP está bloqueado en el proveedor):
+
+	- ALLOW_RECOVERY_DEBUG_LINK=true
+
+Con ese valor, si falla el envío de correo, el endpoint `POST /api/auth/request-password-recovery`
+devolverá `debugRecoveryLink` incluso en producción para no bloquear el reseteo de contraseña.
+
 Legacy pacientes sin credenciales completas:
 
 ```

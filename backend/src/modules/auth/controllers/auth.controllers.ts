@@ -411,6 +411,7 @@ export async function registerPatientController(req: Request, res: Response) {
 export async function requestPasswordRecoveryController(req: Request, res: Response) {
     try {
         const { email } = req.body;
+        const allowRecoveryDebugLink = String(process.env.ALLOW_RECOVERY_DEBUG_LINK || '').toLowerCase() === 'true';
 
         if (!email || typeof email !== 'string') {
             return res.status(400).json({
@@ -454,7 +455,7 @@ export async function requestPasswordRecoveryController(req: Request, res: Respo
             message: genericMessage
         };
 
-        if (!emailSent && process.env.NODE_ENV !== 'production') {
+        if (!emailSent && (process.env.NODE_ENV !== 'production' || allowRecoveryDebugLink)) {
             responsePayload.debugRecoveryLink = recoveryLink;
             responsePayload.message = 'No se pudo enviar el correo en este entorno. Usa el link de recuperación de debug.';
         }
