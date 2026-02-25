@@ -82,8 +82,14 @@ export default function RequestPasswordRecoveryForm({ loginHref, roleLabel }: Re
                 {debugRecoveryLink && (
                     <div className="mb-6 rounded-lg border border-amber-200 bg-amber-50 p-3 text-left">
                         <p className="text-sm text-amber-800 mb-2">
-                            Entorno local sin email configurado. Usá este enlace de recuperación:
+                            No se pudo enviar el correo en este momento. Podés continuar la recuperación con este enlace:
                         </p>
+                        <a
+                            href={debugRecoveryLink}
+                            className="inline-block mb-3 bg-amber-600 text-white px-4 py-2 rounded hover:bg-amber-700 transition"
+                        >
+                            Continuar recuperación ahora
+                        </a>
                         <a
                             href={debugRecoveryLink}
                             className="text-sm text-blue-700 underline break-all"

@@ -17,6 +17,34 @@ function sanitizeHost(value: string): string {
     return value.trim().replace(/^https?:\/\//i, '').replace(/\/+$/, '');
 }
 
+function parseSmtpHostAndPort(rawHost: string, rawPort: string | undefined, fallbackPort: number) {
+    let host = sanitizeHost(rawHost);
+    let port = parsePort(rawPort, fallbackPort);
+
+    if (!host) {
+        return { host: '', port };
+    }
+
+    const withoutPath = host.split('/')[0];
+    const lastColonIndex = withoutPath.lastIndexOf(':');
+
+    if (lastColonIndex > -1 && withoutPath.indexOf(']') === -1) {
+        const maybeHost = withoutPath.slice(0, lastColonIndex).trim();
+        const maybePort = withoutPath.slice(lastColonIndex + 1).trim();
+
+        if (/^\d+$/.test(maybePort) && maybeHost) {
+            host = maybeHost;
+            port = Number(maybePort);
+        } else {
+            host = withoutPath;
+        }
+    } else {
+        host = withoutPath;
+    }
+
+    return { host, port };
+}
+
 function buildTransporter() {
     const emailUser = (process.env.EMAIL_USER || '').trim();
     const emailPassword = (process.env.EMAIL_PASSWORD || '').trim();
@@ -26,8 +54,9 @@ function buildTransporter() {
     }
 
     const emailService = (process.env.EMAIL_SERVICE || 'gmail').trim().toLowerCase();
-    const smtpHost = sanitizeHost((process.env.SMTP_HOST || '').trim());
-    const smtpPort = parsePort(process.env.SMTP_PORT, 587);
+    const smtpEndpoint = parseSmtpHostAndPort((process.env.SMTP_HOST || '').trim(), process.env.SMTP_PORT, 587);
+    const smtpHost = smtpEndpoint.host;
+    const smtpPort = smtpEndpoint.port;
     const smtpSecure = toBoolean(process.env.SMTP_SECURE, false);
     const timeoutMs = parsePort(process.env.SMTP_TIMEOUT_MS, 20000);
 
@@ -42,6 +71,7 @@ function buildTransporter() {
     };
 
     if (smtpHost) {
+        console.log(`[email] SMTP host configurado: ${smtpHost}:${smtpPort} (secure=${smtpSecure})`);
         return nodemailer.createTransport({
             host: smtpHost,
             port: smtpPort,

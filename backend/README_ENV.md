@@ -39,6 +39,10 @@ Email SMTP (producción/local):
 	- SMTP_SECURE=false
 	- SMTP_TIMEOUT_MS=20000
 
+Notas de formato:
+	- No incluir protocolo en SMTP_HOST (usar `smtp.gmail.com`, no `https://smtp.gmail.com`).
+	- Si cargás `SMTP_HOST` con puerto (ej: `smtp.gmail.com:587`), el backend ahora lo normaliza automáticamente.
+
 Recomendado en Render con Gmail:
 
 	- EMAIL_SERVICE=gmail
