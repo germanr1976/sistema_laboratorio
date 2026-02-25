@@ -25,7 +25,7 @@ function parseSmtpHostAndPort(rawHost: string, rawPort: string | undefined, fall
         return { host: '', port };
     }
 
-    const withoutPath = host.split('/')[0];
+    const withoutPath = host.split('/')[0] || '';
     const lastColonIndex = withoutPath.lastIndexOf(':');
 
     if (lastColonIndex > -1 && withoutPath.indexOf(']') === -1) {
