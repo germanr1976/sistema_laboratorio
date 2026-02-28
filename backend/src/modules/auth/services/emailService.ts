@@ -3,6 +3,48 @@ import dotenv from "dotenv";
 
 dotenv.config();
 
+function toBoolean(value: string | undefined, fallback = false): boolean {
+    if (!value) return fallback;
+    return String(value).trim().toLowerCase() === 'true';
+}
+
+function parsePort(value: string | undefined, fallback: number): number {
+    const parsed = Number(value);
+    return Number.isFinite(parsed) ? parsed : fallback;
+}
+
+function sanitizeHost(value: string): string {
+    return value.trim().replace(/^https?:\/\//i, '').replace(/\/+$/, '');
+}
+
+function parseSmtpHostAndPort(rawHost: string, rawPort: string | undefined, fallbackPort: number) {
+    let host = sanitizeHost(rawHost);
+    let port = parsePort(rawPort, fallbackPort);
+
+    if (!host) {
+        return { host: '', port };
+    }
+
+    const withoutPath = host.split('/')[0] || '';
+    const lastColonIndex = withoutPath.lastIndexOf(':');
+
+    if (lastColonIndex > -1 && withoutPath.indexOf(']') === -1) {
+        const maybeHost = withoutPath.slice(0, lastColonIndex).trim();
+        const maybePort = withoutPath.slice(lastColonIndex + 1).trim();
+
+        if (/^\d+$/.test(maybePort) && maybeHost) {
+            host = maybeHost;
+            port = Number(maybePort);
+        } else {
+            host = withoutPath;
+        }
+    } else {
+        host = withoutPath;
+    }
+
+    return { host, port };
+}
+
 function buildTransporter() {
     const emailUser = (process.env.EMAIL_USER || '').trim();
     const emailPassword = (process.env.EMAIL_PASSWORD || '').trim();
@@ -11,28 +53,46 @@ function buildTransporter() {
         throw new Error('SMTP no configurado: faltan EMAIL_USER y/o EMAIL_PASSWORD');
     }
 
-    const smtpHost = (process.env.SMTP_HOST || '').trim();
-    const smtpPort = Number(process.env.SMTP_PORT || 587);
-    const smtpSecure = String(process.env.SMTP_SECURE || 'false').toLowerCase() === 'true';
+    const emailService = (process.env.EMAIL_SERVICE || 'gmail').trim().toLowerCase();
+    const smtpEndpoint = parseSmtpHostAndPort((process.env.SMTP_HOST || '').trim(), process.env.SMTP_PORT, 587);
+    const smtpHost = smtpEndpoint.host;
+    const smtpPort = smtpEndpoint.port;
+    const smtpSecure = toBoolean(process.env.SMTP_SECURE, false);
+    const timeoutMs = parsePort(process.env.SMTP_TIMEOUT_MS, 20000);
 
-    if (smtpHost) {
-        return nodemailer.createTransport({
-            host: smtpHost,
-            port: Number.isFinite(smtpPort) ? smtpPort : 587,
-            secure: smtpSecure,
-            auth: {
-                user: emailUser,
-                pass: emailPassword,
-            },
-        });
-    }
-
-    return nodemailer.createTransport({
-        service: process.env.EMAIL_SERVICE || "gmail",
+    const common = {
         auth: {
             user: emailUser,
             pass: emailPassword,
         },
+        connectionTimeout: timeoutMs,
+        greetingTimeout: timeoutMs,
+        socketTimeout: timeoutMs,
+    };
+
+    if (smtpHost) {
+        console.log(`[email] SMTP host configurado: ${smtpHost}:${smtpPort} (secure=${smtpSecure})`);
+        return nodemailer.createTransport({
+            host: smtpHost,
+            port: smtpPort,
+            secure: smtpSecure,
+            ...common,
+        });
+    }
+
+    if (emailService === 'gmail') {
+        return nodemailer.createTransport({
+            host: 'smtp.gmail.com',
+            port: 587,
+            secure: false,
+            requireTLS: true,
+            ...common,
+        });
+    }
+
+    return nodemailer.createTransport({
+        service: emailService,
+        ...common,
     });
 }
 

@@ -8,6 +8,31 @@ import * as studyRequestService from '../services/studyRequest.services';
 
 const { STUDY_REQUEST_STATUS } = studyRequestService;
 
+const DATE_ONLY_REGEX = /^(\d{4})-(\d{2})-(\d{2})$/;
+
+function parseRequestedDate(value: unknown): Date | null {
+    if (!(value instanceof Date) && typeof value !== 'string') {
+        return null;
+    }
+
+    const raw = value instanceof Date ? value.toISOString() : value.trim();
+    const match = raw.match(DATE_ONLY_REGEX);
+
+    if (match) {
+        const year = Number(match[1]);
+        const month = Number(match[2]);
+        const day = Number(match[3]);
+        return new Date(Date.UTC(year, month - 1, day, 12, 0, 0, 0));
+    }
+
+    const parsed = new Date(raw);
+    if (Number.isNaN(parsed.getTime())) {
+        return null;
+    }
+
+    return parsed;
+}
+
 export const createStudyRequest = async (req: Request, res: Response) => {
     try {
         const patientId = req.user?.id;
@@ -29,13 +54,21 @@ export const createStudyRequest = async (req: Request, res: Response) => {
             });
         }
 
+        const parsedRequestedDate = parseRequestedDate(value.requestedDate);
+        if (!parsedRequestedDate) {
+            return res.status(400).json({
+                success: false,
+                message: 'Fecha solicitada inválida',
+            });
+        }
+
         const uploadedOrderPhoto = (req as any).file as Express.Multer.File | undefined;
         const uploadedOrderUrl = uploadedOrderPhoto ? `/uploads/orders/${uploadedOrderPhoto.filename}` : null;
 
         const created = await studyRequestService.createStudyRequest({
             patientId,
             dni: req.user!.dni,
-            requestedDate: new Date(value.requestedDate),
+            requestedDate: parsedRequestedDate,
             doctorName: value.doctorName,
             insuranceName: value.insuranceName,
             medicalOrderPhotoUrl: uploadedOrderUrl || value.medicalOrderPhotoUrl || null,

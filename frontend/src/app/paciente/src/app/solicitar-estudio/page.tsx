@@ -44,6 +44,20 @@ const todayLocal = () => {
     return `${y}-${m}-${day}`;
 };
 
+const formatDateOnly = (value: string) => {
+    const match = value.match(/^(\d{4})-(\d{2})-(\d{2})/);
+    if (match) {
+        return `${match[3]}/${match[2]}/${match[1]}`;
+    }
+
+    const parsed = new Date(value);
+    if (Number.isNaN(parsed.getTime())) {
+        return value;
+    }
+
+    return parsed.toLocaleDateString("es-AR", { timeZone: "UTC" });
+};
+
 export default function SolicitarEstudioPage() {
     const [requestedDate, setRequestedDate] = useState(todayLocal());
     const [doctorName, setDoctorName] = useState("");
@@ -323,7 +337,7 @@ export default function SolicitarEstudioPage() {
                                     {requests.map((request) => (
                                         <tr key={request.id}>
                                             <td className="px-3 py-2 text-gray-900">
-                                                {new Date(request.requestedDate).toLocaleDateString("es-AR")}
+                                                {formatDateOnly(request.requestedDate)}
                                             </td>
                                             <td className="px-3 py-2 text-gray-900">{request.doctorName}</td>
                                             <td className="px-3 py-2 text-gray-900">{request.insuranceName}</td>

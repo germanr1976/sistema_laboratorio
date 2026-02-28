@@ -2,6 +2,7 @@
 
 import React, { useState } from 'react';
 import Toast from './Toast';
+import { resolveApiBaseUrl } from '../utils/apiBaseUrl';
 
 interface RequestPasswordRecoveryFormProps {
     loginHref: string;
@@ -35,7 +36,15 @@ export default function RequestPasswordRecoveryForm({ loginHref, roleLabel }: Re
 
         setLoading(true);
         try {
-            const base = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:3000';
+            const base = resolveApiBaseUrl();
+            if (!base) {
+                setToast({
+                    type: 'error',
+                    message: 'Configuración inválida: NEXT_PUBLIC_API_URL no está definida correctamente'
+                });
+                return;
+            }
+
             const response = await fetch(`${base}/api/auth/request-password-recovery`, {
                 method: 'POST',
                 headers: {
@@ -44,7 +53,15 @@ export default function RequestPasswordRecoveryForm({ loginHref, roleLabel }: Re
                 body: JSON.stringify({ email })
             });
 
-            const data = await response.json();
+            const raw = await response.text();
+            let data: any = {};
+            if (raw) {
+                try {
+                    data = JSON.parse(raw);
+                } catch {
+                    data = {};
+                }
+            }
 
             if (!response.ok) {
                 setToast({ type: 'error', message: data?.message || 'No se pudo procesar la solicitud' });
@@ -82,8 +99,14 @@ export default function RequestPasswordRecoveryForm({ loginHref, roleLabel }: Re
                 {debugRecoveryLink && (
                     <div className="mb-6 rounded-lg border border-amber-200 bg-amber-50 p-3 text-left">
                         <p className="text-sm text-amber-800 mb-2">
-                            Entorno local sin email configurado. Usá este enlace de recuperación:
+                            No se pudo enviar el correo en este momento. Podés continuar la recuperación con este enlace:
                         </p>
+                        <a
+                            href={debugRecoveryLink}
+                            className="inline-block mb-3 bg-amber-600 text-white px-4 py-2 rounded hover:bg-amber-700 transition"
+                        >
+                            Continuar recuperación ahora
+                        </a>
                         <a
                             href={debugRecoveryLink}
                             className="text-sm text-blue-700 underline break-all"

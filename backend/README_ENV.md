@@ -37,8 +37,29 @@ Email SMTP (producción/local):
 	- SMTP_HOST=smtp.tu-proveedor.com
 	- SMTP_PORT=587
 	- SMTP_SECURE=false
+	- SMTP_TIMEOUT_MS=20000
+
+Notas de formato:
+	- No incluir protocolo en SMTP_HOST (usar `smtp.gmail.com`, no `https://smtp.gmail.com`).
+	- Si cargás `SMTP_HOST` con puerto (ej: `smtp.gmail.com:587`), el backend ahora lo normaliza automáticamente.
+
+Recomendado en Render con Gmail:
+
+	- EMAIL_SERVICE=gmail
+	- EMAIL_USER=tu-correo@gmail.com
+	- EMAIL_PASSWORD=app-password-de-16-caracteres
+	- SMTP_HOST=smtp.gmail.com
+	- SMTP_PORT=587
+	- SMTP_SECURE=false
 
 Si EMAIL_USER o EMAIL_PASSWORD están vacíos, el backend no podrá enviar emails de recuperación.
+
+Fallback de recuperación (útil si SMTP está bloqueado en el proveedor):
+
+	- ALLOW_RECOVERY_DEBUG_LINK=true
+
+Con ese valor, si falla el envío de correo, el endpoint `POST /api/auth/request-password-recovery`
+devolverá `debugRecoveryLink` incluso en producción para no bloquear el reseteo de contraseña.
 
 Legacy pacientes sin credenciales completas:
 
