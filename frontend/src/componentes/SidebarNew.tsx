@@ -12,7 +12,7 @@ export function Sidebar() {
     const AUTO_REFRESH_MS = 45000
     const API_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:3000'
     const pathname = usePathname()
-    
+
     const [isOpen, setIsOpen] = useState(false)
     const { logout, userData } = useAuth()
     const [userName, setUserName] = useState<string>('Bioquímico')
@@ -150,7 +150,7 @@ export function Sidebar() {
                         })}
                     </div>
 
-                    
+
                 </nav>
 
                 {/* Footer */}
