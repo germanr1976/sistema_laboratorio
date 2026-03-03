@@ -43,11 +43,17 @@ export function StudiesTable({ studies }: StudiesTableProps) {
   }
 
   const formatDate = (dateString: string) => {
+    const match = dateString.match(/^(\d{4})-(\d{2})-(\d{2})$/)
+    if (match) {
+      return `${match[3]}/${match[2]}/${match[1]}`
+    }
+
     const date = new Date(dateString)
     return date.toLocaleDateString("es-ES", {
       day: "2-digit",
       month: "2-digit",
       year: "numeric",
+      timeZone: "UTC",
     })
   }
 
@@ -74,9 +80,9 @@ export function StudiesTable({ studies }: StudiesTableProps) {
           <thead className="border-b border-gray-200 bg-gray-50">
             <tr>
               <th className="px-4 py-3 text-left font-medium text-gray-700">Fecha</th>
+              <th className="px-4 py-3 text-left font-medium text-gray-700 min-w-40">Médico</th>
               <th className="px-4 py-3 text-left font-medium text-gray-700">Obra social</th>
               <th className="px-4 py-3 text-left font-medium text-gray-700">Estado</th>
-              <th className="px-4 py-3 text-left font-medium text-gray-700 min-w-40">Médico</th>
               <th className="px-4 py-3 text-right font-medium text-gray-700 w-28">Acciones</th>
             </tr>
           </thead>
@@ -84,6 +90,7 @@ export function StudiesTable({ studies }: StudiesTableProps) {
             {studies.map((study) => (
               <tr key={study.id} className="hover:bg-gray-50">
                 <td className="px-4 py-3 text-gray-900">{formatDate(study.date)}</td>
+                <td className="px-4 py-3 text-gray-600">{study.doctor}</td>
                 <td className="px-4 py-3 text-gray-900">{study.obraSocial}</td>
                 <td className="px-4 py-3">
                   <span
@@ -92,7 +99,6 @@ export function StudiesTable({ studies }: StudiesTableProps) {
                     {study.status}
                   </span>
                 </td>
-                <td className="px-4 py-3 text-gray-600">{study.doctor}</td>
                 <td className="px-4 py-3">
                   <div className="flex justify-end gap-2">
                     {study.pdfUrl ? (

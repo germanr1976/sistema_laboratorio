@@ -2,6 +2,7 @@
 
 import { useEffect, useMemo, useState } from "react";
 import authFetch from "../../../utils/authFetch";
+import RequestDetail from './_requestDetail';
 
 const API_URL = process.env.NEXT_PUBLIC_API_URL || "http://localhost:3000";
 
@@ -38,7 +39,7 @@ const statusClass: Record<StudyRequestStatus, string> = {
     PENDING: "bg-amber-100 text-amber-800 border-amber-200",
     VALIDATED: "bg-blue-100 text-blue-800 border-blue-200",
     REJECTED: "bg-red-100 text-red-800 border-red-200",
-    CONVERTED: "bg-green-100 text-green-800 border-green-200",
+    CONVERTED: "bg-blue-100 text-blue-800 border-blue-200",
 };
 
 const formatDateOnly = (value: string) => {
@@ -156,16 +157,109 @@ export default function SolicitudesPage() {
             const data = await response.json().catch(() => ({}));
             if (!response.ok) {
                 setError(data?.message || "No se pudo ejecutar la acción");
-                return;
+                return null;
+            }
+
+            // Si la acción fue convertir, devolver el estudio convertido para uso inmediato
+            if (action === 'convert') {
+                await loadRows();
+                setError(null);
+                return data?.data || null;
             }
 
             await loadRows();
             setError(null);
+            return null;
         } catch (e) {
             console.error(e);
             setError("Error al conectar con el servidor");
+            return null;
         } finally {
             setActingId(null);
+        }
+    };
+
+    const [selectedRequest, setSelectedRequest] = useState<StudyRequestRow | null>(null);
+    const [selectedStudy, setSelectedStudy] = useState<any | null>(null);
+    const [loadingStudy, setLoadingStudy] = useState(false);
+    const [uploading, setUploading] = useState(false);
+
+    const openRequestDetail = async (row: StudyRequestRow) => {
+        setSelectedRequest(row);
+        setSelectedStudy(null);
+        if (row.convertedStudyId) {
+            await fetchStudy(row.convertedStudyId);
+        }
+    };
+
+    const closeRequestDetail = () => {
+        setSelectedRequest(null);
+        setSelectedStudy(null);
+    };
+
+    const fetchStudy = async (studyId: number) => {
+        try {
+            setLoadingStudy(true);
+            const resp = await authFetch(`${API_URL}/api/studies/${studyId}`);
+            const j = await resp.json().catch(() => ({}));
+            if (!resp.ok) {
+                setError(j?.message || "No se pudo obtener el estudio");
+                return;
+            }
+            setSelectedStudy(j?.data || null);
+        } catch (e) {
+            console.error(e);
+            setError("Error al cargar el estudio");
+        } finally {
+            setLoadingStudy(false);
+        }
+    };
+
+    const uploadPdfToStudy = async (studyId: number, file: File) => {
+        try {
+            setUploading(true);
+            const fd = new FormData();
+            fd.append('pdf', file);
+
+            const resp = await authFetch(`${API_URL}/api/studies/${studyId}/pdf`, {
+                method: 'PATCH',
+                body: fd,
+            });
+            const j = await resp.json().catch(() => ({}));
+            if (!resp.ok) {
+                setError(j?.message || 'No se pudo subir el PDF');
+                return;
+            }
+            setSelectedStudy(j?.data || null);
+            await loadRows();
+        } catch (e) {
+            console.error(e);
+            setError('Error al subir el PDF');
+        } finally {
+            setUploading(false);
+        }
+    };
+
+    const updateStudyStatusApi = async (studyId: number, statusName: 'PARTIAL' | 'COMPLETED') => {
+        try {
+            setLoadingStudy(true);
+            const resp = await authFetch(`${API_URL}/api/studies/${studyId}/status`, {
+                method: 'PATCH',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ statusName }),
+            });
+            const j = await resp.json().catch(() => ({}));
+            if (!resp.ok) {
+                setError(j?.message || 'No se pudo actualizar el estado');
+                return;
+            }
+            setSelectedStudy(j?.data || null);
+            await loadRows();
+        } catch (e) {
+            console.error(e);
+            setError('Error al actualizar estado');
+        } finally {
+            setLoadingStudy(false);
         }
     };
 
@@ -200,8 +294,16 @@ export default function SolicitudesPage() {
 
     const confirmConvert = async () => {
         if (!convertTargetId) return;
-        await runAction(convertTargetId, "convert");
+        const createdStudy = await runAction(convertTargetId, "convert");
         setConvertTargetId(null);
+        // Si se creó el estudio, actualizar modal/estado
+        if (createdStudy) {
+            // createdStudy puede venir ya formateado por el servidor
+            const studyId = createdStudy.id || createdStudy.study?.id || null;
+            if (studyId) {
+                await fetchStudy(studyId);
+            }
+        }
     };
 
     return (
@@ -229,17 +331,7 @@ export default function SolicitudesPage() {
                         </div>
                         <div>
                             <label className="block text-sm font-medium text-gray-700 mb-1">Estado</label>
-                            <select
-                                value={statusFilter}
-                                onChange={(e) => setStatusFilter(e.target.value as "all" | StudyRequestStatus)}
-                                className="w-full rounded-md border border-gray-300 px-3 py-2 text-sm text-gray-700 focus:border-blue-500 focus:outline-none focus:ring-2 focus:ring-blue-500"
-                            >
-                                <option value="all">Todos</option>
-                                <option value="PENDING">Pendiente</option>
-                                <option value="VALIDATED">Validada</option>
-                                <option value="REJECTED">Rechazada</option>
-                                <option value="CONVERTED">Convertida</option>
-                            </select>
+                            <div className="w-full rounded-md border border-gray-300 px-3 py-2 text-sm text-gray-700 bg-gray-50">En proceso</div>
                         </div>
                         <div className="flex items-end">
                             <button
@@ -272,7 +364,6 @@ export default function SolicitudesPage() {
                                     <th className="px-3 py-2 text-left font-medium text-gray-700">Médico</th>
                                     <th className="px-3 py-2 text-left font-medium text-gray-700">Obra social</th>
                                     <th className="px-3 py-2 text-left font-medium text-gray-700">Estado</th>
-                                    <th className="px-3 py-2 text-left font-medium text-gray-700">Orden</th>
                                     <th className="px-3 py-2 text-right font-medium text-gray-700">Acciones</th>
                                 </tr>
                             </thead>
@@ -294,21 +385,14 @@ export default function SolicitudesPage() {
                                                 </span>
                                             </td>
                                             <td className="px-3 py-2">
-                                                {resolveOrderUrl(row.medicalOrderPhotoUrl) ? (
-                                                    <a
-                                                        href={resolveOrderUrl(row.medicalOrderPhotoUrl)!}
-                                                        target="_blank"
-                                                        rel="noopener noreferrer"
-                                                        className="text-blue-600 hover:text-blue-800 underline"
-                                                    >
-                                                        Ver orden
-                                                    </a>
-                                                ) : (
-                                                    <span className="text-gray-500">—</span>
-                                                )}
-                                            </td>
-                                            <td className="px-3 py-2">
                                                 <div className="flex justify-end gap-2">
+                                                    <button
+                                                        type="button"
+                                                        onClick={() => openRequestDetail(row)}
+                                                        className="rounded-md bg-slate-600 px-2.5 py-1 text-xs font-semibold text-white hover:bg-slate-700"
+                                                    >
+                                                        Abrir
+                                                    </button>
                                                     {row.status === "PENDING" && (
                                                         <>
                                                             <button
@@ -362,6 +446,35 @@ export default function SolicitudesPage() {
                     )}
                 </section>
             </div>
+
+            {selectedRequest && (
+                <RequestDetail
+                    request={selectedRequest}
+                    study={selectedStudy}
+                    loadingStudy={loadingStudy}
+                    uploading={uploading}
+                    onClose={() => closeRequestDetail()}
+                    onConvert={async () => {
+                        if (!selectedRequest) return;
+                        const createdStudy = await runAction(selectedRequest.id, 'convert');
+                        if (createdStudy) {
+                            const studyId = createdStudy.id || createdStudy.study?.id || null;
+                            if (studyId) await fetchStudy(studyId);
+                        }
+                    }}
+                    onUpload={async (file: File) => {
+                        if (!selectedStudy?.id && !selectedRequest?.convertedStudyId) return;
+                        const studyId = selectedStudy?.id || selectedRequest?.convertedStudyId;
+                        await uploadPdfToStudy(studyId, file);
+                    }}
+                    onSetStatus={async (s) => {
+                        const studyId = selectedStudy?.id || selectedRequest?.convertedStudyId;
+                        if (!studyId) return;
+                        await updateStudyStatusApi(studyId, s);
+                    }}
+                    apiUrl={API_URL}
+                />
+            )}
 
             {rejectTargetId !== null && (
                 <div className="fixed inset-0 z-50 bg-black/50 flex items-center justify-center p-4">

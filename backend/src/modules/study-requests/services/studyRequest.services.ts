@@ -16,18 +16,48 @@ interface CreateStudyRequestData {
     requestedDate: Date;
     doctorName: string;
     insuranceName: string;
-    medicalOrderPhotoUrl?: string | null;
     observations?: string | null;
 }
 
 export const createStudyRequest = async (data: CreateStudyRequestData) => {
-    return prismaAny.studyRequest.create({
-        data,
-        include: {
-            patient: { include: { profile: true } },
-            validatedBy: { include: { profile: true } },
-            convertedStudy: { include: { status: true } },
-        },
+    return prisma.$transaction(async (tx) => {
+        const txAny = tx as any;
+
+        const inProgressStatus = await tx.status.findUnique({ where: { name: 'IN_PROGRESS' } });
+        if (!inProgressStatus) {
+            throw new Error('Estado IN_PROGRESS no configurado');
+        }
+
+        const createdStudy = await tx.study.create({
+            data: {
+                userId: data.patientId,
+                studyName: 'Estudio solicitado por paciente',
+                studyDate: data.requestedDate,
+                socialInsurance: data.insuranceName,
+                doctor: data.doctorName,
+                statusId: inProgressStatus.id,
+            },
+        });
+
+        return txAny.studyRequest.create({
+            data: {
+                patientId: data.patientId,
+                dni: data.dni,
+                requestedDate: data.requestedDate,
+                doctorName: data.doctorName,
+                insuranceName: data.insuranceName,
+                medicalOrderPhotoUrl: null,
+                observations: data.observations || null,
+                status: STUDY_REQUEST_STATUS.CONVERTED,
+                convertedStudyId: createdStudy.id,
+                validatedAt: new Date(),
+            },
+            include: {
+                patient: { include: { profile: true } },
+                validatedBy: { include: { profile: true } },
+                convertedStudy: { include: { status: true } },
+            },
+        });
     });
 };
 

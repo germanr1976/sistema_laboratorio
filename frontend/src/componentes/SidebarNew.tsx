@@ -2,63 +2,24 @@
 
 import Link from 'next/link'
 import { usePathname, useRouter } from 'next/navigation'
-import { FileEdit, FilePlus, FolderOpen, History, LogOut, Menu, X, ClipboardList } from 'lucide-react'
+import { FilePlus, FolderOpen, History, LogOut, Menu, X, ClipboardList } from 'lucide-react'
 import { useState, useEffect } from 'react'
 import { useAuth } from '../utils/useAuth'
 import authFetch from '../utils/authFetch'
 
-interface EstudioParcial {
-    id: string | number
-    nombreApellido: string
-    dni: string
-    estado: string
-}
 
 export function Sidebar() {
     const AUTO_REFRESH_MS = 45000
     const API_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:3000'
     const pathname = usePathname()
-    const [estudiosParciales, setEstudiosParciales] = useState<EstudioParcial[]>([])
+    
     const [isOpen, setIsOpen] = useState(false)
     const { logout, userData } = useAuth()
     const [userName, setUserName] = useState<string>('Bioquímico')
     const [userInitials, setUserInitials] = useState<string>('BQ')
     const [pendingRequestsCount, setPendingRequestsCount] = useState(0)
 
-    const handleClearDrafts = () => {
-        try {
-            localStorage.removeItem('estudios_metadata')
-            setEstudiosParciales([])
-            window.dispatchEvent(new Event('storage'))
-        } catch (error) {
-            console.error('Error limpiando borradores:', error)
-        }
-    }
 
-    // Cargar estudios parciales del localStorage
-    useEffect(() => {
-        const cargarEstudios = () => {
-            try {
-                const raw = localStorage.getItem('estudios_metadata')
-                const metas = raw ? JSON.parse(raw) : []
-                // Incluir en_proceso y parciales (borradores)
-                const parciales = metas.filter((m: any) => {
-                    const estado = m.estado || m.status || ''
-                    return estado === 'parcial' || estado === 'en_proceso'
-                })
-                console.log('Estudios parciales cargados:', parciales)
-                setEstudiosParciales(parciales)
-            } catch (error) {
-                console.error('Error cargando estudios parciales:', error)
-            }
-        }
-
-        cargarEstudios()
-
-        // Escuchar cambios en localStorage
-        window.addEventListener('storage', cargarEstudios)
-        return () => window.removeEventListener('storage', cargarEstudios)
-    }, [pathname])
 
     useEffect(() => {
         if (!userData) return
@@ -189,40 +150,7 @@ export function Sidebar() {
                         })}
                     </div>
 
-                    {/* Estudios Parciales */}
-                    {estudiosParciales.length > 0 && (
-                        <div className="mt-8">
-                            <h3 className="px-3 text-sm font-semibold text-slate-300 uppercase tracking-wider mb-3">
-                                Borradores ({estudiosParciales.length})
-                            </h3>
-                            <div className="space-y-1">
-                                {estudiosParciales.map((estudio) => (
-                                    <Link
-                                        key={estudio.id}
-                                        href={`/cargar-nuevo?id=${estudio.id}`}
-                                        onClick={() => setIsOpen(false)}
-                                        className={`flex items-center gap-3 px-3.5 py-3 rounded-lg text-base transition-colors group ${pathname === `/cargar-nuevo`
-                                            ? 'bg-amber-600/20 text-amber-300'
-                                            : 'text-slate-300 hover:bg-amber-600/10 hover:text-amber-300'
-                                            }`}
-                                    >
-                                        <FileEdit className="w-5 h-5 text-amber-500" />
-                                        <div className="flex-1 min-w-0">
-                                            <p className="truncate font-semibold text-base">{estudio.nombreApellido}</p>
-                                            <p className="text-sm text-slate-400">DNI: {estudio.dni}</p>
-                                        </div>
-                                        <span className="opacity-0 group-hover:opacity-100 transition-opacity">→</span>
-                                    </Link>
-                                ))}
-                            </div>
-                            <button
-                                onClick={handleClearDrafts}
-                                className="mt-4 w-full px-3.5 py-2.5 text-sm font-semibold text-slate-100 bg-slate-700 hover:bg-slate-600 rounded-lg transition-colors"
-                            >
-                                Borrar borradores locales
-                            </button>
-                        </div>
-                    )}
+                    
                 </nav>
 
                 {/* Footer */}

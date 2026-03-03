@@ -7,6 +7,22 @@ import authFetch from "../../../../../utils/authFetch"
 import type { Study } from "../../utils/tipos"
 
 const API_URL = process.env.NEXT_PUBLIC_API_URL || "http://localhost:3000"
+const DATE_ONLY_REGEX = /^(\d{4})-(\d{2})-(\d{2})$/
+
+const parseDateSafe = (value?: string) => {
+  if (!value) return new Date(NaN)
+  const raw = value.trim()
+  const match = raw.match(DATE_ONLY_REGEX)
+
+  if (match) {
+    const year = Number(match[1])
+    const month = Number(match[2])
+    const day = Number(match[3])
+    return new Date(year, month - 1, day, 12, 0, 0, 0)
+  }
+
+  return new Date(raw)
+}
 
 export default function LabHistoryPage() {
   const [startDate, setStartDate] = useState("")
@@ -18,8 +34,8 @@ export default function LabHistoryPage() {
 
   const sortStudiesByDate = (studies: Study[], order: "desc" | "asc") => {
     return [...studies].sort((a, b) => {
-      const dateA = new Date(a.date).getTime()
-      const dateB = new Date(b.date).getTime()
+      const dateA = parseDateSafe(a.date).getTime()
+      const dateB = parseDateSafe(b.date).getTime()
 
       if (Number.isNaN(dateA) && Number.isNaN(dateB)) return 0
       if (Number.isNaN(dateA)) return 1
@@ -90,9 +106,9 @@ export default function LabHistoryPage() {
     }
 
     const filtered = allStudies.filter((study) => {
-      const studyDate = new Date(study.date)
-      const start = startDate ? new Date(startDate) : null
-      const end = endDate ? new Date(endDate) : null
+      const studyDate = parseDateSafe(study.date)
+      const start = startDate ? parseDateSafe(startDate) : null
+      const end = endDate ? parseDateSafe(endDate) : null
 
       if (start && end) {
         return studyDate >= start && studyDate <= end

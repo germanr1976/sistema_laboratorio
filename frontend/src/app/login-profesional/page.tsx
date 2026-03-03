@@ -11,8 +11,7 @@ export default function LoginProfesional() {
     const [dni, setDni] = useState("");
     const [dniError, setDniError] = useState("");
     const DNI_MAX = 8;
-    const [email, setEmail] = useState("");
-    const [emailError, setEmailError] = useState("");
+
     const [password, setPassword] = useState("");
     const [showPassword, setShowPassword] = useState(false);
 
@@ -97,7 +96,7 @@ export default function LoginProfesional() {
                 />
                 <section className="bg-white rounded-2xl shadow-xl p-8 max-w-md w-full mx-auto mt-16 flex flex-col items-center">
                     <h2 className="text-center text-black font-semibold text-2xl mb-1">Acceso administrativo</h2>
-                    <p className="text-center text-gray-500 text-sm mb-6">Acceso para personal administrativo del laboratorio. Ingresá con tu DNI, email y contraseña.</p>
+                    <p className="text-center text-gray-500 text-sm mb-6">Acceso para personal administrativo del laboratorio. Ingresá con tu DNI y contraseña.</p>
                     <form ref={formRef} className="w-full flex flex-col gap-4" onSubmit={handleSubmit}>
                         <input
                             type="text"
@@ -126,14 +125,7 @@ export default function LoginProfesional() {
                         {dniError && (
                             <p className="text-red-600 text-sm mt-1">{dniError}</p>
                         )}
-                        <input
-                            type="email"
-                            placeholder="Email"
-                            value={email}
-                            onChange={e => setEmail(e.target.value)}
-                            className="w-full px-4 py-2 border border-gray-300 rounded focus:outline-none focus:ring-2 focus:ring-blue-400"
-                            required
-                        />
+
                         <div className="relative w-full">
                             <input
                                 type={showPassword ? "text" : "password"}

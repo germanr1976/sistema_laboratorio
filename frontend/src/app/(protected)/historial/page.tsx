@@ -7,6 +7,23 @@ import Toast from "../../../componentes/Toast"
 import { cancelStudy, getMyStudies } from "../../../utils/studiesApi"
 import type { Study } from "../../../utils/tipos"
 
+const DATE_ONLY_REGEX = /^(\d{4})-(\d{2})-(\d{2})$/
+
+const parseDateSafe = (value?: string) => {
+    if (!value) return new Date(NaN)
+    const raw = value.trim()
+    const match = raw.match(DATE_ONLY_REGEX)
+
+    if (match) {
+        const year = Number(match[1])
+        const month = Number(match[2])
+        const day = Number(match[3])
+        return new Date(year, month - 1, day, 12, 0, 0, 0)
+    }
+
+    return new Date(raw)
+}
+
 export default function LabHistoryPage() {
     const [startDate, setStartDate] = useState("")
     const [endDate, setEndDate] = useState("")
@@ -29,8 +46,8 @@ export default function LabHistoryPage() {
 
     const sortStudiesByDate = (studies: Study[], order: "desc" | "asc") => {
         return [...studies].sort((a, b) => {
-            const dateA = new Date(a.date).getTime()
-            const dateB = new Date(b.date).getTime()
+            const dateA = parseDateSafe(a.date).getTime()
+            const dateB = parseDateSafe(b.date).getTime()
 
             if (Number.isNaN(dateA) && Number.isNaN(dateB)) return 0
             if (Number.isNaN(dateA)) return 1
@@ -54,9 +71,9 @@ export default function LabHistoryPage() {
         const filteredByDate = filteredByStatus.filter((study) => {
             if (!start && !end) return true
 
-            const studyDate = new Date(study.date)
-            const startDateObj = start ? new Date(start) : null
-            const endDateObj = end ? new Date(end) : null
+            const studyDate = parseDateSafe(study.date)
+            const startDateObj = start ? parseDateSafe(start) : null
+            const endDateObj = end ? parseDateSafe(end) : null
 
             if (startDateObj && endDateObj) {
                 return studyDate >= startDateObj && studyDate <= endDateObj

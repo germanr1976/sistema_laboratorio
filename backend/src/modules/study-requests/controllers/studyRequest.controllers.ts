@@ -41,7 +41,7 @@ export const createStudyRequest = async (req: Request, res: Response) => {
         if (!patientId || roleName !== 'PATIENT') {
             return res.status(403).json({
                 success: false,
-                message: 'Solo pacientes autenticados pueden crear solicitudes',
+                message: 'Solo pacientes autenticados pueden solicitar estudios',
             });
         }
 
@@ -62,22 +62,18 @@ export const createStudyRequest = async (req: Request, res: Response) => {
             });
         }
 
-        const uploadedOrderPhoto = (req as any).file as Express.Multer.File | undefined;
-        const uploadedOrderUrl = uploadedOrderPhoto ? `/uploads/orders/${uploadedOrderPhoto.filename}` : null;
-
         const created = await studyRequestService.createStudyRequest({
             patientId,
             dni: req.user!.dni,
             requestedDate: parsedRequestedDate,
             doctorName: value.doctorName,
             insuranceName: value.insuranceName,
-            medicalOrderPhotoUrl: uploadedOrderUrl || value.medicalOrderPhotoUrl || null,
             observations: value.observations || null,
         });
 
         return res.status(201).json({
             success: true,
-            message: 'Solicitud de estudio creada exitosamente',
+            message: 'Estudio solicitado exitosamente y creado en proceso',
             data: created,
         });
     } catch (error) {
@@ -97,7 +93,7 @@ export const getMyStudyRequests = async (req: Request, res: Response) => {
         if (!patientId || roleName !== 'PATIENT') {
             return res.status(403).json({
                 success: false,
-                message: 'Solo pacientes autenticados pueden ver sus solicitudes',
+                message: 'Solo pacientes autenticados pueden ver sus estudios solicitados',
             });
         }
 
@@ -105,7 +101,7 @@ export const getMyStudyRequests = async (req: Request, res: Response) => {
 
         return res.status(200).json({
             success: true,
-            message: 'Solicitudes obtenidas exitosamente',
+            message: 'Estudios solicitados obtenidos exitosamente',
             data: rows,
             count: rows.length,
         });
