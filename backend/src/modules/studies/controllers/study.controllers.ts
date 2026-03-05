@@ -214,10 +214,17 @@ export const getStudyById = async (
       return ResponseHelper.notFound(res, "Estudio");
     }
 
-    // Verificar permisos: el paciente, bioquímico asignado o admin pueden ver el estudio
+    // Verificar permisos: el paciente propietario, el bioquímico asignado
+    // o cualquier bioquímico (para estudios solicitados por pacientes) puede ver.
     const isPatient = study.userId === req.user?.id;
-    const isBiochemist = study.biochemistId === req.user?.id;
     const isAdmin = req.user?.role?.name === "ADMIN";
+
+    let isBiochemist = false;
+    if (req.user?.role?.name === "BIOCHEMIST") {
+      // Si el estudio tiene un bioquímico asignado, debe coincidir.
+      // Si no tiene ninguno (p.ej. creado por un paciente), permitimos ver.
+      isBiochemist = study.biochemistId == null || study.biochemistId === req.user?.id;
+    }
 
     if (!isPatient && !isBiochemist && !isAdmin) {
       return ResponseHelper.forbidden(res, "No tienes permiso para ver este estudio");
@@ -389,8 +396,9 @@ export const updateStudyStatus = async (
       return ResponseHelper.notFound(res, "Estudio");
     }
 
-    // Verificar que el usuario es el bioquímico asignado
-    if (study.biochemistId !== req.user?.id) {
+    // Verificar que el usuario es el bioquímico asignado O es un bioquímico cualquiera si el estudio no tiene biochemista asignado
+    const isBiochemist = (study.biochemistId == null) || (study.biochemistId === req.user?.id);
+    if (!isBiochemist) {
       return ResponseHelper.forbidden(
         res,
         "Solo el bioquímico asignado puede actualizar el estado de este estudio"
@@ -449,8 +457,12 @@ export const updateStudyPdf = async (
       return ResponseHelper.notFound(res, "Estudio");
     }
 
-    // Verificar que el usuario es el bioquímico asignado
-    if (study.biochemistId !== req.user?.id) {
+    // Verificar que el usuario es el bioquímico asignado O es un bioquímico cualquiera si el estudio no tiene biochemista asignado
+    console.log('[studies] updateStudyPdf -> user:', { id: req.user?.id, role: req.user?.role }, 'study.biochemistId:', study.biochemistId);
+    const isBiochemist = (study.biochemistId == null) || (study.biochemistId === req.user?.id);
+    console.log('[studies] updateStudyPdf -> isBiochemist:', isBiochemist);
+
+    if (!isBiochemist) {
       return ResponseHelper.forbidden(
         res,
         "Solo el bioquímico asignado puede actualizar el PDF de este estudio"

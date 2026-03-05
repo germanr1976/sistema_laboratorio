@@ -20,44 +20,25 @@ interface CreateStudyRequestData {
 }
 
 export const createStudyRequest = async (data: CreateStudyRequestData) => {
-    return prisma.$transaction(async (tx) => {
-        const txAny = tx as any;
-
-        const inProgressStatus = await tx.status.findUnique({ where: { name: 'IN_PROGRESS' } });
-        if (!inProgressStatus) {
-            throw new Error('Estado IN_PROGRESS no configurado');
-        }
-
-        const createdStudy = await tx.study.create({
-            data: {
-                userId: data.patientId,
-                studyName: 'Estudio solicitado por paciente',
-                studyDate: data.requestedDate,
-                socialInsurance: data.insuranceName,
-                doctor: data.doctorName,
-                statusId: inProgressStatus.id,
-            },
-        });
-
-        return txAny.studyRequest.create({
-            data: {
-                patientId: data.patientId,
-                dni: data.dni,
-                requestedDate: data.requestedDate,
-                doctorName: data.doctorName,
-                insuranceName: data.insuranceName,
-                medicalOrderPhotoUrl: null,
-                observations: data.observations || null,
-                status: STUDY_REQUEST_STATUS.CONVERTED,
-                convertedStudyId: createdStudy.id,
-                validatedAt: new Date(),
-            },
-            include: {
-                patient: { include: { profile: true } },
-                validatedBy: { include: { profile: true } },
-                convertedStudy: { include: { status: true } },
-            },
-        });
+    // A new study request should start in PENDING state and remain unconverted until a professional validates it.
+    // The previous implementation auto-converted and even created a Study, bypassing the approval workflow.
+    return prismaAny.studyRequest.create({
+        data: {
+            patientId: data.patientId,
+            dni: data.dni,
+            requestedDate: data.requestedDate,
+            doctorName: data.doctorName,
+            insuranceName: data.insuranceName,
+            medicalOrderPhotoUrl: null,
+            observations: data.observations || null,
+            status: STUDY_REQUEST_STATUS.PENDING,
+            // convertedStudyId remains null until validation
+        },
+        include: {
+            patient: { include: { profile: true } },
+            validatedBy: { include: { profile: true } },
+            convertedStudy: { include: { status: true } },
+        },
     });
 };
 
@@ -104,19 +85,19 @@ export const getStudyRequestById = async (id: number) => {
 };
 
 export const validateStudyRequest = async (id: number, validatedByUserId: number) => {
-    return prismaAny.studyRequest.update({
+    // First update to VALIDATED
+    await prismaAny.studyRequest.update({
         where: { id },
         data: {
             status: STUDY_REQUEST_STATUS.VALIDATED,
             validatedByUserId,
             validatedAt: new Date(),
         },
-        include: {
-            patient: { include: { profile: true } },
-            validatedBy: { include: { profile: true } },
-            convertedStudy: true,
-        },
     });
+
+    // Then convert to study
+    const converted = await convertStudyRequestToStudy(id, validatedByUserId);
+    return converted;
 };
 
 export const rejectStudyRequest = async (id: number, validatedByUserId: number, observations?: string | null) => {
@@ -155,32 +136,44 @@ export const convertStudyRequestToStudy = async (id: number, validatedByUserId: 
             throw new Error('Solo se pueden convertir solicitudes validadas');
         }
 
-        if (request.convertedStudyId) {
-            throw new Error('La solicitud ya fue convertida a estudio');
-        }
-
         const inProgressStatus = await tx.status.findUnique({ where: { name: 'IN_PROGRESS' } });
         if (!inProgressStatus) {
             throw new Error('Estado IN_PROGRESS no configurado');
         }
 
-        const createdStudy = await tx.study.create({
-            data: {
-                userId: request.patientId,
-                studyName: 'Estudio solicitado por paciente',
-                studyDate: request.requestedDate,
-                socialInsurance: request.insuranceName,
-                doctor: request.doctorName,
-                statusId: inProgressStatus.id,
-                biochemistId: validatedByUserId,
-            },
-        });
+        // Si ya existe un Study vinculado, reutilizarlo y asignar biochemist si hace falta
+        let studyId = request.convertedStudyId;
+        if (studyId) {
+            // Asegurar que el estudio tenga biochemistId si se está validando
+            const existingStudy = await tx.study.findUnique({ where: { id: studyId } });
+            if (!existingStudy) {
+                throw new Error('Estudio vinculado no encontrado');
+            }
+
+            if (!existingStudy.biochemistId) {
+                await tx.study.update({ where: { id: studyId }, data: { biochemistId: validatedByUserId } });
+            }
+        } else {
+            // Crear estudio si no existía
+            const createdStudy = await tx.study.create({
+                data: {
+                    userId: request.patientId,
+                    studyName: 'Estudio solicitado por paciente',
+                    studyDate: request.requestedDate,
+                    socialInsurance: request.insuranceName,
+                    doctor: request.doctorName,
+                    statusId: inProgressStatus.id,
+                    biochemistId: validatedByUserId,
+                },
+            });
+            studyId = createdStudy.id;
+        }
 
         const updatedRequest = await txAny.studyRequest.update({
             where: { id },
             data: {
                 status: STUDY_REQUEST_STATUS.CONVERTED,
-                convertedStudyId: createdStudy.id,
+                convertedStudyId: studyId,
                 validatedByUserId,
                 validatedAt: new Date(),
             },

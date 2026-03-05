@@ -3,7 +3,6 @@
 import { useEffect, useState } from 'react';
 import { useRouter, usePathname } from 'next/navigation';
 import { getAuthToken } from '../utils/authFetch';
-import Clock from '../componentes/Clock';
 
 export default function Navbar() {
     const [isAuthenticated, setIsAuthenticated] = useState(false);
@@ -56,26 +55,6 @@ export default function Navbar() {
                 </div>
 
                 {/* Navigation Links */}
-                {isAuthenticated && !isAuthFlow && (
-                    <div className="flex items-center gap-6">
-                        <Clock boxBg="bg-white/90" boxBorder="border-blue-200" iconColor="text-blue-600" showDate={true} showIcon={true} />
-                        <button
-                            onClick={() => router.push('/dashboard')}
-                            className={`px-4 py-2 rounded-lg font-medium transition-colors ${pathname === '/dashboard'
-                                ? 'bg-white text-blue-600'
-                                : 'bg-blue-500 text-white hover:bg-blue-600'
-                                }`}
-                        >
-                            Dashboard
-                        </button>
-                        <button
-                            onClick={handleLogout}
-                            className="px-4 py-2 bg-red-500 text-white rounded-lg font-medium hover:bg-red-600 transition-colors"
-                        >
-                            Salir
-                        </button>
-                    </div>
-                )}
             </div>
         </nav>
     );

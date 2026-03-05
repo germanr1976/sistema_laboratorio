@@ -71,9 +71,16 @@ export const createStudyRequest = async (req: Request, res: Response) => {
             observations: value.observations || null,
         });
 
+        // Debug log: mostrar resumen de la creación
+        console.log('[study-requests] createStudyRequest -> created:', {
+            id: created?.id,
+            patientId: created?.patientId,
+            status: created?.status,
+        });
+
         return res.status(201).json({
             success: true,
-            message: 'Estudio solicitado exitosamente y creado en proceso',
+            message: 'Solicitud de estudio creada y quedó en estado PENDING para validación profesional',
             data: created,
         });
     } catch (error) {
@@ -133,10 +140,25 @@ export const listStudyRequestsForProfessional = async (req: Request, res: Respon
             });
         }
 
-        const rows = await studyRequestService.listStudyRequestsForProfessional({
-            dni: value.dni,
-            status: value.status,
-        });
+        const filters = { dni: value.dni, status: value.status };
+
+        // Debug log: quién solicita la lista y con qué filtros
+        console.log('[study-requests] listStudyRequestsForProfessional -> user:', {
+            id: req.user?.id,
+            role: roleName,
+        }, 'filters:', filters);
+
+        const rows = await studyRequestService.listStudyRequestsForProfessional(filters);
+
+        // Debug log: mostrar cuantos rows devolvió y un ejemplo
+        try {
+            console.log('[study-requests] listStudyRequestsForProfessional -> rowsCount:', Array.isArray(rows) ? rows.length : 0);
+            if (Array.isArray(rows) && rows.length > 0) {
+                console.log('[study-requests] listStudyRequestsForProfessional -> sampleRow:', JSON.stringify(rows[0]));
+            }
+        } catch (logErr) {
+            console.error('[study-requests] error logging rows:', logErr);
+        }
 
         return res.status(200).json({
             success: true,

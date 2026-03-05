@@ -29,10 +29,10 @@ interface StudyRequestRow {
 }
 
 const statusLabel: Record<StudyRequestStatus, string> = {
-    PENDING: "Pendiente",
+    PENDING: "En proceso",
     VALIDATED: "Validada",
     REJECTED: "Rechazada",
-    CONVERTED: "Convertida",
+    CONVERTED: "En proceso",
 };
 
 const statusClass: Record<StudyRequestStatus, string> = {
@@ -59,7 +59,7 @@ const formatDateOnly = (value: string) => {
 export default function SolicitudesPage() {
     const AUTO_REFRESH_MS = 45000;
     const [dniFilter, setDniFilter] = useState("");
-    const [statusFilter, setStatusFilter] = useState<"all" | StudyRequestStatus>("PENDING");
+    const [statusFilter, setStatusFilter] = useState<"all" | StudyRequestStatus>("all");
     const [loading, setLoading] = useState(true);
     const [error, setError] = useState<string | null>(null);
     const [rows, setRows] = useState<StudyRequestRow[]>([]);
@@ -67,7 +67,7 @@ export default function SolicitudesPage() {
     const [lastUpdatedAt, setLastUpdatedAt] = useState<Date | null>(null);
     const [rejectTargetId, setRejectTargetId] = useState<number | null>(null);
     const [rejectReason, setRejectReason] = useState("");
-    const [convertTargetId, setConvertTargetId] = useState<number | null>(null);
+    // ya no se usa convertTargetId
 
     const resolveOrderUrl = (value?: string | null) => {
         if (!value) return null;
@@ -93,17 +93,19 @@ export default function SolicitudesPage() {
             if (!response.ok) {
                 setRows([]);
                 setError(data?.message || "No se pudieron cargar las solicitudes");
-                return;
+                return [];
             }
 
             const items = Array.isArray(data?.data) ? data.data : [];
             setRows(items);
             setError(null);
             setLastUpdatedAt(new Date());
+            return items;
         } catch (e) {
             console.error(e);
             setRows([]);
             setError("Error al conectar con el servidor");
+            return [];
         } finally {
             if (showSpinner) {
                 setLoading(false);
@@ -117,14 +119,14 @@ export default function SolicitudesPage() {
 
     useEffect(() => {
         const intervalId = window.setInterval(() => {
-            if (actingId !== null || rejectTargetId !== null || convertTargetId !== null) {
+            if (actingId !== null || rejectTargetId !== null) {
                 return;
             }
             loadRows(false);
         }, AUTO_REFRESH_MS);
 
         return () => window.clearInterval(intervalId);
-    }, [queryString, actingId, rejectTargetId, convertTargetId]);
+    }, [queryString, actingId, rejectTargetId]);
 
     const runAction = async (
         id: number,
@@ -156,6 +158,11 @@ export default function SolicitudesPage() {
 
             const data = await response.json().catch(() => ({}));
             if (!response.ok) {
+                // Conflict errors suelen indicar double-convert; ignorar silenciosamente
+                if (response.status === 409 && action === 'convert') {
+                    console.warn('acción convert conflict, ya estaba en proceso');
+                    return null;
+                }
                 setError(data?.message || "No se pudo ejecutar la acción");
                 return null;
             }
@@ -183,13 +190,73 @@ export default function SolicitudesPage() {
     const [selectedStudy, setSelectedStudy] = useState<any | null>(null);
     const [loadingStudy, setLoadingStudy] = useState(false);
     const [uploading, setUploading] = useState(false);
+    const [successMessage, setSuccessMessage] = useState<string | null>(null);
 
     const openRequestDetail = async (row: StudyRequestRow) => {
-        setSelectedRequest(row);
+        setSelectedRequest(null);
         setSelectedStudy(null);
+        setError(null);
+
+        console.log('[openRequestDetail] Abriendo solicitud:', { id: row.id, status: row.status, convertedStudyId: row.convertedStudyId });
+
+        // Si ya existe un estudio asociado, mostrarlo inmediatamente
         if (row.convertedStudyId) {
+            console.log('[openRequestDetail] Estudio ya existe:', row.convertedStudyId);
+            setSelectedRequest(row);
             await fetchStudy(row.convertedStudyId);
+            return;
         }
+
+        // Si no hay estudio aún, validar y convertir automáticamente
+        if (row.status === 'PENDING' || row.status === 'VALIDATED') {
+            try {
+                setActingId(row.id);
+                console.log('[openRequestDetail] Iniciando validación/conversión');
+
+                // Si es PENDING, validar (esto también crea el estudio)
+                // Si es VALIDATED, convertir directamente
+                if (row.status === 'PENDING') {
+                    console.log('[openRequestDetail] Estado PENDING - validando');
+                    await runAction(row.id, 'validate');
+                } else {
+                    console.log('[openRequestDetail] Estado VALIDATED - convirtiendo');
+                    await runAction(row.id, 'convert');
+                }
+
+                setActingId(null);
+
+                // Recargar para obtener el nuevo convertedStudyId
+                console.log('[openRequestDetail] Esperando y recargando lista de solicitudes');
+                await new Promise(r => setTimeout(r, 500));
+                const updatedRows = await loadRows(false);
+
+                // Buscar la solicitud actualizada en la lista recargada
+                const updatedRowInList = updatedRows.find(r => r.id === row.id);
+
+                console.log('[openRequestDetail] Solicitud recargada:', {
+                    convertedStudyId: updatedRowInList?.convertedStudyId,
+                    status: updatedRowInList?.status
+                });
+
+                if (updatedRowInList?.convertedStudyId) {
+                    setSelectedRequest(updatedRowInList);
+                    console.log('[openRequestDetail] Cargando estudio:', updatedRowInList.convertedStudyId);
+                    await fetchStudy(updatedRowInList.convertedStudyId);
+                    return;
+                } else {
+                    setError('No se pudo convertir la solicitud. Por favor recarga e intenta nuevamente.');
+                    console.error('[openRequestDetail] No se obtuvo convertedStudyId después de validar');
+                }
+            } catch (e) {
+                console.error('[openRequestDetail] Error al procesar solicitud:', e);
+                setError('Error al procesar la solicitud');
+                setActingId(null);
+            }
+        }
+
+        // Si no se pudo procesar, mostrar detalle de solicitud
+        console.log('[openRequestDetail] Mostrando solicitud sin estudio');
+        setSelectedRequest(row);
     };
 
     const closeRequestDetail = () => {
@@ -197,19 +264,39 @@ export default function SolicitudesPage() {
         setSelectedStudy(null);
     };
 
-    const fetchStudy = async (studyId: number) => {
+    const fetchStudy = async (studyId: number, retries = 3) => {
         try {
             setLoadingStudy(true);
-            const resp = await authFetch(`${API_URL}/api/studies/${studyId}`);
-            const j = await resp.json().catch(() => ({}));
-            if (!resp.ok) {
-                setError(j?.message || "No se pudo obtener el estudio");
-                return;
+            let lastError: any = null;
+
+            for (let attempt = 1; attempt <= retries; attempt++) {
+                try {
+                    console.log(`[fetchStudy] Intento ${attempt}/${retries} para estudio ${studyId}`);
+                    const resp = await authFetch(`${API_URL}/api/studies/${studyId}`);
+                    const j = await resp.json().catch(() => ({}));
+
+                    if (!resp.ok) {
+                        lastError = j?.message || "No se pudo obtener el estudio";
+                        if (attempt < retries) {
+                            await new Promise(r => setTimeout(r, 500));
+                            continue;
+                        }
+                        break;
+                    }
+
+                    setSelectedStudy(j?.data || null);
+                    console.log('[fetchStudy] Estudio obtenido exitosamente:', j?.data?.id);
+                    return;
+                } catch (e) {
+                    lastError = e;
+                    if (attempt < retries) {
+                        await new Promise(r => setTimeout(r, 500));
+                        continue;
+                    }
+                }
             }
-            setSelectedStudy(j?.data || null);
-        } catch (e) {
-            console.error(e);
-            setError("Error al cargar el estudio");
+
+            setError(lastError || "No se pudo obtener el estudio después de varios intentos");
         } finally {
             setLoadingStudy(false);
         }
@@ -242,6 +329,7 @@ export default function SolicitudesPage() {
 
     const updateStudyStatusApi = async (studyId: number, statusName: 'PARTIAL' | 'COMPLETED') => {
         try {
+            console.log(`[updateStudyStatusApi] Updating study ${studyId} to ${statusName}`);
             setLoadingStudy(true);
             const resp = await authFetch(`${API_URL}/api/studies/${studyId}/status`, {
                 method: 'PATCH',
@@ -249,17 +337,64 @@ export default function SolicitudesPage() {
                 body: JSON.stringify({ statusName }),
             });
             const j = await resp.json().catch(() => ({}));
+
+            console.log(`[updateStudyStatusApi] Response status: ${resp.status}`, j);
+
             if (!resp.ok) {
-                setError(j?.message || 'No se pudo actualizar el estado');
+                const errorMsg = j?.message || 'No se pudo actualizar el estado';
+                setError(errorMsg);
+                console.error(`[updateStudyStatusApi] Error updating status: ${errorMsg}`);
                 return;
             }
+
             setSelectedStudy(j?.data || null);
+            setError(null);
+            console.log(`[updateStudyStatusApi] Status updated success for study:`, j?.data?.id);
+
+            // Mostrar mensaje de éxito
+            const statusDisplay = statusName === 'PARTIAL' ? 'PARCIAL' : 'COMPLETADO';
+            setSuccessMessage(`✓ Estudio marcado como ${statusDisplay}`);
+
+            // Recargar solicitudes 
             await loadRows();
+
+            // Cerrar modal después de mostrar el mensaje
+            await new Promise(r => setTimeout(r, 1000));
+
+            console.log(`[updateStudyStatusApi] Cerrando modal después de actualizar estado`);
+            setSuccessMessage(null);
+            closeRequestDetail();
+
         } catch (e) {
-            console.error(e);
+            console.error('[updateStudyStatusApi] Exception:', e);
             setError('Error al actualizar estado');
         } finally {
             setLoadingStudy(false);
+        }
+    };
+
+    const deleteAttachment = async (attachmentId: number) => {
+        try {
+            setUploading(true);
+            const studyId = selectedStudy?.id || selectedRequest?.convertedStudyId;
+            if (!studyId) return;
+
+            const resp = await authFetch(`${API_URL}/api/studies/${studyId}/attachments/${attachmentId}`, {
+                method: 'DELETE',
+            });
+
+            if (!resp.ok) {
+                const j = await resp.json().catch(() => ({}));
+                setError(j?.message || 'No se pudo eliminar el PDF');
+                return;
+            }
+
+            await fetchStudy(studyId);
+        } catch (e) {
+            console.error(e);
+            setError('Error al eliminar el PDF');
+        } finally {
+            setUploading(false);
         }
     };
 
@@ -283,35 +418,18 @@ export default function SolicitudesPage() {
         setRejectReason("");
     };
 
-    const openConvertModal = (id: number) => {
-        setConvertTargetId(id);
-    };
+    // ya no necesitamos modal de conversión
 
-    const closeConvertModal = () => {
-        if (actingId) return;
-        setConvertTargetId(null);
-    };
-
-    const confirmConvert = async () => {
-        if (!convertTargetId) return;
-        const createdStudy = await runAction(convertTargetId, "convert");
-        setConvertTargetId(null);
-        // Si se creó el estudio, actualizar modal/estado
-        if (createdStudy) {
-            // createdStudy puede venir ya formateado por el servidor
-            const studyId = createdStudy.id || createdStudy.study?.id || null;
-            if (studyId) {
-                await fetchStudy(studyId);
-            }
-        }
-    };
 
     return (
         <div className="min-h-screen bg-gray-50 p-4 md:p-8">
             <div className="mx-auto max-w-7xl space-y-6">
                 <div className="space-y-2">
                     <h1 className="text-3xl font-bold tracking-tight text-gray-900">Solicitudes de Estudio</h1>
-                    <p className="text-gray-600">Revisá solicitudes de pacientes y convertí a estudios cuando corresponda.</p>
+                    <p className="text-gray-600">Revisá solicitudes de pacientes y determiná el estado del estudio (PARCIAL o COMPLETADO).</p>
+                    <p className="text-xs text-amber-700 bg-amber-50 border border-amber-200 rounded px-2 py-1 inline-block">
+                        💡 Una vez que cambies el estado a PARCIAL o COMPLETADO, el estudio aparecerá en tu panel de gestión de estudios.
+                    </p>
                     <p className="text-xs text-gray-500">
                         Última actualización: {lastUpdatedAt ? lastUpdatedAt.toLocaleTimeString("es-AR") : "—"}
                     </p>
@@ -368,79 +486,73 @@ export default function SolicitudesPage() {
                                 </tr>
                             </thead>
                             <tbody className="divide-y divide-gray-200">
-                                {rows.map((row) => {
-                                    const patientName = `${row.patient?.profile?.firstName || ""} ${row.patient?.profile?.lastName || ""}`.trim() || "-";
-                                    const disabled = actingId === row.id;
+                                {rows
+                                    .filter(row => row.status === 'PENDING' || row.status === 'VALIDATED')
+                                    .map((row) => {
+                                        const patientName = `${row.patient?.profile?.firstName || ""} ${row.patient?.profile?.lastName || ""}`.trim() || "-";
+                                        const disabled = actingId === row.id;
 
-                                    return (
-                                        <tr key={row.id}>
-                                            <td className="px-3 py-2 text-gray-900">{row.dni}</td>
-                                            <td className="px-3 py-2 text-gray-900">{patientName}</td>
-                                            <td className="px-3 py-2 text-gray-900">{formatDateOnly(row.requestedDate)}</td>
-                                            <td className="px-3 py-2 text-gray-900">{row.doctorName}</td>
-                                            <td className="px-3 py-2 text-gray-900">{row.insuranceName}</td>
-                                            <td className="px-3 py-2">
-                                                <span className={`inline-flex rounded-full border px-2.5 py-0.5 text-xs font-semibold ${statusClass[row.status]}`}>
-                                                    {statusLabel[row.status]}
-                                                </span>
-                                            </td>
-                                            <td className="px-3 py-2">
-                                                <div className="flex justify-end gap-2">
-                                                    <button
-                                                        type="button"
-                                                        onClick={() => openRequestDetail(row)}
-                                                        className="rounded-md bg-slate-600 px-2.5 py-1 text-xs font-semibold text-white hover:bg-slate-700"
-                                                    >
-                                                        Abrir
-                                                    </button>
-                                                    {row.status === "PENDING" && (
-                                                        <>
-                                                            <button
-                                                                type="button"
-                                                                disabled={disabled}
-                                                                onClick={() => runAction(row.id, "validate")}
-                                                                className="rounded-md bg-blue-600 px-2.5 py-1 text-xs font-semibold text-white hover:bg-blue-700 disabled:opacity-60"
-                                                            >
-                                                                Validar
-                                                            </button>
-                                                            <button
-                                                                type="button"
-                                                                disabled={disabled}
-                                                                onClick={() => openRejectModal(row.id)}
-                                                                className="rounded-md bg-red-600 px-2.5 py-1 text-xs font-semibold text-white hover:bg-red-700 disabled:opacity-60"
-                                                            >
-                                                                Rechazar
-                                                            </button>
-                                                        </>
-                                                    )}
-                                                    {row.status === "VALIDATED" && (
-                                                        <>
-                                                            <button
-                                                                type="button"
-                                                                disabled={disabled}
-                                                                onClick={() => openConvertModal(row.id)}
-                                                                className="rounded-md bg-green-600 px-2.5 py-1 text-xs font-semibold text-white hover:bg-green-700 disabled:opacity-60"
-                                                            >
-                                                                Convertir
-                                                            </button>
-                                                            <button
-                                                                type="button"
-                                                                disabled={disabled}
-                                                                onClick={() => openRejectModal(row.id)}
-                                                                className="rounded-md bg-red-600 px-2.5 py-1 text-xs font-semibold text-white hover:bg-red-700 disabled:opacity-60"
-                                                            >
-                                                                Rechazar
-                                                            </button>
-                                                        </>
-                                                    )}
-                                                    {row.status === "CONVERTED" && row.convertedStudyId ? (
-                                                        <span className="text-xs text-green-700">Estudio #{row.convertedStudyId}</span>
-                                                    ) : null}
-                                                </div>
-                                            </td>
-                                        </tr>
-                                    );
-                                })}
+                                        return (
+                                            <tr key={row.id}>
+                                                <td className="px-3 py-2 text-gray-900">{row.dni}</td>
+                                                <td className="px-3 py-2 text-gray-900">{patientName}</td>
+                                                <td className="px-3 py-2 text-gray-900">{formatDateOnly(row.requestedDate)}</td>
+                                                <td className="px-3 py-2 text-gray-900">{row.doctorName}</td>
+                                                <td className="px-3 py-2 text-gray-900">{row.insuranceName}</td>
+                                                <td className="px-3 py-2">
+                                                    <span className={`inline-flex rounded-full border px-2.5 py-0.5 text-xs font-semibold ${statusClass[row.status]}`}>
+                                                        {statusLabel[row.status]}
+                                                    </span>
+                                                </td>
+                                                <td className="px-3 py-2">
+                                                    <div className="flex justify-end gap-2">
+                                                        <button
+                                                            type="button"
+                                                            onClick={() => openRequestDetail(row)}
+                                                            className="rounded-md bg-slate-600 px-2.5 py-1 text-xs font-semibold text-white hover:bg-slate-700"
+                                                        >
+                                                            Abrir
+                                                        </button>
+                                                        {row.status === "PENDING" && (
+                                                            <>
+                                                                <button
+                                                                    type="button"
+                                                                    disabled={disabled}
+                                                                    onClick={() => openRejectModal(row.id)}
+                                                                    className="rounded-md bg-red-600 px-2.5 py-1 text-xs font-semibold text-white hover:bg-red-700 disabled:opacity-60"
+                                                                >
+                                                                    Rechazar
+                                                                </button>
+                                                            </>
+                                                        )}
+                                                        {row.status === "VALIDATED" && (
+                                                            <>
+                                                                <button
+                                                                    type="button"
+                                                                    disabled={disabled}
+                                                                    onClick={() => runAction(row.id, "convert")}
+                                                                    className="rounded-md bg-green-600 px-2.5 py-1 text-xs font-semibold text-white hover:bg-green-700 disabled:opacity-60"
+                                                                >
+                                                                    Convertir
+                                                                </button>
+                                                                <button
+                                                                    type="button"
+                                                                    disabled={disabled}
+                                                                    onClick={() => openRejectModal(row.id)}
+                                                                    className="rounded-md bg-red-600 px-2.5 py-1 text-xs font-semibold text-white hover:bg-red-700 disabled:opacity-60"
+                                                                >
+                                                                    Rechazar
+                                                                </button>
+                                                            </>
+                                                        )}
+                                                        {row.status === "CONVERTED" && row.convertedStudyId ? (
+                                                            <span className="text-xs text-green-700">Estudio #{row.convertedStudyId}</span>
+                                                        ) : null}
+                                                    </div>
+                                                </td>
+                                            </tr>
+                                        );
+                                    })}
                             </tbody>
                         </table>
                     )}
@@ -454,25 +566,40 @@ export default function SolicitudesPage() {
                     loadingStudy={loadingStudy}
                     uploading={uploading}
                     onClose={() => closeRequestDetail()}
-                    onConvert={async () => {
-                        if (!selectedRequest) return;
-                        const createdStudy = await runAction(selectedRequest.id, 'convert');
-                        if (createdStudy) {
-                            const studyId = createdStudy.id || createdStudy.study?.id || null;
-                            if (studyId) await fetchStudy(studyId);
-                        }
-                    }}
                     onUpload={async (file: File) => {
-                        if (!selectedStudy?.id && !selectedRequest?.convertedStudyId) return;
                         const studyId = selectedStudy?.id || selectedRequest?.convertedStudyId;
+                        if (!studyId) return;
                         await uploadPdfToStudy(studyId, file);
                     }}
                     onSetStatus={async (s) => {
-                        const studyId = selectedStudy?.id || selectedRequest?.convertedStudyId;
-                        if (!studyId) return;
+                        let studyId = selectedStudy?.id || selectedRequest?.convertedStudyId;
+
+                        // Si no hay studyId disponible, intenta refrescar la solicitud para obtenerlo
+                        if (!studyId) {
+                            try {
+                                const response = await authFetch(`${API_URL}/api/study-requests/${selectedRequest?.id}`);
+                                const data = await response.json();
+                                if (data?.data?.convertedStudyId) {
+                                    studyId = data.data.convertedStudyId;
+                                    setSelectedRequest(data.data);
+                                }
+                            } catch (e) {
+                                console.error('Error al refrescar solicitud:', e);
+                            }
+                        }
+
+                        // Si aún no hay studyId, no se puede continuar
+                        if (!studyId) {
+                            setError('No se pudo obtener el estudio. Por favor intenta nuevamente.');
+                            return;
+                        }
+
                         await updateStudyStatusApi(studyId, s);
                     }}
+                    onDeleteAttachment={deleteAttachment}
                     apiUrl={API_URL}
+                    error={error}
+                    successMessage={successMessage}
                 />
             )}
 
@@ -511,34 +638,7 @@ export default function SolicitudesPage() {
                 </div>
             )}
 
-            {convertTargetId !== null && (
-                <div className="fixed inset-0 z-50 bg-black/50 flex items-center justify-center p-4">
-                    <div className="w-full max-w-md rounded-lg bg-white border border-gray-200 shadow-lg p-5 space-y-4">
-                        <h2 className="text-lg font-semibold text-gray-900">Convertir a estudio</h2>
-                        <p className="text-sm text-gray-600">
-                            Esta acción crea un estudio clínico oficial a partir de la solicitud validada.
-                        </p>
-                        <div className="flex justify-end gap-2">
-                            <button
-                                type="button"
-                                onClick={closeConvertModal}
-                                disabled={actingId === convertTargetId}
-                                className="rounded-md border border-gray-300 bg-white px-3 py-2 text-sm text-gray-700 hover:bg-gray-50 disabled:opacity-60"
-                            >
-                                Cancelar
-                            </button>
-                            <button
-                                type="button"
-                                onClick={confirmConvert}
-                                disabled={actingId === convertTargetId}
-                                className="rounded-md bg-green-600 px-3 py-2 text-sm font-medium text-white hover:bg-green-700 disabled:opacity-60"
-                            >
-                                {actingId === convertTargetId ? "Convirtiendo..." : "Confirmar conversión"}
-                            </button>
-                        </div>
-                    </div>
-                </div>
-            )}
+
         </div>
     );
 }
