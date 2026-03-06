@@ -103,6 +103,7 @@ function buildTransporter() {
  */
 export async function enviarCorreoRecuperacion(destinatario: string, token: string) {
     try {
+        const emailUser = (process.env.EMAIL_USER || '').trim();
         const transporter = buildTransporter();
 
         // Construir URL completamente segura sin caracteres especiales
@@ -112,8 +113,13 @@ export async function enviarCorreoRecuperacion(destinatario: string, token: stri
 
         console.log("Intentando enviar correo a:", destinatario);
         console.log("Link de recuperación:", linkRecuperacion);
+
+        // Most SMTP providers reject spoofed sender domains. Use EMAIL_FROM when configured,
+        // otherwise default to the authenticated mailbox to maximize deliverability.
+        const fromAddress = (process.env.EMAIL_FROM || '').trim() || emailUser;
+
         const info = await transporter.sendMail({
-            from: process.env.EMAIL_FROM || '"LabManager" <noreply@labmanager.com>',
+            from: fromAddress,
             to: destinatario,
             subject: "Recupera tu contraseña - LabManager",
             html: `

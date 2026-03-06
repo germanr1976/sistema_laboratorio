@@ -28,7 +28,7 @@ Email SMTP (producción/local):
 - Mínimo requerido:
 	- EMAIL_USER
 	- EMAIL_PASSWORD
-	- EMAIL_FROM
+	- EMAIL_FROM (usar un remitente del mismo mailbox/dominio autenticado)
 - Configuración por servicio (ej: Gmail):
 	- EMAIL_SERVICE=gmail
 	- EMAIL_USER=tu-correo@gmail.com
@@ -60,6 +60,15 @@ Fallback de recuperación (útil si SMTP está bloqueado en el proveedor):
 
 Con ese valor, si falla el envío de correo, el endpoint `POST /api/auth/request-password-recovery`
 devolverá `debugRecoveryLink` incluso en producción para no bloquear el reseteo de contraseña.
+
+Configuración recomendada por entorno:
+
+- Desarrollo local (sin SMTP real):
+	- ALLOW_RECOVERY_DEBUG_LINK=true
+	- EMAIL_USER y EMAIL_PASSWORD pueden quedar vacíos
+- Deploy / producción:
+	- ALLOW_RECOVERY_DEBUG_LINK=false
+	- Configurar EMAIL_USER, EMAIL_PASSWORD y EMAIL_FROM válidos
 
 Legacy pacientes sin credenciales completas:
 
