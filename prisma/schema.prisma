@@ -1,0 +1,71 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider  = "postgresql"
+  url       = env("DATABASE_URL")
+  directUrl = env("DIRECT_URL")
+}
+
+model User {
+  id              Int       @id @default(autoincrement())
+  dni             String    @unique
+  roleId          Int
+  email           String?   @unique
+  license         String?
+  password        String?
+  createdAt       DateTime  @default(now())
+  updatedAt       DateTime  @updatedAt
+  profile         Profile?
+  assignedStudies Study[]   @relation("StudyBiochemist")
+  patientStudies  Study[]   @relation("StudyPatient")
+  role            Role      @relation(fields: [roleId], references: [id])
+
+  @@index([roleId])
+  @@index([dni])
+}
+
+model Role {
+  id    Int    @id @default(autoincrement())
+  name  String @unique
+  users User[]
+}
+
+model Profile {
+  id        Int       @id @default(autoincrement())
+  firstName String    @db.VarChar(100)
+  lastName  String    @db.VarChar(100)
+  userId    Int       @unique
+  birthDate DateTime?
+  user      User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId])
+}
+
+model Study {
+  id              Int      @id @default(autoincrement())
+  userId          Int
+  studyName       String   @db.VarChar(255)
+  studyDate       DateTime
+  socialInsurance String?  @db.VarChar(50)
+  pdfUrl          String?  @db.Text
+  statusId        Int
+  biochemistId    Int?
+  createdAt       DateTime @default(now())
+  updatedAt       DateTime @default(now()) @updatedAt
+  patient         User     @relation("StudyPatient", fields: [userId], references: [id], onDelete: Cascade)
+  biochemist      User?    @relation("StudyBiochemist", fields: [biochemistId], references: [id], onDelete: SetNull)
+  status          Status   @relation(fields: [statusId], references: [id], onDelete: Restrict)
+
+  @@index([userId])
+  @@index([biochemistId])
+  @@index([statusId])
+  @@index([studyDate])
+}
+
+model Status {
+  id      Int     @id @default(autoincrement())
+  name    String  @unique
+  studies Study[]
+}
