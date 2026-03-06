@@ -47,6 +47,15 @@ export default function LoginProfesional() {
                 return;
             }
 
+            const role = String(json?.data?.user?.role || '').toUpperCase();
+            if (role !== 'BIOCHEMIST' && role !== 'ADMIN') {
+                localStorage.removeItem('authToken');
+                localStorage.removeItem('userType');
+                localStorage.removeItem('userData');
+                toast.error('Tu cuenta no tiene acceso al modulo profesional');
+                return;
+            }
+
             const token = json?.data?.token;
             if (!token) {
                 toast.error('Respuesta inválida del servidor');

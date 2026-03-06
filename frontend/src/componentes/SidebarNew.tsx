@@ -79,14 +79,14 @@ export function Sidebar() {
             icon: FilePlus,
         },
         {
-            label: 'Historial',
-            href: '/historial',
-            icon: History,
-        },
-        {
             label: 'Solicitudes',
             href: '/solicitudes',
             icon: ClipboardList,
+        },
+        {
+            label: 'Historial',
+            href: '/historial',
+            icon: History,
         },
     ]
 

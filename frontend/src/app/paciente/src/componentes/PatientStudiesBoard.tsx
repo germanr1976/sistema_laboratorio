@@ -4,6 +4,7 @@ import { useEffect, useMemo, useState } from "react"
 import { Download, FileText, Loader2, Share2, Calendar, Building2, UserRound, FileCheck, Clock, AlertCircle } from "lucide-react"
 import authFetch from "../../../../utils/authFetch"
 import { getStatusBadgeClass } from "../../../../utils/uiClasses"
+import Toast from "../../../../componentes/Toast"
 
 export type StudyStatus = "completed" | "in-progress" | "partial"
 export type StudyFilter = "all" | StudyStatus
@@ -87,6 +88,9 @@ export default function PatientStudiesBoard({
   const [studies, setStudies] = useState<Study[]>([])
   const [loading, setLoading] = useState(true)
   const [activeFilter, setActiveFilter] = useState<StudyFilter>(initialFilter)
+  const [currentPage, setCurrentPage] = useState(1)
+  const itemsPerPage = 10
+  const [toast, setToast] = useState<{ message: string; type?: string; show: boolean }>({ message: '', type: 'success', show: false })
 
   useEffect(() => {
     let mounted = true
@@ -152,18 +156,36 @@ export default function PatientStudiesBoard({
     return studies.filter((s) => s.status === activeFilter)
   }, [activeFilter, studies])
 
+  const paginatedStudies = useMemo(() => {
+    const startIndex = (currentPage - 1) * itemsPerPage
+    const endIndex = startIndex + itemsPerPage
+    return filteredStudies.slice(startIndex, endIndex)
+  }, [filteredStudies, currentPage])
+
+  const totalPages = Math.ceil(filteredStudies.length / itemsPerPage)
+
   const copyLink = async (url: string) => {
     try {
       await navigator.clipboard.writeText(url)
-      alert('Enlace copiado al portapapeles')
+      setToast({ message: 'Enlace copiado al portapapeles', type: 'success', show: true })
     } catch (e) {
-      console.warn('No se pudo copiar. Mostrando prompt.')
+      setToast({ message: 'No se pudo copiar el enlace', type: 'error', show: true })
       prompt('Copiá el enlace:', url)
     }
   }
 
   return (
     <div className="flex flex-col gap-6">
+      {toast.show && (
+        <div className="fixed bottom-6 right-6 z-50">
+          <Toast
+            message={toast.message}
+            type={toast.type as any}
+            show={toast.show}
+            onClose={() => setToast({ ...toast, show: false })}
+          />
+        </div>
+      )}
       {/* Header */}
       <div className="space-y-1">
         <h1 className="text-3xl font-bold text-gray-900">{title}</h1>
@@ -230,7 +252,10 @@ export default function PatientStudiesBoard({
             return (
               <button
                 key={filter.id}
-                onClick={() => setActiveFilter(filter.id)}
+                onClick={() => {
+                  setActiveFilter(filter.id)
+                  setCurrentPage(1)
+                }}
                 className={`rounded-lg px-4 py-2.5 text-base font-semibold border-2 transition-all ${isActive
                   ? "bg-blue-600 text-white border-blue-600 shadow-md"
                   : "bg-white border-gray-300 text-gray-700 hover:bg-gray-50 hover:border-gray-400"
@@ -257,116 +282,173 @@ export default function PatientStudiesBoard({
             <p className="text-base font-medium text-gray-600">{emptyHint}</p>
           </div>
         ) : (
-          filteredStudies.map((study) => {
-            const status = statusConfig[study.status]
-            const isProcessing = study.status === "in-progress" || study.status === "partial"
+          <>
+            <div className="flex items-center justify-between text-sm text-gray-600 mb-2">
+              <span>
+                Mostrando {(currentPage - 1) * itemsPerPage + 1} - {Math.min(currentPage * itemsPerPage, filteredStudies.length)} de {filteredStudies.length} estudios
+              </span>
+            </div>
+            {paginatedStudies.map((study) => {
+              const status = statusConfig[study.status]
+              const isProcessing = study.status === "in-progress" || study.status === "partial"
 
-            return (
-              <article key={study.id} className="rounded-xl border-2 border-gray-200 bg-white p-6 shadow-sm hover:shadow-md transition-all">
-                <div className="space-y-4">
-                  {/* Header with Status */}
-                  <div className="flex items-start justify-between gap-4 pb-4 border-b border-gray-200">
-                    <div>
-                      <h3 className="text-xl font-bold text-gray-900">{study.studyName || "Estudio Médico"}</h3>
-                    </div>
-                    <span className={`${getStatusBadgeClass(study.status)} inline-flex items-center gap-2 rounded-full px-3 py-1.5 text-sm font-bold whitespace-nowrap`}>
-                      <span className={`h-2.5 w-2.5 rounded-full ${status.dotClass}`} />
-                      {status.label}
-                    </span>
-                  </div>
-
-                  {/* Study Details Grid */}
-                  <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-                    <div className="flex items-center gap-3">
-                      <div className="w-10 h-10 rounded-lg bg-blue-100 flex items-center justify-center shrink-0">
-                        <Calendar className="w-5 h-5 text-blue-600" />
+              return (
+                <article key={study.id} className="rounded-xl border-2 border-gray-200 bg-white p-6 shadow-sm hover:shadow-md transition-all">
+                  <div className="space-y-4">
+                    {/* Header with Status */}
+                    <div className="flex items-start justify-between gap-4 pb-4 border-b border-gray-200">
+                      <div>
+                        <h3 className="text-xl font-bold text-gray-900">{study.studyName || "Estudio Médico"}</h3>
                       </div>
-                      <div className="flex-1 min-w-0">
-                        <p className="text-xs font-medium text-gray-500 uppercase">Fecha del Estudio</p>
-                        <p className="text-base font-semibold text-gray-900">{study.date}</p>
-                      </div>
+                      <span className={`${getStatusBadgeClass(study.status)} inline-flex items-center gap-2 rounded-full px-3 py-1.5 text-sm font-bold whitespace-nowrap`}>
+                        <span className={`h-2.5 w-2.5 rounded-full ${status.dotClass}`} />
+                        {status.label}
+                      </span>
                     </div>
 
-                    <div className="flex items-center gap-3">
-                      <div className="w-10 h-10 rounded-lg bg-green-100 flex items-center justify-center shrink-0">
-                        <Building2 className="w-5 h-5 text-green-600" />
-                      </div>
-                      <div className="flex-1 min-w-0">
-                        <p className="text-xs font-medium text-gray-500 uppercase">Obra Social</p>
-                        <p className="text-base font-semibold text-gray-900 truncate">{study.obraSocial}</p>
-                      </div>
-                    </div>
-
-                    <div className="flex items-center gap-3">
-                      <div className="w-10 h-10 rounded-lg bg-purple-100 flex items-center justify-center shrink-0">
-                        <UserRound className="w-5 h-5 text-purple-600" />
-                      </div>
-                      <div className="flex-1 min-w-0">
-                        <p className="text-xs font-medium text-gray-500 uppercase">Médico</p>
-                        <p className="text-base font-semibold text-gray-900 truncate">{study.medico}</p>
-                      </div>
-                    </div>
-                  </div>
-
-                  {/* Actions */}
-                  <div className="pt-4 border-t border-gray-200">
-                    {isProcessing ? (
-                      <div className="flex items-center justify-center gap-3 rounded-lg bg-amber-50 border-2 border-amber-200 px-4 py-3">
-                        <Loader2 className="h-5 w-5 animate-spin text-amber-600" />
-                        <span className="text-base font-semibold text-amber-900">
-                          {study.status === "in-progress" && "Estudio en proceso de análisis..."}
-                          {study.status === "partial" && "Resultados parciales disponibles pronto..."}
-                        </span>
-                      </div>
-                    ) : study.pdfs && study.pdfs.length > 0 ? (
-                      <div className="space-y-3">
-                        <p className="text-sm font-semibold text-gray-700">Documentos disponibles:</p>
-                        <div className="flex flex-wrap gap-3">
-                          {study.pdfs.map((link, idx) => (
-                            <div key={idx} className="flex items-center gap-2 bg-linear-to-r from-blue-600 to-blue-700 text-white rounded-lg px-4 py-3 shadow-md">
-                              <FileText className="w-5 h-5" />
-                              <span className="text-sm font-semibold">PDF {idx + 1}</span>
-                              <div className="flex items-center gap-1 ml-2 border-l border-blue-400 pl-2">
-                                <a
-                                  href={link}
-                                  target="_blank"
-                                  rel="noopener noreferrer"
-                                  className="p-1.5 hover:bg-blue-500 rounded transition-colors"
-                                  title="Ver PDF"
-                                >
-                                  <FileText className="w-4 h-4" />
-                                </a>
-                                <a
-                                  href={link}
-                                  download
-                                  className="p-1.5 hover:bg-blue-500 rounded transition-colors"
-                                  title="Descargar PDF"
-                                >
-                                  <Download className="w-4 h-4" />
-                                </a>
-                                <button
-                                  onClick={() => copyLink(link)}
-                                  className="p-1.5 hover:bg-blue-500 rounded transition-colors"
-                                  title="Compartir enlace"
-                                >
-                                  <Share2 className="w-4 h-4" />
-                                </button>
-                              </div>
-                            </div>
-                          ))}
+                    {/* Study Details Grid */}
+                    <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                      <div className="flex items-center gap-3">
+                        <div className="w-10 h-10 rounded-lg bg-blue-100 flex items-center justify-center shrink-0">
+                          <Calendar className="w-5 h-5 text-blue-600" />
+                        </div>
+                        <div className="flex-1 min-w-0">
+                          <p className="text-xs font-medium text-gray-500 uppercase">Fecha del Estudio</p>
+                          <p className="text-base font-semibold text-gray-900">{study.date}</p>
                         </div>
                       </div>
-                    ) : (
-                      <div className="flex items-center justify-center gap-3 rounded-lg bg-gray-50 border-2 border-gray-200 px-4 py-3">
-                        <FileText className="h-5 w-5 text-gray-400" />
-                        <span className="text-base font-medium text-gray-600">No hay documentos disponibles aún</span>
+
+                      <div className="flex items-center gap-3">
+                        <div className="w-10 h-10 rounded-lg bg-green-100 flex items-center justify-center shrink-0">
+                          <Building2 className="w-5 h-5 text-green-600" />
+                        </div>
+                        <div className="flex-1 min-w-0">
+                          <p className="text-xs font-medium text-gray-500 uppercase">Obra Social</p>
+                          <p className="text-base font-semibold text-gray-900 truncate">{study.obraSocial}</p>
+                        </div>
                       </div>
-                    )}
+
+                      <div className="flex items-center gap-3">
+                        <div className="w-10 h-10 rounded-lg bg-purple-100 flex items-center justify-center shrink-0">
+                          <UserRound className="w-5 h-5 text-purple-600" />
+                        </div>
+                        <div className="flex-1 min-w-0">
+                          <p className="text-xs font-medium text-gray-500 uppercase">Médico</p>
+                          <p className="text-base font-semibold text-gray-900 truncate">{study.medico}</p>
+                        </div>
+                      </div>
+                    </div>
+
+                    {/* Actions */}
+                    <div className="pt-4 border-t border-gray-200">
+                      {isProcessing ? (
+                        <div className="flex items-center justify-center gap-3 rounded-lg bg-amber-50 border-2 border-amber-200 px-4 py-3">
+                          <Loader2 className="h-5 w-5 animate-spin text-amber-600" />
+                          <span className="text-base font-semibold text-amber-900">
+                            {study.status === "in-progress" && "Estudio en proceso de análisis..."}
+                            {study.status === "partial" && "Resultados parciales disponibles pronto..."}
+                          </span>
+                        </div>
+                      ) : study.pdfs && study.pdfs.length > 0 ? (
+                        <div className="space-y-3">
+                          <p className="text-sm font-semibold text-gray-700">Documentos disponibles:</p>
+                          <div className="flex flex-wrap gap-3">
+                            {study.pdfs.map((link, idx) => (
+                              <div key={idx} className="flex items-center gap-2 bg-linear-to-r from-blue-600 to-blue-700 text-white rounded-lg px-4 py-3 shadow-md">
+                                <FileText className="w-5 h-5" />
+                                <span className="text-sm font-semibold">PDF {idx + 1}</span>
+                                <div className="flex items-center gap-1 ml-2 border-l border-blue-400 pl-2">
+                                  <a
+                                    href={link}
+                                    target="_blank"
+                                    rel="noopener noreferrer"
+                                    className="p-1.5 hover:bg-blue-500 rounded transition-colors"
+                                    title="Ver PDF"
+                                  >
+                                    <FileText className="w-4 h-4" />
+                                  </a>
+                                  <button
+                                    className="p-1.5 hover:bg-blue-500 rounded transition-colors"
+                                    title="Descargar PDF"
+                                    onClick={async () => {
+                                      try {
+                                        const res = await fetch(link)
+                                        const blob = await res.blob()
+                                        const url = window.URL.createObjectURL(blob)
+                                        const a = document.createElement('a')
+                                        a.href = url
+                                        a.download = `Estudio_${idx + 1}.pdf`
+                                        document.body.appendChild(a)
+                                        a.click()
+                                        a.remove()
+                                        window.URL.revokeObjectURL(url)
+                                        setToast({ message: 'Descarga iniciada en segundo plano', type: 'success', show: true })
+                                      } catch (e) {
+                                        setToast({ message: 'Error al descargar el PDF', type: 'error', show: true })
+                                      }
+                                    }}
+                                  >
+                                    <Download className="w-4 h-4" />
+                                  </button>
+                                  <button
+                                    onClick={async () => {
+                                      await copyLink(link)
+                                      setToast({ message: 'Enlace copiado al portapapeles', type: 'success', show: true })
+                                    }}
+                                    className="p-1.5 hover:bg-blue-500 rounded transition-colors"
+                                    title="Compartir enlace"
+                                  >
+                                    <Share2 className="w-4 h-4" />
+                                  </button>
+                                </div>
+                              </div>
+                            ))}
+                          </div>
+                        </div>
+                      ) : (
+                        <div className="flex items-center justify-center gap-3 rounded-lg bg-gray-50 border-2 border-gray-200 px-4 py-3">
+                          <FileText className="h-5 w-5 text-gray-400" />
+                          <span className="text-base font-medium text-gray-600">No hay documentos disponibles aún</span>
+                        </div>
+                      )}
+                    </div>
                   </div>
-                </div>
-              </article>
-            )
-          })
+                </article>
+              )
+            })}
+
+            {/* Pagination Controls */}
+            <div className="flex items-center justify-center gap-2 mt-6 pt-6 border-t border-gray-200">
+              <button
+                onClick={() => setCurrentPage(Math.max(1, currentPage - 1))}
+                disabled={currentPage === 1}
+                className="px-3 py-2 rounded-lg border border-gray-300 text-sm font-medium text-gray-700 hover:bg-gray-50 disabled:opacity-50 disabled:cursor-not-allowed"
+              >
+                Anterior
+              </button>
+              <div className="flex items-center gap-1">
+                {Array.from({ length: totalPages }, (_, i) => i + 1).map((page) => (
+                  <button
+                    key={page}
+                    onClick={() => setCurrentPage(page)}
+                    className={`px-3 py-2 rounded-lg text-sm font-medium transition-colors ${currentPage === page
+                      ? "bg-blue-600 text-white"
+                      : "border border-gray-300 text-gray-700 hover:bg-gray-50"
+                      }`}
+                  >
+                    {page}
+                  </button>
+                ))}
+              </div>
+              <button
+                onClick={() => setCurrentPage(Math.min(totalPages, currentPage + 1))}
+                disabled={currentPage === totalPages}
+                className="px-3 py-2 rounded-lg border border-gray-300 text-sm font-medium text-gray-700 hover:bg-gray-50 disabled:opacity-50 disabled:cursor-not-allowed"
+              >
+                Siguiente
+              </button>
+            </div>
+          </>
         )}
       </div>
     </div>

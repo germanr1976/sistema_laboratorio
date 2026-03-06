@@ -32,12 +32,16 @@ function CargarNuevoContent() {
     const [estudioExistente, setEstudioExistente] = useState<EstudioExistente | null>(null)
     const [loading, setLoading] = useState(false)
     const [permitirCambio, setPermitirCambio] = useState(false)
+    const [datosPacienteBloqueados, setDatosPacienteBloqueados] = useState(false)
 
     // Cargar estudio si viene con ID en params
     useEffect(() => {
         const id = searchParams?.get('id')
+        const bloqDatos = searchParams?.get('bloqDatos') === 'true'
+
         if (!id) return
 
+        setDatosPacienteBloqueados(bloqDatos)
         setLoading(true)
         const loadFromLocal = () => {
             try {
@@ -57,6 +61,13 @@ function CargarNuevoContent() {
                         pdfs: encontrado.pdfs || [],
                         estado: encontrado.estado || encontrado.status || 'en_proceso',
                     }
+
+                    const nombreGenerico = (estudioMapeado.nombreApellido || '').trim().toLowerCase() === 'estudio solicitado por paciente'
+                    if (nombreGenerico) {
+                        console.log('Nombre local genérico detectado, se solicitará nombre real al backend')
+                        return false
+                    }
+
                     console.log('Estudio cargado (local):', estudioMapeado)
                     setEstudioExistente(estudioMapeado)
                     setPermitirCambio(estudioMapeado.estado === 'en_proceso' || estudioMapeado.estado === 'parcial')
@@ -81,12 +92,31 @@ function CargarNuevoContent() {
                 }
                 const result = await response.json()
                 const study = result.data || result
+
+                // Extraer nombre con múltiples fallbacks (priorizar nombre real del paciente)
+                let nombreCompleto = ''
+                if (study.patient?.fullName) {
+                    nombreCompleto = String(study.patient.fullName).trim()
+                } else if (study.patient?.profile?.firstName || study.patient?.profile?.lastName) {
+                    nombreCompleto = `${study.patient.profile.firstName || ''} ${study.patient.profile.lastName || ''}`.trim()
+                } else if (study.patient?.firstName || study.patient?.lastName) {
+                    nombreCompleto = `${study.patient.firstName || ''} ${study.patient.lastName || ''}`.trim()
+                } else if (study.studyName) {
+                    nombreCompleto = study.studyName
+                }
+
+                console.log('📦 Datos del backend:', {
+                    studyId: study.id,
+                    patientProfile: study.patient?.profile,
+                    patient: study.patient,
+                    studyName: study.studyName,
+                    nombreCompleto: nombreCompleto,
+                })
+
                 const estudioMapeado: EstudioExistente = {
                     id: study.id,
                     backendId: study.id,
-                    nombreApellido: study.patient?.profile
-                        ? `${study.patient.profile.firstName || ''} ${study.patient.profile.lastName || ''}`.trim()
-                        : study.studyName || '',
+                    nombreApellido: nombreCompleto,
                     dni: study.patient?.dni || study.patient?.documentNumber || '',
                     fechaEstudio: toDateInput(study.studyDate),
                     obraSocial: study.socialInsurance || '',
@@ -133,6 +163,7 @@ function CargarNuevoContent() {
                     estudioExistente={estudioExistente ?? undefined}
                     modoEdicion={!!estudioExistente}
                     permitirCambioEstado={permitirCambio}
+                    datosPacienteBloqueados={datosPacienteBloqueados}
                 />
             </div>
         </div>

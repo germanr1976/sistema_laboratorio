@@ -2,13 +2,54 @@
 
 import "../globals.css";
 import { useEffect, useRef, useState } from "react";
+import { useRouter } from "next/navigation";
 import { Sidebar } from "./src/componentes/SideBar";
 
 export default function PatientLayout({ children }: { children: React.ReactNode }) {
+  const router = useRouter();
   const scrollContainerRef = useRef<HTMLElement | null>(null);
   const [isScrolled, setIsScrolled] = useState(false);
+  const [canAccess, setCanAccess] = useState(false);
 
   useEffect(() => {
+    const token = localStorage.getItem("authToken");
+    const userType = (localStorage.getItem("userType") || "").toLowerCase();
+
+    let role = "";
+    try {
+      const rawUser = localStorage.getItem("userData");
+      const parsedUser = rawUser ? JSON.parse(rawUser) : null;
+      role = String(parsedUser?.role || "").toUpperCase();
+    } catch {
+      role = "";
+    }
+
+    const isPatientRole = role === "PATIENT";
+    const isProfessionalRole = role === "BIOCHEMIST" || role === "ADMIN";
+    const isPatientType = userType === "patient";
+    const isProfessionalType = userType === "professional";
+
+    if (!token) {
+      router.replace("/login-paciente");
+      return;
+    }
+
+    if (isProfessionalRole || isProfessionalType) {
+      router.replace("/dashboard");
+      return;
+    }
+
+    if (!isPatientRole && !isPatientType) {
+      router.replace("/");
+      return;
+    }
+
+    setCanAccess(true);
+  }, [router]);
+
+  useEffect(() => {
+    if (!canAccess) return;
+
     const el = scrollContainerRef.current;
     if (!el) return;
 
@@ -19,7 +60,11 @@ export default function PatientLayout({ children }: { children: React.ReactNode 
     onScroll();
     el.addEventListener("scroll", onScroll);
     return () => el.removeEventListener("scroll", onScroll);
-  }, []);
+  }, [canAccess]);
+
+  if (!canAccess) {
+    return null;
+  }
 
   return (
     <div className="flex h-screen overflow-hidden bg-gray-50 text-black">

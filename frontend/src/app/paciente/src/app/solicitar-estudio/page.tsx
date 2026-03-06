@@ -22,6 +22,7 @@ export default function SolicitarEstudioPage() {
 
     const [loading, setLoading] = useState(false);
     const [error, setError] = useState<string | null>(null);
+    const [successMessage, setSuccessMessage] = useState<string | null>(null);
 
     const canSubmit = useMemo(() => {
         return !!patientDni && !!patientFullName && !!requestedDate && doctorName.trim().length >= 2 && insuranceName.trim().length >= 2;
@@ -49,6 +50,8 @@ export default function SolicitarEstudioPage() {
         e.preventDefault();
         if (!canSubmit) return;
 
+        setSuccessMessage(null);
+
         if (!patientDni || !patientFullName) {
             setError("No se pudieron autocompletar tus datos de paciente. Volvé a iniciar sesión.");
             return;
@@ -71,6 +74,7 @@ export default function SolicitarEstudioPage() {
             const data = await response.json().catch(() => ({}));
             if (!response.ok) {
                 setError(data?.message || "No se pudo solicitar el estudio");
+                setSuccessMessage(null);
                 return;
             }
 
@@ -78,9 +82,11 @@ export default function SolicitarEstudioPage() {
             setInsuranceName("");
             setRequestedDate(todayLocal());
             setError(null);
+            setSuccessMessage("Solicitud procesada");
         } catch (submitError) {
             console.error(submitError);
             setError("Error al conectar con el servidor");
+            setSuccessMessage(null);
         } finally {
             setLoading(false);
         }
@@ -94,6 +100,18 @@ export default function SolicitarEstudioPage() {
                     <p className="text-sm text-gray-600 mb-6">
                         Completá los datos y presioná SOLICITAR para crear tu estudio en estado EN PROCESO.
                     </p>
+
+                    {successMessage && (
+                        <div className="mb-4 rounded-md border border-green-200 bg-green-50 px-3 py-2 text-sm text-green-700">
+                            {successMessage}
+                        </div>
+                    )}
+
+                    {error && (
+                        <div className="mb-4 rounded-md border border-red-200 bg-red-50 px-3 py-2 text-sm text-red-700">
+                            {error}
+                        </div>
+                    )}
 
                     <form onSubmit={onSubmit} className="grid grid-cols-1 md:grid-cols-2 gap-4">
                         <div>

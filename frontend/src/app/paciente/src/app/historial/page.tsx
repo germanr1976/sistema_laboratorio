@@ -28,9 +28,12 @@ export default function LabHistoryPage() {
   const [startDate, setStartDate] = useState("")
   const [endDate, setEndDate] = useState("")
   const [sortOrder, setSortOrder] = useState<"desc" | "asc">("desc")
-  const [allStudies, setAllStudies] = useState<Study[]>([])
-  const [filteredStudies, setFilteredStudies] = useState<Study[]>([])
+  const [studies, setStudies] = useState<Study[]>([])
   const [loading, setLoading] = useState(true)
+  const [currentPage, setCurrentPage] = useState(1)
+  const [totalStudies, setTotalStudies] = useState(0)
+  const itemsPerPage = 10
+  const [totalPages, setTotalPages] = useState(1)
 
   const sortStudiesByDate = (studies: Study[], order: "desc" | "asc") => {
     return [...studies].sort((a, b) => {
@@ -47,34 +50,33 @@ export default function LabHistoryPage() {
 
   useEffect(() => {
     const loadStudies = async () => {
+      setLoading(true);
       try {
-        const response = await authFetch(`${API_URL}/api/studies/patient/me`)
+        const response = await authFetch(`${API_URL}/api/studies/patient/me?page=${currentPage}&limit=${itemsPerPage}`);
         if (!response.ok) {
-          console.error('Error fetching studies:', response.statusText)
-          setLoading(false)
-          return
+          console.error('Error fetching studies:', response.statusText);
+          setLoading(false);
+          return;
         }
-        const result = await response.json()
-        const backendStudiesRaw = result?.data?.items ?? result?.items ?? result?.data ?? []
-        const backendStudies = Array.isArray(backendStudiesRaw) ? backendStudiesRaw : []
-
+        const result = await response.json();
+        const backendStudiesRaw = result?.data?.items ?? result?.items ?? result?.data ?? [];
+        const backendStudies = Array.isArray(backendStudiesRaw) ? backendStudiesRaw : [];
+        setTotalStudies(result?.data?.pagination?.total ?? result?.pagination?.total ?? backendStudies.length);
+        setTotalPages(result?.data?.pagination?.totalPages ?? result?.pagination?.totalPages ?? 1);
         if (!Array.isArray(backendStudiesRaw)) {
-          console.warn('Formato inesperado en /patient/me:', result)
+          console.warn('Formato inesperado en /patient/me:', result);
         }
-
         // Transformar datos del backend al formato del componente
         const transformedStudies: Study[] = backendStudies.map((s: any) => {
           const attachmentUrls = Array.isArray(s.attachments)
             ? s.attachments.map((a: any) => a?.url).filter(Boolean)
-            : []
+            : [];
           const rawPdfs = attachmentUrls.length > 0
             ? attachmentUrls
-            : (Array.isArray(s.pdfs) ? s.pdfs : (s.pdfUrl ? [s.pdfUrl] : []))
-
+            : (Array.isArray(s.pdfs) ? s.pdfs : (s.pdfUrl ? [s.pdfUrl] : []));
           const pdfLinks = rawPdfs
             .map((p: string) => (p?.startsWith("http") ? p : `${API_URL}${p}`))
-            .filter(Boolean)
-
+            .filter(Boolean);
           return {
             id: s.id?.toString() || crypto.randomUUID(),
             patientName: `${s.patient?.profile?.firstName || ''} ${s.patient?.profile?.lastName || ''}`.toUpperCase(),
@@ -84,20 +86,17 @@ export default function LabHistoryPage() {
             doctor: s.doctor || 'Sin asignar',
             pdfUrl: pdfLinks[0],
             pdfs: pdfLinks,
-          }
-        })
-
-        const sortedStudies = sortStudiesByDate(transformedStudies, sortOrder)
-        setAllStudies(sortedStudies)
-        setFilteredStudies(sortedStudies)
-        setLoading(false)
+          };
+        });
+        setStudies(transformedStudies);
+        setLoading(false);
       } catch (e) {
-        console.error('Error loading studies:', e)
-        setLoading(false)
+        console.error('Error loading studies:', e);
+        setLoading(false);
       }
-    }
-    loadStudies()
-  }, [])
+    };
+    loadStudies();
+  }, [currentPage]);
 
   const handleSearch = () => {
     if (!startDate && !endDate) {
@@ -210,7 +209,7 @@ export default function LabHistoryPage() {
                       <FileText className="h-5 w-5" />
                       Resultados
                     </h2>
-                    <p className="mt-1 text-sm text-gray-600">Se encontraron {filteredStudies.length} estudios</p>
+                    <p className="mt-1 text-sm text-gray-600">Se encontraron {totalStudies} estudios</p>
                   </div>
                   <div className="flex w-full flex-wrap items-center gap-3 sm:w-auto sm:justify-end">
                     <label htmlFor="sort-order" className="text-sm font-medium text-gray-700">
@@ -226,13 +225,46 @@ export default function LabHistoryPage() {
                       <option value="asc">Más antiguos</option>
                     </select>
                     <span className="rounded-full bg-gray-100 px-3 py-1 text-sm font-medium text-gray-700">
-                      Total: {filteredStudies.length}
+                      Total: {totalStudies}
                     </span>
                   </div>
                 </div>
               </div>
               <div className="p-6">
-                <StudiesTable studies={filteredStudies} />
+                <StudiesTable studies={studies} />
+                {/* Controles de paginación */}
+                {totalPages > 1 && (
+                  <div className="flex items-center justify-center gap-2 mt-6 pt-6 border-t border-gray-200">
+                    <button
+                      onClick={() => setCurrentPage(Math.max(1, currentPage - 1))}
+                      disabled={currentPage === 1}
+                      className="px-3 py-2 rounded-lg border border-gray-300 text-sm font-medium text-gray-700 hover:bg-gray-50 disabled:opacity-50 disabled:cursor-not-allowed"
+                    >
+                      Anterior
+                    </button>
+                    <div className="flex items-center gap-1">
+                      {Array.from({ length: totalPages }, (_, i) => i + 1).map((page) => (
+                        <button
+                          key={page}
+                          onClick={() => setCurrentPage(page)}
+                          className={`px-3 py-2 rounded-lg text-sm font-medium transition-colors ${currentPage === page
+                              ? "bg-blue-600 text-white"
+                              : "border border-gray-300 text-gray-700 hover:bg-gray-50"
+                            }`}
+                        >
+                          {page}
+                        </button>
+                      ))}
+                    </div>
+                    <button
+                      onClick={() => setCurrentPage(Math.min(totalPages, currentPage + 1))}
+                      disabled={currentPage === totalPages}
+                      className="px-3 py-2 rounded-lg border border-gray-300 text-sm font-medium text-gray-700 hover:bg-gray-50 disabled:opacity-50 disabled:cursor-not-allowed"
+                    >
+                      Siguiente
+                    </button>
+                  </div>
+                )}
               </div>
             </div>
           </>

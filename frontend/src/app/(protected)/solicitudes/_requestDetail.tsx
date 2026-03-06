@@ -1,6 +1,7 @@
 "use client";
 
 import React, { useState } from "react";
+import { useRouter } from "next/navigation";
 import { Eye, Download, Trash2, X } from "lucide-react";
 
 interface Props {
@@ -26,6 +27,7 @@ const statusLabel: Record<string, string> = {
 };
 
 export default function RequestDetail({ request, study, loadingStudy, uploading, onClose, onUpload, onSetStatus, onDeleteAttachment, apiUrl, error, successMessage }: Props) {
+    const router = useRouter();
     const [showPdfModal, setShowPdfModal] = useState(false);
 
     if (!request) return null;
@@ -148,6 +150,12 @@ export default function RequestDetail({ request, study, loadingStudy, uploading,
                             </label>
 
                             <div className="flex items-center gap-2">
+                                <button
+                                    onClick={() => router.push(`/cargar-nuevo?id=${study.id}&bloqDatos=true`)}
+                                    className="rounded-md bg-blue-600 px-3 py-2 text-xs text-white hover:bg-blue-700 disabled:opacity-50"
+                                >
+                                    Editar Estudio
+                                </button>
                                 <button onClick={() => onSetStatus('PARTIAL')} disabled={uploading || loadingStudy} className="rounded-md bg-amber-500 px-3 py-2 text-xs text-white hover:bg-amber-600 disabled:opacity-50">Marcar PARCIAL</button>
                                 <button onClick={() => onSetStatus('COMPLETED')} disabled={uploading || loadingStudy} className="rounded-md bg-green-600 px-3 py-2 text-xs text-white hover:bg-green-700 disabled:opacity-50">Marcar COMPLETADO</button>
                             </div>

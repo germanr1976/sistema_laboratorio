@@ -57,6 +57,15 @@ export default function LoginPaciente() {
                 return;
             }
 
+            const role = String(json?.data?.user?.role || '').toUpperCase();
+            if (role !== 'PATIENT') {
+                localStorage.removeItem('authToken');
+                localStorage.removeItem('userType');
+                localStorage.removeItem('userData');
+                toast.error('Esta cuenta no corresponde a un paciente');
+                return;
+            }
+
             const token = json?.data?.token;
             if (!token) {
                 toast.error('Respuesta inválida del servidor');

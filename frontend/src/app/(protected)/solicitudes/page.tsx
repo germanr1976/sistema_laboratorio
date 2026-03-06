@@ -36,7 +36,7 @@ const statusLabel: Record<StudyRequestStatus, string> = {
 };
 
 const statusClass: Record<StudyRequestStatus, string> = {
-    PENDING: "bg-amber-100 text-amber-800 border-amber-200",
+    PENDING: "bg-blue-100 text-blue-800 border-blue-200",
     VALIDATED: "bg-blue-100 text-blue-800 border-blue-200",
     REJECTED: "bg-red-100 text-red-800 border-red-200",
     CONVERTED: "bg-blue-100 text-blue-800 border-blue-200",
@@ -59,7 +59,6 @@ const formatDateOnly = (value: string) => {
 export default function SolicitudesPage() {
     const AUTO_REFRESH_MS = 45000;
     const [dniFilter, setDniFilter] = useState("");
-    const [statusFilter, setStatusFilter] = useState<"all" | StudyRequestStatus>("all");
     const [loading, setLoading] = useState(true);
     const [error, setError] = useState<string | null>(null);
     const [rows, setRows] = useState<StudyRequestRow[]>([]);
@@ -77,10 +76,10 @@ export default function SolicitudesPage() {
     const queryString = useMemo(() => {
         const params = new URLSearchParams();
         if (dniFilter.trim()) params.set("dni", dniFilter.trim());
-        if (statusFilter !== "all") params.set("status", statusFilter);
+        params.set("status", "PENDING");
         const qs = params.toString();
         return qs ? `?${qs}` : "";
-    }, [dniFilter, statusFilter]);
+    }, [dniFilter]);
 
     const loadRows = async (showSpinner = true) => {
         try {
@@ -167,16 +166,10 @@ export default function SolicitudesPage() {
                 return null;
             }
 
-            // Si la acción fue convertir, devolver el estudio convertido para uso inmediato
-            if (action === 'convert') {
-                await loadRows();
-                setError(null);
-                return data?.data || null;
-            }
-
             await loadRows();
             setError(null);
-            return null;
+            // Devolver payload para que el caller pueda extraer convertedStudyId/studyId sin depender del listado filtrado.
+            return data?.data || data || null;
         } catch (e) {
             console.error(e);
             setError("Error al conectar con el servidor");
@@ -191,6 +184,41 @@ export default function SolicitudesPage() {
     const [loadingStudy, setLoadingStudy] = useState(false);
     const [uploading, setUploading] = useState(false);
     const [successMessage, setSuccessMessage] = useState<string | null>(null);
+
+    const extractStudyIdFromPayload = (payload: any): number | null => {
+        if (!payload) return null;
+
+        const candidates = [
+            payload?.convertedStudyId,
+            payload?.convertedStudy?.id,
+            payload?.studyId,
+            payload?.study?.id,
+            payload?.id,
+            payload?.data?.convertedStudyId,
+            payload?.data?.convertedStudy?.id,
+            payload?.data?.studyId,
+            payload?.data?.study?.id,
+            payload?.data?.id,
+        ];
+
+        for (const candidate of candidates) {
+            const n = Number(candidate);
+            if (Number.isFinite(n) && n > 0) return n;
+        }
+        return null;
+    };
+
+    const fetchRequestById = async (requestId: number) => {
+        try {
+            const resp = await authFetch(`${API_URL}/api/study-requests/${requestId}`);
+            const j = await resp.json().catch(() => ({}));
+            if (!resp.ok) return null;
+            return j?.data || j || null;
+        } catch (e) {
+            console.warn('[fetchRequestById] No se pudo obtener solicitud por id:', e);
+            return null;
+        }
+    };
 
     const openRequestDetail = async (row: StudyRequestRow) => {
         setSelectedRequest(null);
@@ -213,40 +241,52 @@ export default function SolicitudesPage() {
                 setActingId(row.id);
                 console.log('[openRequestDetail] Iniciando validación/conversión');
 
-                // Si es PENDING, validar (esto también crea el estudio)
-                // Si es VALIDATED, convertir directamente
+                // Si es PENDING, validar primero. Si no devuelve studyId, intentar convertir.
                 if (row.status === 'PENDING') {
                     console.log('[openRequestDetail] Estado PENDING - validando');
-                    await runAction(row.id, 'validate');
+                    const validateResult = await runAction(row.id, 'validate');
+                    let studyId = extractStudyIdFromPayload(validateResult);
+
+                    if (!studyId) {
+                        console.log('[openRequestDetail] Validate sin studyId. Intentando convert...');
+                        const convertResult = await runAction(row.id, 'convert');
+                        studyId = extractStudyIdFromPayload(convertResult);
+                    }
+
+                    if (!studyId) {
+                        const freshRequest = await fetchRequestById(row.id);
+                        studyId = extractStudyIdFromPayload(freshRequest);
+                    }
+
+                    if (studyId) {
+                        const requestWithStudy: StudyRequestRow = { ...row, convertedStudyId: studyId };
+                        setSelectedRequest(requestWithStudy);
+                        console.log('[openRequestDetail] Cargando estudio tras validate/convert:', studyId);
+                        await fetchStudy(studyId);
+                        return;
+                    }
                 } else {
                     console.log('[openRequestDetail] Estado VALIDATED - convirtiendo');
-                    await runAction(row.id, 'convert');
+                    const convertResult = await runAction(row.id, 'convert');
+                    let studyId = extractStudyIdFromPayload(convertResult);
+
+                    if (!studyId) {
+                        const freshRequest = await fetchRequestById(row.id);
+                        studyId = extractStudyIdFromPayload(freshRequest);
+                    }
+
+                    if (studyId) {
+                        const requestWithStudy: StudyRequestRow = { ...row, convertedStudyId: studyId };
+                        setSelectedRequest(requestWithStudy);
+                        console.log('[openRequestDetail] Cargando estudio tras convert:', studyId);
+                        await fetchStudy(studyId);
+                        return;
+                    }
                 }
 
                 setActingId(null);
-
-                // Recargar para obtener el nuevo convertedStudyId
-                console.log('[openRequestDetail] Esperando y recargando lista de solicitudes');
-                await new Promise(r => setTimeout(r, 500));
-                const updatedRows = await loadRows(false);
-
-                // Buscar la solicitud actualizada en la lista recargada
-                const updatedRowInList = updatedRows.find(r => r.id === row.id);
-
-                console.log('[openRequestDetail] Solicitud recargada:', {
-                    convertedStudyId: updatedRowInList?.convertedStudyId,
-                    status: updatedRowInList?.status
-                });
-
-                if (updatedRowInList?.convertedStudyId) {
-                    setSelectedRequest(updatedRowInList);
-                    console.log('[openRequestDetail] Cargando estudio:', updatedRowInList.convertedStudyId);
-                    await fetchStudy(updatedRowInList.convertedStudyId);
-                    return;
-                } else {
-                    setError('No se pudo convertir la solicitud. Por favor recarga e intenta nuevamente.');
-                    console.error('[openRequestDetail] No se obtuvo convertedStudyId después de validar');
-                }
+                setError('No se pudo convertir la solicitud. Por favor recarga e intenta nuevamente.');
+                console.error('[openRequestDetail] No se obtuvo convertedStudyId en el flujo de apertura');
             } catch (e) {
                 console.error('[openRequestDetail] Error al procesar solicitud:', e);
                 setError('Error al procesar la solicitud');
@@ -352,8 +392,7 @@ export default function SolicitudesPage() {
             console.log(`[updateStudyStatusApi] Status updated success for study:`, j?.data?.id);
 
             // Mostrar mensaje de éxito
-            const statusDisplay = statusName === 'PARTIAL' ? 'PARCIAL' : 'COMPLETADO';
-            setSuccessMessage(`✓ Estudio marcado como ${statusDisplay}`);
+            setSuccessMessage('Solicitud procesada');
 
             // Recargar solicitudes 
             await loadRows();
@@ -436,7 +475,7 @@ export default function SolicitudesPage() {
                 </div>
 
                 <section className="rounded-lg border border-gray-200 bg-white shadow-sm p-5">
-                    <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
                         <div>
                             <label className="block text-sm font-medium text-gray-700 mb-1">Buscar por DNI</label>
                             <input
@@ -446,10 +485,6 @@ export default function SolicitudesPage() {
                                 placeholder="Ej: 30123456"
                                 className="w-full rounded-md border border-gray-300 px-3 py-2 text-sm text-gray-700 focus:border-blue-500 focus:outline-none focus:ring-2 focus:ring-blue-500"
                             />
-                        </div>
-                        <div>
-                            <label className="block text-sm font-medium text-gray-700 mb-1">Estado</label>
-                            <div className="w-full rounded-md border border-gray-300 px-3 py-2 text-sm text-gray-700 bg-gray-50">En proceso</div>
                         </div>
                         <div className="flex items-end">
                             <button
@@ -471,7 +506,7 @@ export default function SolicitudesPage() {
                     {loading ? (
                         <div className="p-6 text-sm text-gray-600">Cargando solicitudes...</div>
                     ) : rows.length === 0 ? (
-                        <div className="p-6 text-sm text-gray-600">No hay solicitudes para los filtros seleccionados.</div>
+                        <div className="p-6 text-sm text-gray-600">No hay solicitudes en proceso para el DNI buscado.</div>
                     ) : (
                         <table className="w-full text-sm table-auto">
                             <thead className="border-b border-gray-200 bg-gray-50">
@@ -486,73 +521,71 @@ export default function SolicitudesPage() {
                                 </tr>
                             </thead>
                             <tbody className="divide-y divide-gray-200">
-                                {rows
-                                    .filter(row => row.status === 'PENDING' || row.status === 'VALIDATED')
-                                    .map((row) => {
-                                        const patientName = `${row.patient?.profile?.firstName || ""} ${row.patient?.profile?.lastName || ""}`.trim() || "-";
-                                        const disabled = actingId === row.id;
+                                {rows.map((row) => {
+                                    const patientName = `${row.patient?.profile?.firstName || ""} ${row.patient?.profile?.lastName || ""}`.trim() || "-";
+                                    const disabled = actingId === row.id;
 
-                                        return (
-                                            <tr key={row.id}>
-                                                <td className="px-3 py-2 text-gray-900">{row.dni}</td>
-                                                <td className="px-3 py-2 text-gray-900">{patientName}</td>
-                                                <td className="px-3 py-2 text-gray-900">{formatDateOnly(row.requestedDate)}</td>
-                                                <td className="px-3 py-2 text-gray-900">{row.doctorName}</td>
-                                                <td className="px-3 py-2 text-gray-900">{row.insuranceName}</td>
-                                                <td className="px-3 py-2">
-                                                    <span className={`inline-flex rounded-full border px-2.5 py-0.5 text-xs font-semibold ${statusClass[row.status]}`}>
-                                                        {statusLabel[row.status]}
-                                                    </span>
-                                                </td>
-                                                <td className="px-3 py-2">
-                                                    <div className="flex justify-end gap-2">
-                                                        <button
-                                                            type="button"
-                                                            onClick={() => openRequestDetail(row)}
-                                                            className="rounded-md bg-slate-600 px-2.5 py-1 text-xs font-semibold text-white hover:bg-slate-700"
-                                                        >
-                                                            Abrir
-                                                        </button>
-                                                        {row.status === "PENDING" && (
-                                                            <>
-                                                                <button
-                                                                    type="button"
-                                                                    disabled={disabled}
-                                                                    onClick={() => openRejectModal(row.id)}
-                                                                    className="rounded-md bg-red-600 px-2.5 py-1 text-xs font-semibold text-white hover:bg-red-700 disabled:opacity-60"
-                                                                >
-                                                                    Rechazar
-                                                                </button>
-                                                            </>
-                                                        )}
-                                                        {row.status === "VALIDATED" && (
-                                                            <>
-                                                                <button
-                                                                    type="button"
-                                                                    disabled={disabled}
-                                                                    onClick={() => runAction(row.id, "convert")}
-                                                                    className="rounded-md bg-green-600 px-2.5 py-1 text-xs font-semibold text-white hover:bg-green-700 disabled:opacity-60"
-                                                                >
-                                                                    Convertir
-                                                                </button>
-                                                                <button
-                                                                    type="button"
-                                                                    disabled={disabled}
-                                                                    onClick={() => openRejectModal(row.id)}
-                                                                    className="rounded-md bg-red-600 px-2.5 py-1 text-xs font-semibold text-white hover:bg-red-700 disabled:opacity-60"
-                                                                >
-                                                                    Rechazar
-                                                                </button>
-                                                            </>
-                                                        )}
-                                                        {row.status === "CONVERTED" && row.convertedStudyId ? (
-                                                            <span className="text-xs text-green-700">Estudio #{row.convertedStudyId}</span>
-                                                        ) : null}
-                                                    </div>
-                                                </td>
-                                            </tr>
-                                        );
-                                    })}
+                                    return (
+                                        <tr key={row.id}>
+                                            <td className="px-3 py-2 text-gray-900">{row.dni}</td>
+                                            <td className="px-3 py-2 text-gray-900">{patientName}</td>
+                                            <td className="px-3 py-2 text-gray-900">{formatDateOnly(row.requestedDate)}</td>
+                                            <td className="px-3 py-2 text-gray-900">{row.doctorName}</td>
+                                            <td className="px-3 py-2 text-gray-900">{row.insuranceName}</td>
+                                            <td className="px-3 py-2">
+                                                <span className={`inline-flex rounded-full border px-2.5 py-0.5 text-xs font-semibold ${statusClass[row.status]}`}>
+                                                    {statusLabel[row.status]}
+                                                </span>
+                                            </td>
+                                            <td className="px-3 py-2">
+                                                <div className="flex justify-end gap-2">
+                                                    <button
+                                                        type="button"
+                                                        onClick={() => openRequestDetail(row)}
+                                                        className="rounded-md bg-slate-600 px-2.5 py-1 text-xs font-semibold text-white hover:bg-slate-700"
+                                                    >
+                                                        Abrir
+                                                    </button>
+                                                    {row.status === "PENDING" && (
+                                                        <>
+                                                            <button
+                                                                type="button"
+                                                                disabled={disabled}
+                                                                onClick={() => openRejectModal(row.id)}
+                                                                className="rounded-md bg-red-600 px-2.5 py-1 text-xs font-semibold text-white hover:bg-red-700 disabled:opacity-60"
+                                                            >
+                                                                Rechazar
+                                                            </button>
+                                                        </>
+                                                    )}
+                                                    {row.status === "VALIDATED" && (
+                                                        <>
+                                                            <button
+                                                                type="button"
+                                                                disabled={disabled}
+                                                                onClick={() => runAction(row.id, "convert")}
+                                                                className="rounded-md bg-green-600 px-2.5 py-1 text-xs font-semibold text-white hover:bg-green-700 disabled:opacity-60"
+                                                            >
+                                                                Convertir
+                                                            </button>
+                                                            <button
+                                                                type="button"
+                                                                disabled={disabled}
+                                                                onClick={() => openRejectModal(row.id)}
+                                                                className="rounded-md bg-red-600 px-2.5 py-1 text-xs font-semibold text-white hover:bg-red-700 disabled:opacity-60"
+                                                            >
+                                                                Rechazar
+                                                            </button>
+                                                        </>
+                                                    )}
+                                                    {row.status === "CONVERTED" && row.convertedStudyId ? (
+                                                        <span className="text-xs text-green-700">Estudio #{row.convertedStudyId}</span>
+                                                    ) : null}
+                                                </div>
+                                            </td>
+                                        </tr>
+                                    );
+                                })}
                             </tbody>
                         </table>
                     )}

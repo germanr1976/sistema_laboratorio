@@ -1,5 +1,6 @@
 "use client"
 
+import { useEffect, useMemo, useState } from "react"
 import { Eye, Download, CircleOff } from "lucide-react"
 import type { Study } from "../utils/tipos"
 import { getStatusBadgeClass } from "../utils/uiClasses"
@@ -11,6 +12,30 @@ interface StudiesTableProps {
 }
 
 export function StudiesTable({ studies, onCancelStudy, cancellingStudyId = null }: StudiesTableProps) {
+  const studiesPerPage = 10
+  const [currentPage, setCurrentPage] = useState(1)
+
+  const totalPages = Math.max(1, Math.ceil(studies.length / studiesPerPage))
+
+  useEffect(() => {
+    setCurrentPage(1)
+  }, [studies])
+
+  useEffect(() => {
+    if (currentPage > totalPages) {
+      setCurrentPage(totalPages)
+    }
+  }, [currentPage, totalPages])
+
+  const { pageStudies, startIndex, endIndex } = useMemo(() => {
+    const start = (currentPage - 1) * studiesPerPage
+    const end = Math.min(start + studiesPerPage, studies.length)
+    return {
+      pageStudies: studies.slice(start, end),
+      startIndex: start,
+      endIndex: end,
+    }
+  }, [currentPage, studies])
 
   const formatDate = (dateString: string) => {
     const match = dateString.match(/^(\d{4})-(\d{2})-(\d{2})$/)
@@ -50,7 +75,7 @@ export function StudiesTable({ studies, onCancelStudy, cancellingStudyId = null 
           </tr>
         </thead>
         <tbody className="divide-y divide-gray-200">
-          {studies.map((study) => (
+          {pageStudies.map((study) => (
             <tr key={study.id} className="hover:bg-gray-50">
               <td className="px-4 py-3 text-gray-900">{formatDate(study.date)}</td>
               <td className="px-4 py-3 text-gray-600">{study.doctor}</td>
@@ -107,6 +132,50 @@ export function StudiesTable({ studies, onCancelStudy, cancellingStudyId = null 
           ))}
         </tbody>
       </table>
+
+      {totalPages > 1 && (
+        <div className="flex flex-col gap-3 border-t border-gray-200 bg-gray-50 px-4 py-3 sm:flex-row sm:items-center sm:justify-between">
+          <p className="text-xs text-gray-600 sm:text-sm">
+            Mostrando {startIndex + 1}-{endIndex} de {studies.length} estudios
+          </p>
+
+          <div className="flex items-center gap-2">
+            <button
+              type="button"
+              onClick={() => setCurrentPage((prev) => Math.max(1, prev - 1))}
+              disabled={currentPage === 1}
+              className="rounded-md border border-gray-300 bg-white px-3 py-1.5 text-xs font-medium text-gray-700 hover:bg-gray-100 disabled:cursor-not-allowed disabled:opacity-50 sm:text-sm"
+            >
+              Anterior
+            </button>
+
+            <div className="flex items-center gap-1">
+              {Array.from({ length: totalPages }, (_, i) => i + 1).map((page) => (
+                <button
+                  key={page}
+                  type="button"
+                  onClick={() => setCurrentPage(page)}
+                  className={`rounded-md px-2.5 py-1.5 text-xs font-medium sm:text-sm ${page === currentPage
+                      ? "bg-blue-600 text-white"
+                      : "border border-gray-300 bg-white text-gray-700 hover:bg-gray-100"
+                    }`}
+                >
+                  {page}
+                </button>
+              ))}
+            </div>
+
+            <button
+              type="button"
+              onClick={() => setCurrentPage((prev) => Math.min(totalPages, prev + 1))}
+              disabled={currentPage === totalPages}
+              className="rounded-md border border-gray-300 bg-white px-3 py-1.5 text-xs font-medium text-gray-700 hover:bg-gray-100 disabled:cursor-not-allowed disabled:opacity-50 sm:text-sm"
+            >
+              Siguiente
+            </button>
+          </div>
+        </div>
+      )}
     </div>
   )
 }
