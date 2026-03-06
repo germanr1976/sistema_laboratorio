@@ -443,11 +443,19 @@ export async function requestPasswordRecoveryController(req: Request, res: Respo
 
         // Enviar correo con el token (si falla SMTP no romper el endpoint)
         let emailSent = false;
-        try {
-            await enviarCorreoRecuperacion(email, recoveryToken);
-            emailSent = true;
-        } catch (emailError) {
-            console.error('No se pudo enviar correo de recuperación:', emailError);
+        const emailUser = (process.env.EMAIL_USER || '').trim();
+        const emailPassword = (process.env.EMAIL_PASSWORD || '').trim();
+        const smtpConfigured = Boolean(emailUser && emailPassword);
+
+        if (!smtpConfigured) {
+            console.warn('SMTP no configurado: faltan EMAIL_USER y/o EMAIL_PASSWORD. Se omite envio de correo.');
+        } else {
+            try {
+                await enviarCorreoRecuperacion(email, recoveryToken);
+                emailSent = true;
+            } catch (emailError) {
+                console.error('No se pudo enviar correo de recuperación:', emailError);
+            }
         }
 
         const responsePayload: any = {
@@ -455,7 +463,7 @@ export async function requestPasswordRecoveryController(req: Request, res: Respo
             message: genericMessage
         };
 
-        if (!emailSent && (process.env.NODE_ENV !== 'production' || allowRecoveryDebugLink)) {
+        if (!emailSent && allowRecoveryDebugLink) {
             responsePayload.debugRecoveryLink = recoveryLink;
             responsePayload.message = 'No se pudo enviar el correo en este entorno. Usa el link de recuperación de debug.';
         }
