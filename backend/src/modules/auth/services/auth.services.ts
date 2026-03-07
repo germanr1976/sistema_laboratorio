@@ -1,5 +1,6 @@
 import bcrypt from 'bcryptjs'
 import jwt from 'jsonwebtoken'
+import logger from '@/config/logger';
 
 export async function hashPassword(password: string): Promise<string> {
     const saltRounds = parseInt(process.env.BCRYPT_SALT_ROUNDS || '12');
@@ -31,7 +32,7 @@ export async function verifyToken(token: string): Promise<any> {
         const isTokenCorrect = jwt.verify(token, jwtSecret)
         return isTokenCorrect
     } catch (error) {
-        console.error(error)
+        logger.error({ err: error }, 'Error verificando token');
         throw error
     }
 }
@@ -66,7 +67,7 @@ export async function verifyPasswordRecoveryToken(token: string): Promise<any> {
         }
         return decoded;
     } catch (error) {
-        console.error('Error verificando token de recuperación:', error);
+        logger.error({ err: error }, 'Error verificando token de recuperación');
         throw error;
     }
 }

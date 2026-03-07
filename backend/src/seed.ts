@@ -1,10 +1,11 @@
 import { PrismaClient } from "@prisma/client";
 import { hashPassword } from "@/modules/auth/services/auth.services";
+import logger from "@/config/logger";
 
 const prisma = new PrismaClient();
 
 async function main() {
-  console.log("🌱 Seeding roles y usuario de prueba...");
+  logger.info("Seeding roles y usuario de prueba...");
 
   const patientRole = await prisma.role.upsert({
     where: { name: "PATIENT" },
@@ -88,13 +89,13 @@ async function main() {
     },
   });
 
-  console.log({ patientRole, bioRole, demoUser, bioUser, statuses: { pending, inProgress, completed }, study });
-  console.log("✅ Seed completo");
+  logger.info({ patientRole, bioRole, demoUser, bioUser, statuses: { pending, inProgress, completed }, study });
+  logger.info("Seed completo");
 }
 
 main()
   .catch((e) => {
-    console.error(e);
+    logger.error({ err: e }, "Seed failed");
     process.exit(1);
   })
   .finally(async () => {

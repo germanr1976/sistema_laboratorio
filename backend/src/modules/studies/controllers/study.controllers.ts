@@ -39,8 +39,8 @@ export const createStudy = async (
       pdfUrl = `/uploads/pdfs/${uploadedFiles[0]!.filename}`;
     }
 
-    console.log('Archivos recibidos:', uploadedFiles?.map(f => f.filename));
-    console.log('Body recibido:', req.body);
+    req.log.debug({ files: uploadedFiles?.map(f => f.filename) }, 'Archivos recibidos');
+    req.log.debug({ body: req.body }, 'Body recibido');
 
     // Validar datos de entrada
     const validatedData = ValidationHelper.validate<{
@@ -55,17 +55,7 @@ export const createStudy = async (
 
     const { dni, studyName, studyDate, socialInsurance, biochemistId, doctor } = validatedData;
 
-    console.log('📝 Datos recibidos en createStudy:', {
-      dni,
-      studyName,
-      studyDate,
-      studyDateType: typeof studyDate,
-      studyDateIsNull: studyDate === null,
-      studyDateIsUndefined: studyDate === undefined,
-      socialInsurance,
-      biochemistId,
-      doctor
-    });
+    req.log.info({ dni, studyName, studyDate, studyDateType: typeof studyDate, studyDateIsNull: studyDate === null, studyDateIsUndefined: studyDate === undefined, socialInsurance, biochemistId, doctor }, 'Datos recibidos en createStudy');
 
     // Verificar que el paciente existe
     const patient = await studyService.getPatientByDni(dni);
@@ -110,26 +100,18 @@ export const createStudy = async (
 
     // Asignar la fecha si viene del frontend, de lo contrario dejarla como null
     if (studyDate !== null && studyDate !== undefined) {
-      console.log('📅 Asignando studyDate:', studyDate, 'tipo:', typeof studyDate);
+      req.log.debug({ studyDate, type: typeof studyDate }, 'Asignando studyDate');
       studyData.studyDate = (studyDate as any) instanceof Date ? studyDate : new Date(studyDate);
     } else {
-      console.log('📅 studyDate es null/undefined, asignando null');
+      req.log.debug('studyDate es null/undefined, asignando null');
       studyData.studyDate = null;
     }
 
-    console.log('💾 Guardando estudio con datos:', studyData);
+    req.log.debug({ studyData }, 'Guardando estudio con datos');
 
     const study = await studyService.createStudy(studyData);
 
-    console.log('✅ Estudio guardado en BD:', {
-      id: study.id,
-      studyName: study.studyName,
-      studyDate: study.studyDate,
-      socialInsurance: study.socialInsurance,
-      doctor: study.doctor,
-      userId: study.userId,
-      statusId: study.statusId
-    });
+    req.log.info({ id: study.id, studyName: study.studyName, studyDate: study.studyDate, socialInsurance: study.socialInsurance, doctor: study.doctor, userId: study.userId, statusId: study.statusId }, 'Estudio guardado en BD');
 
     // Crear adjuntos si hay múltiples archivos
     if (uploadedFiles.length > 0) {
@@ -144,7 +126,7 @@ export const createStudy = async (
 
     ResponseHelper.created(res, formattedStudy, "Estudio creado exitosamente");
   } catch (error: any) {
-    console.error("Error al crear estudio:", error);
+    req.log.error({ err: error }, 'Error al crear estudio');
     ResponseHelper.serverError(res, "Error al crear el estudio", error);
   }
 };
@@ -169,7 +151,7 @@ export const getMyStudies = async (
 
     ResponseHelper.success(res, formattedStudies, "Estudios obtenidos exitosamente");
   } catch (error: any) {
-    console.error("Error al obtener estudios del bioquímico:", error);
+    req.log.error({ err: error }, 'Error al obtener estudios del bioquímico');
     ResponseHelper.serverError(res, "Error al obtener estudios", error);
   }
 };
@@ -179,7 +161,7 @@ export const getMyStudies = async (
  * Solo accesible por administradores
  */
 export const getAllStudies = async (
-  _req: Request,
+  req: Request,
   res: Response
 ): Promise<void> => {
   try {
@@ -188,7 +170,7 @@ export const getAllStudies = async (
 
     ResponseHelper.success(res, formattedStudies, "Todos los estudios obtenidos exitosamente");
   } catch (error: any) {
-    console.error("Error al obtener todos los estudios:", error);
+    req.log.error({ err: error }, 'Error al obtener todos los estudios');
     ResponseHelper.serverError(res, "Error al obtener estudios", error);
   }
 };
@@ -234,7 +216,7 @@ export const getStudyById = async (
 
     ResponseHelper.success(res, formattedStudy, "Estudio obtenido exitosamente");
   } catch (error: any) {
-    console.error("Error al obtener estudio:", error);
+    req.log.error({ err: error }, 'Error al obtener estudio');
     ResponseHelper.serverError(res, "Error al obtener estudio", error);
   }
 };
@@ -276,7 +258,7 @@ export const getMyStudiesAsPatient = async (
       "Estudios obtenidos exitosamente"
     );
   } catch (error: any) {
-    console.error("Error al obtener estudios del paciente:", error);
+    req.log.error({ err: error }, 'Error al obtener estudios del paciente');
     ResponseHelper.serverError(res, "Error al obtener estudios", error);
   }
 };
@@ -299,7 +281,7 @@ export const updateStudy = async (
 
     const { socialInsurance, studyDate, doctor } = req.body;
 
-    console.log('📝 updateStudy - Actualizando estudio', studyId, { socialInsurance, studyDate, doctor });
+    req.log.info({ studyId, socialInsurance, studyDate, doctor }, 'updateStudy - Actualizando estudio');
 
     // Construir objeto de actualización solo con campos proporcionados
     const updateData: any = {};
@@ -350,11 +332,11 @@ export const updateStudy = async (
       },
     });
 
-    console.log('✅ Estudio actualizado:', updatedStudy);
+    req.log.info({ studyId: updatedStudy.id }, 'Estudio actualizado');
     const formattedStudy = studyFormatter.formatStudy(updatedStudy);
     ResponseHelper.success(res, formattedStudy, "Estudio actualizado exitosamente");
   } catch (error: any) {
-    console.error("Error al actualizar estudio:", error);
+    req.log.error({ err: error }, 'Error al actualizar estudio');
     ResponseHelper.serverError(res, "Error al actualizar estudio", error);
   }
 };
@@ -414,7 +396,7 @@ export const updateStudyStatus = async (
 
     ResponseHelper.success(res, formattedStudy, "Estudio actualizado exitosamente");
   } catch (error: any) {
-    console.error("Error al actualizar estudio:", error);
+    req.log.error({ err: error }, 'Error al actualizar estado del estudio');
     ResponseHelper.serverError(res, "Error al actualizar estudio", error);
   }
 };
@@ -458,9 +440,9 @@ export const updateStudyPdf = async (
     }
 
     // Verificar que el usuario es el bioquímico asignado O es un bioquímico cualquiera si el estudio no tiene biochemista asignado
-    console.log('[studies] updateStudyPdf -> user:', { id: req.user?.id, role: req.user?.role }, 'study.biochemistId:', study.biochemistId);
+    req.log.debug({ userId: req.user?.id, role: req.user?.role, biochemistId: study.biochemistId }, 'updateStudyPdf -> permission check');
     const isBiochemist = (study.biochemistId == null) || (study.biochemistId === req.user?.id);
-    console.log('[studies] updateStudyPdf -> isBiochemist:', isBiochemist);
+    req.log.debug({ isBiochemist }, 'updateStudyPdf -> isBiochemist');
 
     if (!isBiochemist) {
       return ResponseHelper.forbidden(
@@ -484,7 +466,7 @@ export const updateStudyPdf = async (
 
     ResponseHelper.success(res, formattedStudy, "PDF(s) actualizado(s) exitosamente");
   } catch (error: any) {
-    console.error("Error al actualizar PDF del estudio:", error);
+    req.log.error({ err: error }, 'Error al actualizar PDF del estudio');
     ResponseHelper.serverError(res, "Error al actualizar PDF del estudio", error);
   }
 };
@@ -534,7 +516,7 @@ export const getPatientByDni = async (
       socialInsurance: lastStudy?.socialInsurance || "",
     }, "Paciente encontrado exitosamente");
   } catch (error: any) {
-    console.error("Error al buscar paciente:", error);
+    req.log.error({ err: error }, 'Error al buscar paciente');
     ResponseHelper.serverError(res, "Error al buscar paciente", error);
   }
 };
@@ -583,7 +565,7 @@ export const cancelStudy = async (
 
     ResponseHelper.success(res, formattedStudy, "Estudio anulado exitosamente");
   } catch (error: any) {
-    console.error("Error al anular estudio:", error);
+    req.log.error({ err: error }, 'Error al anular estudio');
     ResponseHelper.serverError(res, "Error al anular estudio", error);
   }
 };

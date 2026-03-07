@@ -48,7 +48,7 @@ export async function getMyAnalysisController(req: Request, res: Response) {
         });
 
     } catch (error) {
-        console.error('Error al obtener los análisis del paciente', error)
+        req.log.error({ err: error }, 'Error al obtener los análisis del paciente');
         return res.status(500).json({
             success: false,
             message: 'Error interno del servidor al obtener los análisis'
@@ -116,7 +116,7 @@ export async function getAnalysisByIdController(req: Request, res: Response) {
             data: analysis
         });
     } catch (error) {
-        console.error('Error al obtener los análisis del paciente', error)
+        req.log.error({ err: error }, 'Error al obtener los análisis del paciente');
         return res.status(500).json({
             success: false,
             message: 'Error interno del servidor al obtener los análisis'

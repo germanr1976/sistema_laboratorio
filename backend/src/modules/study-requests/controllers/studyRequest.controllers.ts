@@ -72,11 +72,7 @@ export const createStudyRequest = async (req: Request, res: Response) => {
         });
 
         // Debug log: mostrar resumen de la creación
-        console.log('[study-requests] createStudyRequest -> created:', {
-            id: created?.id,
-            patientId: created?.patientId,
-            status: created?.status,
-        });
+        req.log.info({ id: created?.id, patientId: created?.patientId, status: created?.status }, '[study-requests] createStudyRequest -> created');
 
         return res.status(201).json({
             success: true,
@@ -84,7 +80,7 @@ export const createStudyRequest = async (req: Request, res: Response) => {
             data: created,
         });
     } catch (error) {
-        console.error('Error creando solicitud de estudio:', error);
+        req.log.error({ err: error }, 'Error creando solicitud de estudio');
         return res.status(500).json({
             success: false,
             message: 'Error interno del servidor',
@@ -113,7 +109,7 @@ export const getMyStudyRequests = async (req: Request, res: Response) => {
             count: rows.length,
         });
     } catch (error) {
-        console.error('Error obteniendo solicitudes del paciente:', error);
+        req.log.error({ err: error }, 'Error obteniendo solicitudes del paciente');
         return res.status(500).json({
             success: false,
             message: 'Error interno del servidor',
@@ -143,21 +139,18 @@ export const listStudyRequestsForProfessional = async (req: Request, res: Respon
         const filters = { dni: value.dni, status: value.status };
 
         // Debug log: quién solicita la lista y con qué filtros
-        console.log('[study-requests] listStudyRequestsForProfessional -> user:', {
-            id: req.user?.id,
-            role: roleName,
-        }, 'filters:', filters);
+        req.log.debug({ userId: req.user?.id, role: roleName, filters }, '[study-requests] listStudyRequestsForProfessional');
 
         const rows = await studyRequestService.listStudyRequestsForProfessional(filters);
 
         // Debug log: mostrar cuantos rows devolvió y un ejemplo
         try {
-            console.log('[study-requests] listStudyRequestsForProfessional -> rowsCount:', Array.isArray(rows) ? rows.length : 0);
+            req.log.debug({ rowsCount: Array.isArray(rows) ? rows.length : 0 }, '[study-requests] listStudyRequestsForProfessional');
             if (Array.isArray(rows) && rows.length > 0) {
-                console.log('[study-requests] listStudyRequestsForProfessional -> sampleRow:', JSON.stringify(rows[0]));
+                req.log.debug({ sampleRow: rows[0] }, '[study-requests] listStudyRequestsForProfessional sample row');
             }
         } catch (logErr) {
-            console.error('[study-requests] error logging rows:', logErr);
+            req.log.error({ err: logErr }, '[study-requests] error logging rows');
         }
 
         return res.status(200).json({
@@ -167,7 +160,7 @@ export const listStudyRequestsForProfessional = async (req: Request, res: Respon
             count: rows.length,
         });
     } catch (error) {
-        console.error('Error listando solicitudes para profesional:', error);
+        req.log.error({ err: error }, 'Error listando solicitudes para profesional');
         return res.status(500).json({
             success: false,
             message: 'Error interno del servidor',
@@ -206,7 +199,7 @@ export const validateStudyRequest = async (req: Request, res: Response) => {
             data: updated,
         });
     } catch (error) {
-        console.error('Error validando solicitud:', error);
+        req.log.error({ err: error }, 'Error validando solicitud');
         return res.status(500).json({
             success: false,
             message: 'Error interno del servidor',
@@ -254,7 +247,7 @@ export const rejectStudyRequest = async (req: Request, res: Response) => {
             data: updated,
         });
     } catch (error) {
-        console.error('Error rechazando solicitud:', error);
+        req.log.error({ err: error }, 'Error rechazando solicitud');
         return res.status(500).json({
             success: false,
             message: 'Error interno del servidor',
@@ -295,7 +288,7 @@ export const convertStudyRequest = async (req: Request, res: Response) => {
             return res.status(409).json({ success: false, message });
         }
 
-        console.error('Error convirtiendo solicitud:', error);
+        req.log.error({ err: error }, 'Error convirtiendo solicitud');
         return res.status(500).json({
             success: false,
             message: 'Error interno del servidor',

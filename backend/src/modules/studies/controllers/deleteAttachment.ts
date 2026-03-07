@@ -37,7 +37,7 @@ export const deleteAttachment = async (
 
     ResponseHelper.success(res, null, "Archivo eliminado exitosamente");
   } catch (error: any) {
-    console.error("Error al eliminar attachment:", error);
+    req.log.error({ err: error }, 'Error al eliminar attachment');
     ResponseHelper.serverError(res, "Error al eliminar archivo", error);
   }
 };

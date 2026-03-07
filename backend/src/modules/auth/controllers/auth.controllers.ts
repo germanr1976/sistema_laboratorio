@@ -136,7 +136,7 @@ export async function loginController(req: Request, res: Response) {
 
 
     } catch (error) {
-        console.error(error);
+        req.log.error({ err: error }, 'Error en login');
         return res.status(500).json({
             success: false,
             message: 'Error interno del servidor'
@@ -231,7 +231,7 @@ export async function registerDoctorController(req: Request, res: Response) {
         });
 
     } catch (error) {
-        console.error(error);
+        req.log.error({ err: error }, 'Error en registro de bioquímico');
         return res.status(500).json({
             success: false,
             message: 'Error interno del servidor'
@@ -240,11 +240,11 @@ export async function registerDoctorController(req: Request, res: Response) {
 }
 export async function registerPatientController(req: Request, res: Response) {
     try {
-        console.log('📝 Registro de paciente - Datos recibidos:', JSON.stringify(req.body, null, 2));
+        req.log.info({ body: req.body }, 'Registro de paciente - Datos recibidos');
 
         const validationResultPatient = validatePatient(req.body)
         if (validationResultPatient.error) {
-            console.error('❌ Error de validación:', validationResultPatient.error.details);
+            req.log.error({ errors: validationResultPatient.error.details }, 'Error de validación en registro de paciente');
             return res.status(400).json({
                 success: false,
                 message: 'Datos de entrada invalidos',
@@ -395,7 +395,7 @@ export async function registerPatientController(req: Request, res: Response) {
         });
 
     } catch (error) {
-        console.error(error);
+        req.log.error({ err: error }, 'Error en registro de paciente');
         return res.status(500).json({
             success: false,
             message: 'Error interno del servidor'
@@ -448,13 +448,13 @@ export async function requestPasswordRecoveryController(req: Request, res: Respo
         const smtpConfigured = Boolean(emailUser && emailPassword);
 
         if (!smtpConfigured) {
-            console.warn('SMTP no configurado: faltan EMAIL_USER y/o EMAIL_PASSWORD. Se omite envio de correo.');
+            req.log.warn('SMTP no configurado: faltan EMAIL_USER y/o EMAIL_PASSWORD. Se omite envio de correo.');
         } else {
             try {
                 await enviarCorreoRecuperacion(email, recoveryToken);
                 emailSent = true;
             } catch (emailError) {
-                console.error('No se pudo enviar correo de recuperación:', emailError);
+                req.log.error({ err: emailError }, 'No se pudo enviar correo de recuperación');
             }
         }
 
@@ -471,7 +471,7 @@ export async function requestPasswordRecoveryController(req: Request, res: Respo
         return res.status(200).json(responsePayload);
 
     } catch (error) {
-        console.error('Error en solicitud de recuperación de contraseña:', error);
+        req.log.error({ err: error }, 'Error en solicitud de recuperación de contraseña');
         return res.status(500).json({
             success: false,
             message: 'Error al procesar la solicitud'
@@ -547,7 +547,7 @@ export async function resetPasswordController(req: Request, res: Response) {
         });
 
     } catch (error) {
-        console.error('Error al restablecer contraseña:', error);
+        req.log.error({ err: error }, 'Error al restablecer contraseña');
         return res.status(500).json({
             success: false,
             message: 'Error al restablecer la contraseña'
