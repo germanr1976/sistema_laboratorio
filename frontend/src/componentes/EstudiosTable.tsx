@@ -583,12 +583,12 @@ export function EstudiosTable() {
                     <table className="w-full text-base">
                         <thead className="bg-gray-50 border-b border-gray-200">
                             <tr>
-                                <th className="px-6 py-3 text-left font-semibold text-gray-900 text-lg">Estado</th>
+                                <th className="px-6 py-3 text-left font-semibold text-gray-900 text-lg">Fecha</th>
                                 <th className="px-6 py-3 text-left font-semibold text-gray-900 text-lg">Paciente</th>
                                 <th className="px-6 py-3 text-left font-semibold text-gray-900 text-lg">DNI</th>
-                                <th className="px-6 py-3 text-left font-semibold text-gray-900 text-lg">Fecha</th>
-                                <th className="px-6 py-3 text-left font-semibold text-gray-900 text-lg">Obra Social</th>
                                 <th className="px-6 py-3 text-left font-semibold text-gray-900 text-lg">Médico</th>
+                                <th className="px-6 py-3 text-left font-semibold text-gray-900 text-lg">Obra Social</th>
+                                <th className="px-6 py-3 text-left font-semibold text-gray-900 text-lg">Estado</th>
                                 <th className="px-6 py-3 text-left font-semibold text-gray-900 text-lg">PDFs</th>
                                 <th className="px-6 py-3 text-right font-semibold text-gray-900 text-lg">Acciones</th>
                             </tr>
@@ -596,16 +596,16 @@ export function EstudiosTable() {
                         <tbody className="divide-y divide-gray-200">
                             {estudiosPaginados.map((estudio) => (
                                 <tr key={estudio.id} className="hover:bg-gray-50 transition-colors">
-                                    <td className="px-6 py-4">
-                                        {renderEstadoBadge(estudio.estado || estudio.status)}
-                                    </td>
-                                    <td className="px-6 py-4 font-semibold text-gray-900">{estudio.nombreApellido}</td>
-                                    <td className="px-6 py-4 text-gray-800">{estudio.dni}</td>
                                     <td className="px-6 py-4 text-gray-800">
                                         {estudio.fechaEstudio ? estudio.fechaEstudio : '-'}
                                     </td>
-                                    <td className="px-6 py-4 text-gray-800">{estudio.obraSocial || '-'}</td>
+                                    <td className="px-6 py-4 font-semibold text-gray-900">{estudio.nombreApellido}</td>
+                                    <td className="px-6 py-4 text-gray-800">{estudio.dni}</td>
                                     <td className="px-6 py-4 text-gray-800">{estudio.medico || '-'}</td>
+                                    <td className="px-6 py-4 text-gray-800">{estudio.obraSocial || '-'}</td>
+                                    <td className="px-6 py-4">
+                                        {renderEstadoBadge(estudio.estado || estudio.status)}
+                                    </td>
                                     <td className="px-6 py-4">
                                         <div className="flex items-center gap-1 text-gray-800">
                                             <FileText className="w-5 h-5 text-gray-500" />

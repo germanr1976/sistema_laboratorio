@@ -39,6 +39,7 @@ async function sendPatientAccessLink(
     const emailUser = (process.env.EMAIL_USER || '').trim();
     const emailPassword = (process.env.EMAIL_PASSWORD || '').trim();
     const smtpConfigured = Boolean(emailUser && emailPassword);
+    const activationPayload = exposeAccessLink ? { activationLink: recoveryLink } : {};
 
     if (!smtpConfigured) {
         console.warn('SMTP no configurado: faltan EMAIL_USER y/o EMAIL_PASSWORD. Se omite envio de correo.');
@@ -46,12 +47,12 @@ async function sendPatientAccessLink(
             return {
                 inviteEmailSent: false,
                 debugRecoveryLink: recoveryLink,
-                activationLink: exposeAccessLink ? recoveryLink : undefined,
+                ...activationPayload,
             };
         }
         return {
             inviteEmailSent: false,
-            activationLink: exposeAccessLink ? recoveryLink : undefined,
+            ...activationPayload,
         };
     }
 
@@ -59,7 +60,7 @@ async function sendPatientAccessLink(
         await enviarCorreoRecuperacion(email, recoveryToken);
         return {
             inviteEmailSent: true,
-            activationLink: exposeAccessLink ? recoveryLink : undefined,
+            ...activationPayload,
         };
     } catch (error) {
         console.error('No se pudo enviar correo de activación de paciente:', error);
@@ -67,12 +68,12 @@ async function sendPatientAccessLink(
             return {
                 inviteEmailSent: false,
                 debugRecoveryLink: recoveryLink,
-                activationLink: exposeAccessLink ? recoveryLink : undefined,
+                ...activationPayload,
             };
         }
         return {
             inviteEmailSent: false,
-            activationLink: exposeAccessLink ? recoveryLink : undefined,
+            ...activationPayload,
         };
     }
 }
