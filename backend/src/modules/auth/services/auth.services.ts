@@ -15,6 +15,7 @@ export async function comparePassword(password: string, hashedPassword: string):
 
 export async function generateToken(userData: {
     userId: number,
+    tenantId: number,
     dni: string,
     roleId: number,
     roleName: string
@@ -43,10 +44,10 @@ export async function verifyToken(token: string): Promise<any> {
  * @param dni - DNI del usuario
  * @returns Token con expiración de 1 hora
  */
-export async function generatePasswordRecoveryToken(userId: number, dni: string): Promise<string> {
+export async function generatePasswordRecoveryToken(userId: number, tenantId: number, dni: string): Promise<string> {
     const jwtSecret = process.env.JWT_SECRET || 'fallback-secret';
     const token = jwt.sign(
-        { userId, dni, type: 'password-recovery' },
+        { userId, tenantId, dni, type: 'password-recovery' },
         jwtSecret,
         { expiresIn: '1h' }
     );

@@ -1,9 +1,11 @@
 import { Request, Response, NextFunction } from 'express';
 import { verifyToken } from '../services/auth.services';
-import { PrismaClient } from '@prisma/client';
+import prisma from '@/config/prisma';
 
-
-const prisma = new PrismaClient();
+type TokenPayload = {
+    userId: number;
+    tenantId: number;
+};
 
 export async function authMiddleware(req: Request, res: Response, next: NextFunction) {
     try {
@@ -22,8 +24,8 @@ export async function authMiddleware(req: Request, res: Response, next: NextFunc
             })
         }
         const token = authHeader.substring(7); 
-        const tokenverify = await verifyToken(token);
-        if(!tokenverify){
+        const tokenverify = await verifyToken(token) as TokenPayload | null;
+        if(!tokenverify || !tokenverify.userId || !tokenverify.tenantId){
             return res.status(401).json({
                 success: false, 
                 message: 'Token expirado'
@@ -31,7 +33,7 @@ export async function authMiddleware(req: Request, res: Response, next: NextFunc
         }
         const user = await prisma.user.findUnique({
             where:{id: tokenverify.userId},
-            include:{profile: true, role:true}
+            include:{profile: true, role:true, tenant: true}
         })
         if(!user){
             return res.status(401).json({
@@ -39,6 +41,21 @@ export async function authMiddleware(req: Request, res: Response, next: NextFunc
                 message:'usuario no encontrado' 
             })
         }
+
+        if (user.tenantId !== tokenverify.tenantId) {
+            return res.status(401).json({
+                success: false,
+                message: 'Token inválido para este tenant',
+            });
+        }
+
+        req.tenantId = user.tenantId;
+        req.tenant = {
+            id: user.tenant.id,
+            name: user.tenant.name,
+            slug: user.tenant.slug,
+            suspended: user.tenant.suspended,
+        };
         req.user = user
        return  next()
     } catch (error) {

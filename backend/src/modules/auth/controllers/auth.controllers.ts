@@ -2,14 +2,39 @@ import { Request, Response } from 'express';
 import { validateLogin } from '../validators/validators';
 import { comparePassword, generateToken, generatePasswordRecoveryToken, verifyPasswordRecoveryToken, hashPassword } from '../services/auth.services';
 import { enviarCorreoRecuperacion } from '../services/emailService';
-import { PrismaClient } from '@prisma/client';
+import prisma from '@/config/prisma';
 import { validateDoctor, validatePatient } from '../validators/validators';
 
+async function resolveTenantFromRequest(req: Request, createIfMissing = false) {
+    const slugFromHeader = String(req.headers['x-tenant-slug'] || '').trim().toLowerCase();
+    const fallbackSlug = String(process.env.DEFAULT_TENANT_SLUG || 'default').trim().toLowerCase();
+    const fallbackName = String(process.env.DEFAULT_TENANT_NAME || 'Laboratorio principal').trim();
+    const tenantSlug = slugFromHeader || fallbackSlug;
 
-const prisma = new PrismaClient();
+    if (createIfMissing) {
+        return prisma.tenant.upsert({
+            where: { slug: tenantSlug },
+            update: {},
+            create: {
+                slug: tenantSlug,
+                name: fallbackName,
+            },
+        });
+    }
+
+    return prisma.tenant.findUnique({ where: { slug: tenantSlug } });
+}
 
 export async function loginController(req: Request, res: Response) {
     try {
+        const tenant = await resolveTenantFromRequest(req);
+        if (!tenant) {
+            return res.status(401).json({
+                success: false,
+                message: 'Credenciales inválidas'
+            });
+        }
+
         const validationResult = validateLogin(req.body);
         if (validationResult.error) {
             return res.status(400).json({
@@ -21,8 +46,8 @@ export async function loginController(req: Request, res: Response) {
         const dni: string = validatedData.dni;
         const password: string | undefined = validatedData.password;
 
-        const user = await prisma.user.findUnique({
-            where: { dni },
+        const user = await prisma.user.findFirst({
+            where: { dni, tenantId: tenant.id },
             include: { profile: true, role: true }
         })
         if (!user) {
@@ -60,6 +85,7 @@ export async function loginController(req: Request, res: Response) {
 
                     const tokenGenerated = await generateToken({
                         userId: user.id,
+                        tenantId: user.tenantId,
                         dni: user.dni,
                         roleId: user.roleId,
                         roleName: user.role.name
@@ -104,6 +130,7 @@ export async function loginController(req: Request, res: Response) {
                     } else {
                         const tokenGenerated = await generateToken({
                             userId: user.id,
+                            tenantId: user.tenantId,
                             dni: user.dni,
                             roleId: user.roleId,
                             roleName: user.role.name
@@ -146,6 +173,14 @@ export async function loginController(req: Request, res: Response) {
 
 export async function registerDoctorController(req: Request, res: Response) {
     try {
+        const tenant = await resolveTenantFromRequest(req, true);
+        if (!tenant) {
+            return res.status(500).json({
+                success: false,
+                message: 'No se pudo resolver el tenant de registro'
+            });
+        }
+
         const validationResultDoctor = validateDoctor(req.body);
         if (validationResultDoctor.error) {
             return res.status(400).json({
@@ -161,8 +196,8 @@ export async function registerDoctorController(req: Request, res: Response) {
         const email: string = validatedData.email;
         const password: string = validatedData.password;
 
-        const existingUserByDni = await prisma.user.findUnique({
-            where: { dni }
+        const existingUserByDni = await prisma.user.findFirst({
+            where: { dni, tenantId: tenant.id }
         });
         const existingUserByEmail = await prisma.user.findUnique({
             where: { email }
@@ -196,6 +231,7 @@ export async function registerDoctorController(req: Request, res: Response) {
                     email,
                     password: hashedPassword,
                     license,
+                    tenantId: tenant.id,
                     roleId: doctorRole.id
                 }
             });
@@ -210,6 +246,7 @@ export async function registerDoctorController(req: Request, res: Response) {
         });
         const tokenGenerated = await generateToken({
             userId: result.user.id,
+            tenantId: result.user.tenantId,
             dni: result.user.dni,
             roleId: result.user.roleId,
             roleName: doctorRole.name
@@ -240,6 +277,14 @@ export async function registerDoctorController(req: Request, res: Response) {
 }
 export async function registerPatientController(req: Request, res: Response) {
     try {
+        const tenant = await resolveTenantFromRequest(req, true);
+        if (!tenant) {
+            return res.status(500).json({
+                success: false,
+                message: 'No se pudo resolver el tenant de registro'
+            });
+        }
+
         req.log.info({ body: req.body }, 'Registro de paciente - Datos recibidos');
 
         const validationResultPatient = validatePatient(req.body)
@@ -259,8 +304,8 @@ export async function registerPatientController(req: Request, res: Response) {
         const email: string | undefined = validatedData.email;
         const password: string | undefined = validatedData.password;
 
-        const existingPatientByDni = await prisma.user.findUnique({
-            where: { dni },
+        const existingPatientByDni = await prisma.user.findFirst({
+            where: { dni, tenantId: tenant.id },
             include: { profile: true, role: true }
         });
         if (existingPatientByDni) {
@@ -366,6 +411,7 @@ export async function registerPatientController(req: Request, res: Response) {
                     dni,
                     email,
                     password: hashedPassword,
+                    tenantId: tenant.id,
                     roleId: patientRole?.id
                 }
             });
@@ -411,7 +457,15 @@ export async function registerPatientController(req: Request, res: Response) {
 export async function requestPasswordRecoveryController(req: Request, res: Response) {
     try {
         const { email } = req.body;
+        const tenant = await resolveTenantFromRequest(req);
         const allowRecoveryDebugLink = String(process.env.ALLOW_RECOVERY_DEBUG_LINK || '').toLowerCase() === 'true';
+
+        if (!tenant) {
+            return res.status(200).json({
+                success: true,
+                message: 'Si el email existe en nuestro sistema, recibirás un enlace de recuperación'
+            });
+        }
 
         if (!email || typeof email !== 'string') {
             return res.status(400).json({
@@ -423,8 +477,8 @@ export async function requestPasswordRecoveryController(req: Request, res: Respo
         const genericMessage = 'Si el email existe en nuestro sistema, recibirás un enlace de recuperación';
 
         // Buscar usuario por email
-        const user = await prisma.user.findUnique({
-            where: { email },
+        const user = await prisma.user.findFirst({
+            where: { email, tenantId: tenant.id },
             include: { profile: true, role: true }
         });
 
@@ -437,7 +491,7 @@ export async function requestPasswordRecoveryController(req: Request, res: Respo
         }
 
         // Generar token de recuperación
-        const recoveryToken = await generatePasswordRecoveryToken(user.id, user.dni);
+        const recoveryToken = await generatePasswordRecoveryToken(user.id, user.tenantId, user.dni);
         const baseUrl = process.env.APP_FRONTEND_URL || 'http://localhost:3001';
         const recoveryLink = `${baseUrl}/recuperar-contrasena?token=${encodeURIComponent(recoveryToken)}`;
 
@@ -521,8 +575,11 @@ export async function resetPasswordController(req: Request, res: Response) {
         }
 
         // Buscar usuario
-        const user = await prisma.user.findUnique({
-            where: { id: decodedToken.userId }
+        const user = await prisma.user.findFirst({
+            where: {
+                id: decodedToken.userId,
+                tenantId: decodedToken.tenantId,
+            }
         });
 
         if (!user) {

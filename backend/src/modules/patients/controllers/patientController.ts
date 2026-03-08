@@ -6,6 +6,7 @@ import { ROLE_NAMES } from '@/modules/auth';
 
 export async function getMyAnalysisController(req: Request, res: Response) {
     const userId = req.user?.id;
+    const tenantId = req.tenantId;
     const userRole = req.user?.role.name;
     if (!userId) {
         return res.status(401).json({
@@ -20,10 +21,18 @@ export async function getMyAnalysisController(req: Request, res: Response) {
         });
     }
 
+    if (!tenantId) {
+        return res.status(403).json({
+            success: false,
+            message: 'Contexto de tenant no disponible'
+        });
+    }
+
     try {
         const analyses = await prisma.study.findMany({
             where: {
-                userId: userId
+                userId: userId,
+                tenantId,
             },
             select: {
                 id: true,
@@ -59,6 +68,7 @@ export async function getMyAnalysisController(req: Request, res: Response) {
 
 export async function getAnalysisByIdController(req: Request, res: Response) {
     const userId = req.user?.id;
+    const tenantId = req.tenantId;
     const userRole = req.user?.role.name;
     const id = Array.isArray(req.params.id) ? req.params.id[0] : req.params.id;
     const analysisId = parseInt(id || '0');
@@ -85,11 +95,19 @@ export async function getAnalysisByIdController(req: Request, res: Response) {
         });
     }
 
+    if (!tenantId) {
+        return res.status(403).json({
+            success: false,
+            message: 'Contexto de tenant no disponible'
+        });
+    }
+
     try {
         const analysis = await prisma.study.findFirst({
             where: {
                 id: analysisId,
-                userId: userId
+                userId: userId,
+                tenantId,
             },
             select: {
                 id: true,

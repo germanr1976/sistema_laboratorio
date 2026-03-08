@@ -6,6 +6,7 @@ import {
   isAdmin,
 } from "@/modules/auth/middlewares/auth.middleware";
 import { upload } from "@/config/upload";
+import { tenantContext } from '@/middlewares/tenantContext.middleware';
 
 const router = Router();
 
@@ -17,6 +18,7 @@ const router = Router();
 router.post(
   "/",
   authMiddleware,
+  tenantContext,
   isBiochemist,
   upload.fields([{ name: 'pdf', maxCount: 1 }, { name: 'pdfs', maxCount: 20 }]),
   studyController.createStudy
@@ -37,6 +39,7 @@ router.post(
 router.get(
   "/biochemist/me",
   authMiddleware,
+  tenantContext,
   isBiochemist,
   studyController.getMyStudies
 );
@@ -46,7 +49,7 @@ router.get(
  * @desc    Obtener todos los estudios (solo administradores)
  * @access  Private (Admin)
  */
-router.get("/all", authMiddleware, isAdmin, studyController.getAllStudies);
+router.get("/all", authMiddleware, tenantContext, isAdmin, studyController.getAllStudies);
 
 /**
  * @route   GET /api/studies/patient/me
@@ -56,6 +59,7 @@ router.get("/all", authMiddleware, isAdmin, studyController.getAllStudies);
 router.get(
   "/patient/me",
   authMiddleware,
+  tenantContext,
   studyController.getMyStudiesAsPatient
 );
 
@@ -67,6 +71,7 @@ router.get(
 router.get(
   "/patient/:dni",
   authMiddleware,
+  tenantContext,
   isBiochemist,
   studyController.getPatientByDni
 );
@@ -76,7 +81,7 @@ router.get(
  * @desc    Obtener un estudio específico por ID
  * @access  Private
  */
-router.get("/:id", authMiddleware, studyController.getStudyById);
+router.get("/:id", authMiddleware, tenantContext, studyController.getStudyById);
 
 /**
  * @route   PATCH /api/studies/:id
@@ -86,6 +91,7 @@ router.get("/:id", authMiddleware, studyController.getStudyById);
 router.patch(
   "/:id",
   authMiddleware,
+  tenantContext,
   isBiochemist,
   studyController.updateStudy
 );
@@ -98,6 +104,7 @@ router.patch(
 router.patch(
   "/:id/status",
   authMiddleware,
+  tenantContext,
   isBiochemist,
   studyController.updateStudyStatus
 );
@@ -110,6 +117,7 @@ router.patch(
 router.patch(
   "/:id/pdf",
   authMiddleware,
+  tenantContext,
   isBiochemist,
   upload.fields([{ name: 'pdf', maxCount: 1 }, { name: 'pdfs', maxCount: 20 }]),
   studyController.updateStudyPdf
@@ -123,6 +131,7 @@ router.patch(
 router.delete(
   "/:studyId/attachments/:attachmentId",
   authMiddleware,
+  tenantContext,
   isBiochemist,
   studyController.deleteAttachment
 );
@@ -135,6 +144,7 @@ router.delete(
 router.post(
   "/:id/cancel",
   authMiddleware,
+  tenantContext,
   isBiochemist,
   studyController.cancelStudy
 );

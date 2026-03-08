@@ -11,6 +11,7 @@ model User {
   id              Int      @id @default(autoincrement())
   dni             String   @unique
   roleId          Int
+  tenantId        Int
   createdAt       DateTime @default(now())
   email           String? @unique  @db.VarChar(255)
   license         String?
@@ -21,10 +22,13 @@ model User {
   patientStudies  Study[]  @relation("StudyPatient")
   studyRequests   StudyRequest[] @relation("StudyRequestPatient")
   validatedRequests StudyRequest[] @relation("StudyRequestValidator")
+  tenant          Tenant   @relation(fields: [tenantId], references: [id])
   role            Role     @relation(fields: [roleId], references: [id])
 
   @@index([roleId])
   @@index([dni])
+  @@index([tenantId])
+  @@index([tenantId, createdAt])
 }
 
 model Role {
@@ -46,6 +50,7 @@ model Profile {
 
 model Study {
   id              Int      @id @default(autoincrement())
+  tenantId        Int
   userId          Int
   studyName       String   @db.VarChar(255)
   studyDate       DateTime?
@@ -59,6 +64,7 @@ model Study {
   biochemist      User?    @relation("StudyBiochemist", fields: [biochemistId], references: [id])
   status          Status   @relation(fields: [statusId], references: [id])
   patient         User     @relation("StudyPatient", fields: [userId], references: [id], onDelete: Cascade)
+  tenant          Tenant   @relation(fields: [tenantId], references: [id])
   attachments     StudyAttachment[]
   convertedFromRequests StudyRequest[]
 
@@ -66,6 +72,9 @@ model Study {
   @@index([biochemistId])
   @@index([statusId])
   @@index([studyDate])
+  @@index([tenantId])
+  @@index([tenantId, createdAt])
+  @@index([tenantId, studyDate])
 }
 
 enum StudyRequestStatus {
@@ -109,12 +118,28 @@ model Status {
 
 model StudyAttachment {
   id        Int      @id @default(autoincrement())
+  tenantId  Int
   studyId   Int
   url       String   @db.VarChar(500)
   filename  String?  @db.VarChar(255)
   createdAt DateTime @default(now())
 
   study     Study    @relation(fields: [studyId], references: [id], onDelete: Cascade)
+  tenant    Tenant   @relation(fields: [tenantId], references: [id])
 
   @@index([studyId])
+  @@index([tenantId])
+  @@index([tenantId, createdAt])
+}
+
+model Tenant {
+  id               Int               @id @default(autoincrement())
+  name             String            @db.VarChar(150)
+  slug             String            @unique @db.VarChar(80)
+  suspended        Boolean           @default(false)
+  createdAt        DateTime          @default(now())
+  updatedAt        DateTime          @updatedAt
+  users            User[]
+  studies          Study[]
+  studyAttachments StudyAttachment[]
 }

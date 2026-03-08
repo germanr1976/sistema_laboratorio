@@ -36,9 +36,10 @@ function parseRequestedDate(value: unknown): Date | null {
 export const createStudyRequest = async (req: Request, res: Response) => {
     try {
         const patientId = req.user?.id;
+        const tenantId = req.tenantId;
         const roleName = req.user?.role?.name;
 
-        if (!patientId || roleName !== 'PATIENT') {
+        if (!patientId || !tenantId || roleName !== 'PATIENT') {
             return res.status(403).json({
                 success: false,
                 message: 'Solo pacientes autenticados pueden solicitar estudios',
@@ -63,6 +64,7 @@ export const createStudyRequest = async (req: Request, res: Response) => {
         }
 
         const created = await studyRequestService.createStudyRequest({
+            tenantId,
             patientId,
             dni: req.user!.dni,
             requestedDate: parsedRequestedDate,
@@ -91,16 +93,17 @@ export const createStudyRequest = async (req: Request, res: Response) => {
 export const getMyStudyRequests = async (req: Request, res: Response) => {
     try {
         const patientId = req.user?.id;
+        const tenantId = req.tenantId;
         const roleName = req.user?.role?.name;
 
-        if (!patientId || roleName !== 'PATIENT') {
+        if (!patientId || !tenantId || roleName !== 'PATIENT') {
             return res.status(403).json({
                 success: false,
                 message: 'Solo pacientes autenticados pueden ver sus estudios solicitados',
             });
         }
 
-        const rows = await studyRequestService.getStudyRequestsByPatient(patientId);
+        const rows = await studyRequestService.getStudyRequestsByPatient(patientId, tenantId);
 
         return res.status(200).json({
             success: true,
@@ -119,8 +122,9 @@ export const getMyStudyRequests = async (req: Request, res: Response) => {
 
 export const listStudyRequestsForProfessional = async (req: Request, res: Response) => {
     try {
+        const tenantId = req.tenantId;
         const roleName = req.user?.role?.name;
-        if (roleName !== 'BIOCHEMIST' && roleName !== 'ADMIN') {
+        if (!tenantId || (roleName !== 'BIOCHEMIST' && roleName !== 'ADMIN')) {
             return res.status(403).json({
                 success: false,
                 message: 'Se requieren permisos de profesional',
@@ -141,7 +145,7 @@ export const listStudyRequestsForProfessional = async (req: Request, res: Respon
         // Debug log: quién solicita la lista y con qué filtros
         req.log.debug({ userId: req.user?.id, role: roleName, filters }, '[study-requests] listStudyRequestsForProfessional');
 
-        const rows = await studyRequestService.listStudyRequestsForProfessional(filters);
+        const rows = await studyRequestService.listStudyRequestsForProfessional(tenantId, filters);
 
         // Debug log: mostrar cuantos rows devolvió y un ejemplo
         try {
@@ -171,7 +175,8 @@ export const listStudyRequestsForProfessional = async (req: Request, res: Respon
 export const validateStudyRequest = async (req: Request, res: Response) => {
     try {
         const validatorId = req.user?.id;
-        if (!validatorId) {
+        const tenantId = req.tenantId;
+        if (!validatorId || !tenantId) {
             return res.status(401).json({ success: false, message: 'Usuario no autenticado' });
         }
 
@@ -180,7 +185,7 @@ export const validateStudyRequest = async (req: Request, res: Response) => {
             return res.status(400).json({ success: false, message: 'ID inválido' });
         }
 
-        const request = await studyRequestService.getStudyRequestById(id);
+        const request = await studyRequestService.getStudyRequestById(id, tenantId);
         if (!request) {
             return res.status(404).json({ success: false, message: 'Solicitud no encontrada' });
         }
@@ -192,7 +197,7 @@ export const validateStudyRequest = async (req: Request, res: Response) => {
             });
         }
 
-        const updated = await studyRequestService.validateStudyRequest(id, validatorId);
+        const updated = await studyRequestService.validateStudyRequest(id, tenantId, validatorId);
         return res.status(200).json({
             success: true,
             message: 'Solicitud validada correctamente',
@@ -210,7 +215,8 @@ export const validateStudyRequest = async (req: Request, res: Response) => {
 export const rejectStudyRequest = async (req: Request, res: Response) => {
     try {
         const validatorId = req.user?.id;
-        if (!validatorId) {
+        const tenantId = req.tenantId;
+        if (!validatorId || !tenantId) {
             return res.status(401).json({ success: false, message: 'Usuario no autenticado' });
         }
 
@@ -228,7 +234,7 @@ export const rejectStudyRequest = async (req: Request, res: Response) => {
             });
         }
 
-        const request = await studyRequestService.getStudyRequestById(id);
+        const request = await studyRequestService.getStudyRequestById(id, tenantId);
         if (!request) {
             return res.status(404).json({ success: false, message: 'Solicitud no encontrada' });
         }
@@ -240,7 +246,7 @@ export const rejectStudyRequest = async (req: Request, res: Response) => {
             });
         }
 
-        const updated = await studyRequestService.rejectStudyRequest(id, validatorId, value.observations || null);
+        const updated = await studyRequestService.rejectStudyRequest(id, tenantId, validatorId, value.observations || null);
         return res.status(200).json({
             success: true,
             message: 'Solicitud rechazada correctamente',
@@ -258,7 +264,8 @@ export const rejectStudyRequest = async (req: Request, res: Response) => {
 export const convertStudyRequest = async (req: Request, res: Response) => {
     try {
         const validatorId = req.user?.id;
-        if (!validatorId) {
+        const tenantId = req.tenantId;
+        if (!validatorId || !tenantId) {
             return res.status(401).json({ success: false, message: 'Usuario no autenticado' });
         }
 
@@ -267,7 +274,7 @@ export const convertStudyRequest = async (req: Request, res: Response) => {
             return res.status(400).json({ success: false, message: 'ID inválido' });
         }
 
-        const converted = await studyRequestService.convertStudyRequestToStudy(id, validatorId);
+        const converted = await studyRequestService.convertStudyRequestToStudy(id, tenantId, validatorId);
 
         return res.status(200).json({
             success: true,

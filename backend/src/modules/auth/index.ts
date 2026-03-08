@@ -2,6 +2,7 @@ export * from './validators/validators';
 
 export interface JWTPayload {
     userId: number;
+    tenantId: number;
     dni: string;
     roleId: number;
     roleName: string;

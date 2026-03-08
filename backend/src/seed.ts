@@ -7,6 +7,15 @@ const prisma = new PrismaClient();
 async function main() {
   logger.info("Seeding roles y usuario de prueba...");
 
+  const defaultTenant = await prisma.tenant.upsert({
+    where: { slug: 'default' },
+    update: {},
+    create: {
+      slug: 'default',
+      name: 'Laboratorio principal',
+    },
+  });
+
   const patientRole = await prisma.role.upsert({
     where: { name: "PATIENT" },
     update: {},
@@ -27,6 +36,7 @@ async function main() {
     update: {},
     create: {
       dni: demoDni,
+      tenantId: defaultTenant.id,
       roleId: patientRole.id,
       profile: {
         create: {
@@ -44,6 +54,7 @@ async function main() {
     update: {},
     create: {
       dni: bioDni,
+      tenantId: defaultTenant.id,
       email: "bio@demo.local",
       license: "LIC-0001",
       password: bioPassword,
@@ -79,6 +90,7 @@ async function main() {
     where: { id: 1 },
     update: {},
     create: {
+      tenantId: defaultTenant.id,
       userId: demoUser.id,
       studyName: "Hemograma completo",
       studyDate: new Date(),

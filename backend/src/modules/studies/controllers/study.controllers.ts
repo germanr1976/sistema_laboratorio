@@ -20,6 +20,11 @@ export const createStudy = async (
   res: Response
 ): Promise<void> => {
   try {
+    const tenantId = req.tenantId;
+    if (!tenantId) {
+      return ResponseHelper.forbidden(res, 'Contexto de tenant no disponible');
+    }
+
     // Obtener archivos subidos (soporta 'pdf' único y 'pdfs' múltiples)
     const filesField = (req as any).files as Record<string, Express.Multer.File[]> | Express.Multer.File[] | undefined;
     const singleFile = (req as any).file as Express.Multer.File | undefined;
@@ -58,14 +63,14 @@ export const createStudy = async (
     req.log.info({ dni, studyName, studyDate, studyDateType: typeof studyDate, studyDateIsNull: studyDate === null, studyDateIsUndefined: studyDate === undefined, socialInsurance, biochemistId, doctor }, 'Datos recibidos en createStudy');
 
     // Verificar que el paciente existe
-    const patient = await studyService.getPatientByDni(dni);
+    const patient = await studyService.getPatientByDni(dni, tenantId);
     if (!patient) {
       return ResponseHelper.notFound(res, "Paciente con el DNI proporcionado");
     }
 
     // Si se proporciona biochemistId, verificar que existe y es un bioquímico
     if (biochemistId) {
-      const biochemist = await studyService.getBiochemistById(biochemistId);
+      const biochemist = await studyService.getBiochemistById(biochemistId, tenantId);
       if (!biochemist) {
         return ResponseHelper.notFound(res, "Bioquímico");
       }
@@ -88,6 +93,7 @@ export const createStudy = async (
 
     // Crear el estudio
     const studyData: any = {
+      tenantId,
       userId: patient.id,
       studyName,
       socialInsurance: socialInsurance || null,
@@ -117,11 +123,12 @@ export const createStudy = async (
     if (uploadedFiles.length > 0) {
       await studyService.addStudyAttachments(
         study.id,
+        tenantId,
         uploadedFiles.map((f) => ({ url: `/uploads/pdfs/${f.filename}`, filename: f.originalname }))
       );
     }
 
-    const studyWithAttachments = await studyService.getStudyById(study.id);
+    const studyWithAttachments = await studyService.getStudyById(study.id, tenantId);
     const formattedStudy = studyFormatter.formatStudy(studyWithAttachments);
 
     ResponseHelper.created(res, formattedStudy, "Estudio creado exitosamente");
@@ -140,13 +147,18 @@ export const getMyStudies = async (
   res: Response
 ): Promise<void> => {
   try {
+    const tenantId = req.tenantId;
+    if (!tenantId) {
+      return ResponseHelper.forbidden(res, 'Contexto de tenant no disponible');
+    }
+
     const biochemistId = req.user?.id;
 
     if (!biochemistId) {
       return ResponseHelper.unauthorized(res, "Usuario no autenticado");
     }
 
-    const studies = await studyService.getStudiesByBiochemist(biochemistId);
+    const studies = await studyService.getStudiesByBiochemist(biochemistId, tenantId);
     const formattedStudies = studies.map(studyFormatter.formatStudy);
 
     ResponseHelper.success(res, formattedStudies, "Estudios obtenidos exitosamente");
@@ -165,7 +177,12 @@ export const getAllStudies = async (
   res: Response
 ): Promise<void> => {
   try {
-    const studies = await studyService.getAllStudies();
+    const tenantId = req.tenantId;
+    if (!tenantId) {
+      return ResponseHelper.forbidden(res, 'Contexto de tenant no disponible');
+    }
+
+    const studies = await studyService.getAllStudies(tenantId);
     const formattedStudies = studies.map(studyFormatter.formatStudy);
 
     ResponseHelper.success(res, formattedStudies, "Todos los estudios obtenidos exitosamente");
@@ -183,6 +200,11 @@ export const getStudyById = async (
   res: Response
 ): Promise<void> => {
   try {
+    const tenantId = req.tenantId;
+    if (!tenantId) {
+      return ResponseHelper.forbidden(res, 'Contexto de tenant no disponible');
+    }
+
     const id = Array.isArray(req.params.id) ? req.params.id[0] : req.params.id;
     const studyId = parseInt(id!, 10);
 
@@ -190,7 +212,7 @@ export const getStudyById = async (
       return ResponseHelper.validationError(res, "ID de estudio inválido");
     }
 
-    const study = await studyService.getStudyById(studyId);
+    const study = await studyService.getStudyById(studyId, tenantId);
 
     if (!study) {
       return ResponseHelper.notFound(res, "Estudio");
@@ -230,6 +252,11 @@ export const getMyStudiesAsPatient = async (
   res: Response
 ): Promise<void> => {
   try {
+    const tenantId = req.tenantId;
+    if (!tenantId) {
+      return ResponseHelper.forbidden(res, 'Contexto de tenant no disponible');
+    }
+
     const patientId = req.user?.id;
 
     if (!patientId) {
@@ -239,7 +266,7 @@ export const getMyStudiesAsPatient = async (
     const page = parseInt(req.query.page as string, 10) || 1;
     const limit = parseInt(req.query.limit as string, 10) || 10;
 
-    const result = await studyService.getStudiesByPatient(patientId, page, limit);
+    const result = await studyService.getStudiesByPatient(patientId, tenantId, page, limit);
     const formattedStudies = result.items.map(studyFormatter.formatStudy);
     const totalPages = result.total === 0 ? 0 : Math.ceil(result.total / result.limit);
 
@@ -272,6 +299,11 @@ export const updateStudy = async (
   res: Response
 ): Promise<void> => {
   try {
+    const tenantId = req.tenantId;
+    if (!tenantId) {
+      return ResponseHelper.forbidden(res, 'Contexto de tenant no disponible');
+    }
+
     const id = Array.isArray(req.params.id) ? req.params.id[0] : req.params.id;
     const studyId = parseInt(id!, 10);
 
@@ -299,38 +331,20 @@ export const updateStudy = async (
       return ResponseHelper.validationError(res, "No hay campos para actualizar");
     }
 
-    const updatedStudy = await prisma.study.update({
-      where: { id: studyId },
+    const scoped = await studyService.getStudyById(studyId, tenantId);
+    if (!scoped) {
+      return ResponseHelper.notFound(res, 'Estudio');
+    }
+
+    await prisma.study.update({
+      where: { id: scoped.id },
       data: updateData,
-      include: {
-        attachments: true,
-        biochemist: {
-          select: {
-            id: true,
-            license: true,
-            profile: {
-              select: {
-                firstName: true,
-                lastName: true,
-              },
-            },
-          },
-        },
-        patient: {
-          select: {
-            id: true,
-            dni: true,
-            profile: {
-              select: {
-                firstName: true,
-                lastName: true,
-              },
-            },
-          },
-        },
-        status: true,
-      },
     });
+
+    const updatedStudy = await studyService.getStudyById(studyId, tenantId);
+    if (!updatedStudy) {
+      return ResponseHelper.notFound(res, 'Estudio');
+    }
 
     req.log.info({ studyId: updatedStudy.id }, 'Estudio actualizado');
     const formattedStudy = studyFormatter.formatStudy(updatedStudy);
@@ -350,6 +364,11 @@ export const updateStudyStatus = async (
   res: Response
 ): Promise<void> => {
   try {
+    const tenantId = req.tenantId;
+    if (!tenantId) {
+      return ResponseHelper.forbidden(res, 'Contexto de tenant no disponible');
+    }
+
     const id = Array.isArray(req.params.id) ? req.params.id[0] : req.params.id;
     const studyId = parseInt(id!, 10);
 
@@ -372,7 +391,7 @@ export const updateStudyStatus = async (
     }
 
     // Obtener el estudio
-    const study = await studyService.getStudyById(studyId);
+    const study = await studyService.getStudyById(studyId, tenantId);
 
     if (!study) {
       return ResponseHelper.notFound(res, "Estudio");
@@ -388,9 +407,13 @@ export const updateStudyStatus = async (
     }
 
     // Actualizar el estado
-    const updatedStudy = await studyService.updateStudyStatus(studyId, {
+    const updatedStudy = await studyService.updateStudyStatus(studyId, tenantId, {
       statusId: status.id,
     });
+
+    if (!updatedStudy) {
+      return ResponseHelper.notFound(res, 'Estudio');
+    }
 
     const formattedStudy = studyFormatter.formatStudy(updatedStudy);
 
@@ -410,6 +433,11 @@ export const updateStudyPdf = async (
   res: Response
 ): Promise<void> => {
   try {
+    const tenantId = req.tenantId;
+    if (!tenantId) {
+      return ResponseHelper.forbidden(res, 'Contexto de tenant no disponible');
+    }
+
     const id = Array.isArray(req.params.id) ? req.params.id[0] : req.params.id;
     const studyId = parseInt(id!, 10);
 
@@ -434,7 +462,7 @@ export const updateStudyPdf = async (
     }
 
     // Obtener el estudio
-    const study = await studyService.getStudyById(studyId);
+    const study = await studyService.getStudyById(studyId, tenantId);
     if (!study) {
       return ResponseHelper.notFound(res, "Estudio");
     }
@@ -453,15 +481,16 @@ export const updateStudyPdf = async (
 
     // Actualiza compatibilidad del primer PDF
     const firstUrl = `/uploads/pdfs/${uploadedFiles[0]!.filename}`;
-    await studyService.updateStudyPdfUrl(studyId, { pdfUrl: firstUrl });
+    await studyService.updateStudyPdfUrl(studyId, tenantId, { pdfUrl: firstUrl });
 
     // Agrega todos como adjuntos
     await studyService.addStudyAttachments(
       studyId,
+      tenantId,
       uploadedFiles.map((f) => ({ url: `/uploads/pdfs/${f.filename}`, filename: f.originalname }))
     );
 
-    const updated = await studyService.getStudyById(studyId);
+    const updated = await studyService.getStudyById(studyId, tenantId);
     const formattedStudy = studyFormatter.formatStudy(updated);
 
     ResponseHelper.success(res, formattedStudy, "PDF(s) actualizado(s) exitosamente");
@@ -480,6 +509,11 @@ export const getPatientByDni = async (
   res: Response
 ): Promise<void> => {
   try {
+    const tenantId = req.tenantId;
+    if (!tenantId) {
+      return ResponseHelper.forbidden(res, 'Contexto de tenant no disponible');
+    }
+
     const dni = Array.isArray(req.params.dni) ? req.params.dni[0] : req.params.dni;
 
     if (!dni || dni.trim() === "") {
@@ -487,7 +521,7 @@ export const getPatientByDni = async (
     }
 
     // Buscar el paciente
-    const patient = await studyService.getPatientByDni(dni.trim());
+    const patient = await studyService.getPatientByDni(dni.trim(), tenantId);
 
     if (!patient) {
       return ResponseHelper.notFound(res, "Paciente con el DNI proporcionado");
@@ -497,6 +531,7 @@ export const getPatientByDni = async (
     const lastStudy = await prisma.study.findFirst({
       where: {
         userId: patient.id,
+        tenantId,
       },
       select: {
         socialInsurance: true,
@@ -530,6 +565,11 @@ export const cancelStudy = async (
   res: Response
 ): Promise<void> => {
   try {
+    const tenantId = req.tenantId;
+    if (!tenantId) {
+      return ResponseHelper.forbidden(res, 'Contexto de tenant no disponible');
+    }
+
     const id = Array.isArray(req.params.id) ? req.params.id[0] : req.params.id;
     const studyId = parseInt(id!, 10);
 
@@ -538,7 +578,7 @@ export const cancelStudy = async (
     }
 
     // Obtener el estudio
-    const study = await studyService.getStudyById(studyId);
+    const study = await studyService.getStudyById(studyId, tenantId);
     if (!study) {
       return ResponseHelper.notFound(res, "Estudio");
     }
@@ -560,7 +600,10 @@ export const cancelStudy = async (
     }
 
     // Anular el estudio
-    const cancelledStudy = await studyService.cancelStudy(studyId);
+    const cancelledStudy = await studyService.cancelStudy(studyId, tenantId);
+    if (!cancelledStudy) {
+      return ResponseHelper.notFound(res, 'Estudio');
+    }
     const formattedStudy = studyFormatter.formatStudy(cancelledStudy);
 
     ResponseHelper.success(res, formattedStudy, "Estudio anulado exitosamente");
