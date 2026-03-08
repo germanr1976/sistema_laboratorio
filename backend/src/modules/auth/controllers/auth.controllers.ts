@@ -4,6 +4,7 @@ import { comparePassword, generateToken, generatePasswordRecoveryToken, verifyPa
 import { enviarCorreoRecuperacion } from '../services/emailService';
 import prisma from '@/config/prisma';
 import { validateDoctor, validatePatient } from '../validators/validators';
+import { AUDIT_EVENT_TYPES, recordAuditEvent } from '@/modules/audit/services/audit.services';
 
 async function resolveTenantFromRequest(req: Request, createIfMissing = false) {
     const slugFromHeader = String(req.headers['x-tenant-slug'] || '').trim().toLowerCase();
@@ -37,6 +38,14 @@ export async function loginController(req: Request, res: Response) {
 
         const validationResult = validateLogin(req.body);
         if (validationResult.error) {
+            await recordAuditEvent({
+                req,
+                eventType: AUDIT_EVENT_TYPES.LOGIN_FAILED,
+                tenantId: tenant.id,
+                metadata: {
+                    reason: 'invalid_input',
+                },
+            });
             return res.status(400).json({
                 success: false,
                 message: 'Datos de entrada invalidos'
@@ -51,6 +60,15 @@ export async function loginController(req: Request, res: Response) {
             include: { profile: true, role: true }
         })
         if (!user) {
+            await recordAuditEvent({
+                req,
+                eventType: AUDIT_EVENT_TYPES.LOGIN_FAILED,
+                tenantId: tenant.id,
+                metadata: {
+                    reason: 'user_not_found',
+                    dni,
+                },
+            });
             return res.status(404).json({
                 success: false,
                 message: 'Usuario no encontrado'
@@ -62,6 +80,15 @@ export async function loginController(req: Request, res: Response) {
                     const hasPendingMarker = patientEmail.endsWith('@pending.local');
 
                     if (hasPendingMarker || !user.email || !user.password) {
+                        await recordAuditEvent({
+                            req,
+                            eventType: AUDIT_EVENT_TYPES.LOGIN_FAILED,
+                            tenantId: tenant.id,
+                            actorUserId: user.id,
+                            metadata: {
+                                reason: 'patient_pending_registration',
+                            },
+                        });
                         return res.status(403).json({
                             success: false,
                             message: 'Debes completar tu registro de paciente para poder iniciar sesión'
@@ -69,6 +96,15 @@ export async function loginController(req: Request, res: Response) {
                     }
 
                     if (!password) {
+                        await recordAuditEvent({
+                            req,
+                            eventType: AUDIT_EVENT_TYPES.LOGIN_FAILED,
+                            tenantId: tenant.id,
+                            actorUserId: user.id,
+                            metadata: {
+                                reason: 'missing_password',
+                            },
+                        });
                         return res.status(400).json({
                             success: false,
                             message: 'Password requerida'
@@ -77,6 +113,15 @@ export async function loginController(req: Request, res: Response) {
 
                     const patientPasswordVerify = await comparePassword(password, user.password)
                     if (!patientPasswordVerify) {
+                        await recordAuditEvent({
+                            req,
+                            eventType: AUDIT_EVENT_TYPES.LOGIN_FAILED,
+                            tenantId: tenant.id,
+                            actorUserId: user.id,
+                            metadata: {
+                                reason: 'invalid_password',
+                            },
+                        });
                         return res.status(401).json({
                             success: false,
                             message: 'Error en la contraseña'
@@ -89,6 +134,15 @@ export async function loginController(req: Request, res: Response) {
                         dni: user.dni,
                         roleId: user.roleId,
                         roleName: user.role.name
+                    });
+                    await recordAuditEvent({
+                        req,
+                        eventType: AUDIT_EVENT_TYPES.LOGIN_SUCCESS,
+                        tenantId: tenant.id,
+                        actorUserId: user.id,
+                        metadata: {
+                            role: user.role.name,
+                        },
                     });
                     return res.status(200).json({
                         success: true,
@@ -108,6 +162,15 @@ export async function loginController(req: Request, res: Response) {
                     });
                 case 'BIOCHEMIST':
                     if (!password) {
+                        await recordAuditEvent({
+                            req,
+                            eventType: AUDIT_EVENT_TYPES.LOGIN_FAILED,
+                            tenantId: tenant.id,
+                            actorUserId: user.id,
+                            metadata: {
+                                reason: 'missing_password',
+                            },
+                        });
                         return res.status(400).json({
                             success: false,
                             message: 'Password requerida'
@@ -115,6 +178,15 @@ export async function loginController(req: Request, res: Response) {
                     }
 
                     if (!user.password) {
+                        await recordAuditEvent({
+                            req,
+                            eventType: AUDIT_EVENT_TYPES.LOGIN_FAILED,
+                            tenantId: tenant.id,
+                            actorUserId: user.id,
+                            metadata: {
+                                reason: 'missing_password_config',
+                            },
+                        });
                         return res.status(500).json({
                             success: false,
                             message: 'Usuario sin contraseña configurada'
@@ -123,6 +195,15 @@ export async function loginController(req: Request, res: Response) {
 
                     const passwordVerify = await comparePassword(password, user.password)
                     if (!passwordVerify) {
+                        await recordAuditEvent({
+                            req,
+                            eventType: AUDIT_EVENT_TYPES.LOGIN_FAILED,
+                            tenantId: tenant.id,
+                            actorUserId: user.id,
+                            metadata: {
+                                reason: 'invalid_password',
+                            },
+                        });
                         return res.status(401).json({
                             success: false,
                             message: 'Error en la contraseñá'
@@ -134,6 +215,15 @@ export async function loginController(req: Request, res: Response) {
                             dni: user.dni,
                             roleId: user.roleId,
                             roleName: user.role.name
+                        });
+                        await recordAuditEvent({
+                            req,
+                            eventType: AUDIT_EVENT_TYPES.LOGIN_SUCCESS,
+                            tenantId: tenant.id,
+                            actorUserId: user.id,
+                            metadata: {
+                                role: user.role.name,
+                            },
                         });
                         return res.status(200).json({
                             success: true,
@@ -608,6 +698,125 @@ export async function resetPasswordController(req: Request, res: Response) {
         return res.status(500).json({
             success: false,
             message: 'Error al restablecer la contraseña'
+        });
+    }
+}
+
+export async function changeUserRoleController(req: Request, res: Response) {
+    try {
+        const tenantId = req.tenantId;
+        if (!tenantId) {
+            return res.status(403).json({
+                success: false,
+                message: 'Contexto de tenant no disponible',
+            });
+        }
+
+        const targetUserId = Number(req.params.userId);
+        const roleName = String(req.body?.roleName || '').trim().toUpperCase();
+        if (!Number.isFinite(targetUserId) || targetUserId <= 0 || !roleName) {
+            return res.status(400).json({
+                success: false,
+                message: 'Parámetros inválidos',
+            });
+        }
+
+        const targetUser = await prisma.user.findFirst({
+            where: {
+                id: targetUserId,
+                tenantId,
+            },
+            include: { role: true },
+        });
+
+        if (!targetUser) {
+            return res.status(404).json({
+                success: false,
+                message: 'Usuario no encontrado',
+            });
+        }
+
+        const nextRole = await prisma.role.findUnique({ where: { name: roleName } });
+        if (!nextRole) {
+            return res.status(404).json({
+                success: false,
+                message: 'Rol no encontrado',
+            });
+        }
+
+        const updated = await prisma.user.update({
+            where: { id: targetUser.id },
+            data: { roleId: nextRole.id },
+            include: { role: true },
+        });
+
+        await recordAuditEvent({
+            req,
+            eventType: AUDIT_EVENT_TYPES.ROLE_CHANGED,
+            tenantId,
+            targetUserId: targetUser.id,
+            metadata: {
+                previousRole: targetUser.role.name,
+                newRole: updated.role.name,
+            },
+        });
+
+        return res.status(200).json({
+            success: true,
+            message: 'Rol actualizado exitosamente',
+            data: {
+                id: updated.id,
+                role: updated.role.name,
+            },
+        });
+    } catch (error) {
+        req.log.error({ err: error }, 'Error al cambiar rol de usuario');
+        return res.status(500).json({
+            success: false,
+            message: 'Error interno del servidor',
+        });
+    }
+}
+
+export async function setTenantSuspendedController(req: Request, res: Response) {
+    try {
+        const tenantId = req.tenantId;
+        if (!tenantId) {
+            return res.status(403).json({
+                success: false,
+                message: 'Contexto de tenant no disponible',
+            });
+        }
+
+        const suspended = Boolean(req.body?.suspended);
+
+        const updated = await prisma.tenant.update({
+            where: { id: tenantId },
+            data: { suspended },
+        });
+
+        await recordAuditEvent({
+            req,
+            eventType: AUDIT_EVENT_TYPES.TENANT_SUSPENDED,
+            tenantId,
+            metadata: {
+                suspended,
+            },
+        });
+
+        return res.status(200).json({
+            success: true,
+            message: suspended ? 'Tenant suspendido' : 'Tenant reactivado',
+            data: {
+                id: updated.id,
+                suspended: updated.suspended,
+            },
+        });
+    } catch (error) {
+        req.log.error({ err: error }, 'Error al actualizar suspensión del tenant');
+        return res.status(500).json({
+            success: false,
+            message: 'Error interno del servidor',
         });
     }
 }

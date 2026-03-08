@@ -81,6 +81,8 @@ router.get(
  * @desc    Obtener un estudio específico por ID
  * @access  Private
  */
+router.get("/:id/download", authMiddleware, tenantContext, studyController.downloadStudy);
+
 router.get("/:id", authMiddleware, tenantContext, studyController.getStudyById);
 
 /**

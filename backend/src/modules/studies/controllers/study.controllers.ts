@@ -8,6 +8,7 @@ import {
 import { ResponseHelper } from "../helpers/response.helper";
 import { ValidationHelper } from "../helpers/validation.helper";
 import prisma from "@/config/prisma";
+import { AUDIT_EVENT_TYPES, recordAuditEvent } from "@/modules/audit/services/audit.services";
 
 export { deleteAttachment } from "./deleteAttachment";
 
@@ -116,6 +117,17 @@ export const createStudy = async (
     req.log.debug({ studyData }, 'Guardando estudio con datos');
 
     const study = await studyService.createStudy(studyData);
+    await recordAuditEvent({
+      req,
+      eventType: AUDIT_EVENT_TYPES.STUDY_CREATED,
+      tenantId,
+      studyId: study.id,
+      targetUserId: patient.id,
+      metadata: {
+        studyName,
+        statusId: inProgressStatus.id,
+      },
+    });
 
     req.log.info({ id: study.id, studyName: study.studyName, studyDate: study.studyDate, socialInsurance: study.socialInsurance, doctor: study.doctor, userId: study.userId, statusId: study.statusId }, 'Estudio guardado en BD');
 
@@ -244,6 +256,61 @@ export const getStudyById = async (
 };
 
 /**
+ * Controlador para descargar un PDF de estudio con auditoría
+ */
+export const downloadStudy = async (
+  req: Request,
+  res: Response
+): Promise<void> => {
+  try {
+    const tenantId = req.tenantId;
+    if (!tenantId) {
+      return ResponseHelper.forbidden(res, 'Contexto de tenant no disponible');
+    }
+
+    const id = Array.isArray(req.params.id) ? req.params.id[0] : req.params.id;
+    const studyId = parseInt(id!, 10);
+
+    if (isNaN(studyId)) {
+      return ResponseHelper.validationError(res, "ID de estudio inválido");
+    }
+
+    const study = await studyService.getStudyById(studyId, tenantId);
+    if (!study) {
+      return ResponseHelper.notFound(res, "Estudio");
+    }
+
+    const isPatient = study.userId === req.user?.id;
+    const isAdmin = req.user?.role?.name === "ADMIN";
+    const isBiochemist = req.user?.role?.name === "BIOCHEMIST" && (study.biochemistId == null || study.biochemistId === req.user?.id);
+
+    if (!isPatient && !isBiochemist && !isAdmin) {
+      return ResponseHelper.forbidden(res, "No tienes permiso para descargar este estudio");
+    }
+
+    if (!study.pdfUrl) {
+      return ResponseHelper.notFound(res, "Archivo PDF");
+    }
+
+    await recordAuditEvent({
+      req,
+      eventType: AUDIT_EVENT_TYPES.STUDY_DOWNLOADED,
+      tenantId,
+      studyId: study.id,
+      targetUserId: study.userId,
+      metadata: {
+        pdfUrl: study.pdfUrl,
+      },
+    });
+
+    return void res.redirect(302, study.pdfUrl);
+  } catch (error: any) {
+    req.log.error({ err: error }, 'Error al descargar estudio');
+    return ResponseHelper.serverError(res, "Error al descargar estudio", error);
+  }
+};
+
+/**
  * Controlador para obtener los estudios del paciente autenticado
  * Solo accesible por pacientes autenticados
  */
@@ -341,6 +408,17 @@ export const updateStudy = async (
       data: updateData,
     });
 
+    await recordAuditEvent({
+      req,
+      eventType: AUDIT_EVENT_TYPES.STUDY_EDITED,
+      tenantId,
+      studyId: scoped.id,
+      targetUserId: scoped.userId,
+      metadata: {
+        updatedFields: Object.keys(updateData),
+      },
+    });
+
     const updatedStudy = await studyService.getStudyById(studyId, tenantId);
     if (!updatedStudy) {
       return ResponseHelper.notFound(res, 'Estudio');
@@ -414,6 +492,18 @@ export const updateStudyStatus = async (
     if (!updatedStudy) {
       return ResponseHelper.notFound(res, 'Estudio');
     }
+
+    await recordAuditEvent({
+      req,
+      eventType: AUDIT_EVENT_TYPES.STUDY_STATUS_CHANGED,
+      tenantId,
+      studyId: updatedStudy.id,
+      targetUserId: updatedStudy.userId,
+      metadata: {
+        statusId: status.id,
+        statusName,
+      },
+    });
 
     const formattedStudy = studyFormatter.formatStudy(updatedStudy);
 

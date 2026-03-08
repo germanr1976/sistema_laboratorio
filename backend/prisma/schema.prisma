@@ -22,6 +22,8 @@ model User {
   patientStudies  Study[]  @relation("StudyPatient")
   studyRequests   StudyRequest[] @relation("StudyRequestPatient")
   validatedRequests StudyRequest[] @relation("StudyRequestValidator")
+  auditEvents     AuditEvent[] @relation("AuditEventActor")
+  auditTargets    AuditEvent[] @relation("AuditEventTarget")
   tenant          Tenant   @relation(fields: [tenantId], references: [id])
   role            Role     @relation(fields: [roleId], references: [id])
 
@@ -66,6 +68,7 @@ model Study {
   patient         User     @relation("StudyPatient", fields: [userId], references: [id], onDelete: Cascade)
   tenant          Tenant   @relation(fields: [tenantId], references: [id])
   attachments     StudyAttachment[]
+  auditEvents     AuditEvent[]
   convertedFromRequests StudyRequest[]
 
   @@index([userId])
@@ -142,4 +145,43 @@ model Tenant {
   users            User[]
   studies          Study[]
   studyAttachments StudyAttachment[]
+  auditEvents      AuditEvent[]
+}
+
+enum AuditEventType {
+  LOGIN_SUCCESS
+  LOGIN_FAILED
+  STUDY_CREATED
+  STUDY_STATUS_CHANGED
+  STUDY_EDITED
+  STUDY_DOWNLOADED
+  ROLE_CHANGED
+  TENANT_SUSPENDED
+}
+
+model AuditEvent {
+  id          Int            @id @default(autoincrement())
+  eventType   AuditEventType
+  tenantId    Int?
+  actorUserId Int?
+  targetUserId Int?
+  studyId     Int?
+  requestId   String?        @db.VarChar(100)
+  ipAddress   String?        @db.VarChar(100)
+  userAgent   String?        @db.VarChar(400)
+  metadata    Json?
+  createdAt   DateTime       @default(now())
+
+  tenant      Tenant?        @relation(fields: [tenantId], references: [id])
+  actorUser   User?          @relation("AuditEventActor", fields: [actorUserId], references: [id])
+  targetUser  User?          @relation("AuditEventTarget", fields: [targetUserId], references: [id])
+  study       Study?         @relation(fields: [studyId], references: [id])
+
+  @@index([tenantId])
+  @@index([actorUserId])
+  @@index([targetUserId])
+  @@index([studyId])
+  @@index([eventType])
+  @@index([createdAt])
+  @@index([tenantId, createdAt])
 }
