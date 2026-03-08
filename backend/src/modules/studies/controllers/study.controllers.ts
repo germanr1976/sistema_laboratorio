@@ -525,12 +525,16 @@ export const getPatientByDni = async (
     });
 
     // Retornar los datos del paciente incluyendo obra social del último estudio
+    const patientEmail = patient.email ?? '';
+    const registrationPending = !patient.password || patientEmail.endsWith('@pending.local') || !patient.email;
+
     ResponseHelper.success(res, {
       id: patient.id,
       dni: dni,
       firstName: patient.profile?.firstName,
       lastName: patient.profile?.lastName,
       email: patient.email,
+      registrationPending,
       socialInsurance: lastStudy?.socialInsurance || "",
     }, "Paciente encontrado exitosamente");
   } catch (error: any) {

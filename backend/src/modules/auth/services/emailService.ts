@@ -110,6 +110,7 @@ export async function enviarCorreoRecuperacion(destinatario: string, token: stri
         const baseUrl = process.env.APP_FRONTEND_URL || 'http://localhost:3001';
         const encodedToken = encodeURIComponent(token);
         const linkRecuperacion = `${baseUrl}/recuperar-contrasena?token=${encodedToken}`;
+        const loginPacienteLink = `${baseUrl}/login-paciente`;
 
         console.log("Intentando enviar correo a:", destinatario);
         console.log("Link de recuperación:", linkRecuperacion);
@@ -132,6 +133,10 @@ export async function enviarCorreoRecuperacion(destinatario: string, token: stri
                     <p style="margin-top: 20px; font-size: 12px; color: #666;">
                         Si no solicitaste este correo, ignóralo. El enlace expirará en 1 hora.
                     </p>
+                    <p style="margin-top: 12px;">Una vez creada tu contraseña, podrás ingresar al portal de pacientes con tu DNI y contraseña.</p>
+                    <a href="${loginPacienteLink}" style="display: inline-block; padding: 10px 20px; background-color: #0f766e; color: white; text-decoration: none; border-radius: 5px; margin: 10px 0;">
+                        Ir al Portal de Pacientes
+                    </a>
                     <p style="margin-top: 20px; font-size: 12px; color: #999; word-break: break-all;">
                         O copia y pega este enlace en tu navegador: ${linkRecuperacion}
                     </p>

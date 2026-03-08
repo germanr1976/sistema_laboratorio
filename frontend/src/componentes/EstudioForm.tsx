@@ -39,6 +39,7 @@ interface EstudioFormProps {
     }
     modoEdicion?: boolean
     permitirCambioEstado?: boolean
+    datosPacienteBloqueados?: boolean
     onSuccess?: () => void
 }
 
@@ -46,6 +47,7 @@ export function EstudioForm({
     estudioExistente,
     modoEdicion = false,
     permitirCambioEstado = false,
+    datosPacienteBloqueados = false,
     onSuccess,
 }: EstudioFormProps) {
     const router = useRouter()
@@ -89,11 +91,15 @@ export function EstudioForm({
     const [fechaEstudio, setFechaEstudio] = useState(estudioExistente?.fechaEstudio || todayLocal())
     const [obraSocial, setObraSocial] = useState(estudioExistente?.obraSocial || '')
     const [medico, setMedico] = useState(estudioExistente?.medico || '')
+    const [emailPaciente, setEmailPaciente] = useState('')
     const [pdfs, setPdfs] = useState<File[]>([])
     const [isDragging, setIsDragging] = useState(false)
     const [pacienteEncontrado, setPacienteEncontrado] = useState(false)
+    const [pacienteRequiereRegistro, setPacienteRequiereRegistro] = useState(false)
     const [previewUrl, setPreviewUrl] = useState<string | null>(null)
     const [previewName, setPreviewName] = useState<string | null>(null)
+    const [debugInviteLink, setDebugInviteLink] = useState<string | null>(null)
+    const [isGeneratingPasswordLink, setIsGeneratingPasswordLink] = useState(false)
 
     // Actualizar el formulario cuando cambien los datos del estudio existente
     useEffect(() => {
@@ -104,6 +110,7 @@ export function EstudioForm({
             setFechaEstudio(estudioExistente.fechaEstudio || '')
             setObraSocial(estudioExistente.obraSocial || '')
             setMedico(estudioExistente.medico || '')
+            setEmailPaciente('')
             // Si está en modo cambio de estado y el estado es "en_proceso", cambiar a "parcial" por defecto
             if (permitirCambioEstado && estudioExistente.estado === 'en_proceso') {
                 setEstado('parcial')
@@ -111,13 +118,17 @@ export function EstudioForm({
                 setEstado(estudioExistente.estado || 'en_proceso')
             }
             setPacienteEncontrado(!!estudioExistente.dni)
+            setPacienteRequiereRegistro(false)
         }
     }, [estudioExistente, permitirCambioEstado])
 
     // Buscar paciente cuando cambia el DNI (solo si no es modo edición)
     useEffect(() => {
         if (modoEdicion || dni.length < 7) {
-            if (!modoEdicion) setPacienteEncontrado(false)
+            if (!modoEdicion) {
+                setPacienteEncontrado(false)
+                setPacienteRequiereRegistro(false)
+            }
             return
         }
 
@@ -132,6 +143,8 @@ export function EstudioForm({
                         const firstName = patient?.firstName ?? patient?.profile?.firstName ?? ''
                         const lastName = patient?.lastName ?? patient?.profile?.lastName ?? ''
                         setNombreApellido(`${firstName} ${lastName}`.trim())
+                        setEmailPaciente(patient?.email ?? '')
+                        setPacienteRequiereRegistro(Boolean(patient?.registrationPending))
                         // Solo precargar obra social si NO es en_proceso (es decir, si es parcial o completado)
                         if (patient?.socialInsurance && estado !== 'en_proceso') {
                             setObraSocial(patient.socialInsurance)
@@ -140,11 +153,13 @@ export function EstudioForm({
                         setPacienteEncontrado(true)
                     } else {
                         setPacienteEncontrado(false)
+                        setPacienteRequiereRegistro(false)
                     }
                 }
             } catch (error) {
                 console.error('Error buscando paciente:', error)
                 setPacienteEncontrado(false)
+                setPacienteRequiereRegistro(false)
             }
         }
 
@@ -226,6 +241,158 @@ export function EstudioForm({
         setPreviewName(null)
     }
 
+    const normalizeShareableLink = (rawLink: string): string => {
+        let normalized = String(rawLink || '').trim()
+        if (!normalized) return normalized
+
+        if (normalized.startsWith('/') && typeof window !== 'undefined' && window.location?.origin) {
+            normalized = `${window.location.origin}${normalized}`
+        }
+
+        if (!/^https?:\/\//i.test(normalized)) {
+            normalized = `https://${normalized}`
+        }
+
+        try {
+            const parsed = new URL(normalized)
+            if (typeof window !== 'undefined' && window.location?.origin) {
+                const isLocalhost = parsed.hostname === 'localhost' || parsed.hostname === '127.0.0.1'
+                if (isLocalhost) {
+                    const currentOrigin = new URL(window.location.origin)
+                    parsed.protocol = currentOrigin.protocol
+                    parsed.host = currentOrigin.host
+                    normalized = parsed.toString()
+                }
+            }
+        } catch {
+            // Si no se puede parsear, devolver el string construido para no bloquear la accion.
+        }
+
+        return normalized
+    }
+
+    const handleCopyDebugInviteLink = async () => {
+        if (!debugInviteLink) return
+
+        try {
+            await navigator.clipboard.writeText(normalizeShareableLink(debugInviteLink))
+            showToastMessage('Enlace copiado al portapapeles', 'success')
+            setTimeout(() => {
+                if (onSuccess) {
+                    onSuccess()
+                } else {
+                    router.push('/dashboard')
+                }
+            }, 900)
+        } catch (error) {
+            console.error('No se pudo copiar el enlace:', error)
+            showToastMessage('No se pudo copiar el enlace. Copialo manualmente desde abajo.', 'error')
+        }
+    }
+
+    const getPatientPortalLoginLink = (): string => {
+        if (typeof window !== 'undefined' && window.location?.origin) {
+            return `${window.location.origin}/login-paciente`
+        }
+        const baseUrl = process.env.NEXT_PUBLIC_APP_URL || process.env.NEXT_PUBLIC_API_URL || 'http://localhost:3001'
+        return `${baseUrl.replace(/\/$/, '')}/login-paciente`
+    }
+
+    const handleShareDebugInviteByWhatsApp = () => {
+        if (!debugInviteLink) return
+        const shareableLink = normalizeShareableLink(debugInviteLink)
+
+        const messageLines = [
+            `Hola ${nombreApellido || 'paciente'},`,
+            '',
+            'Te compartimos el enlace para completar tu registro en el sistema del laboratorio y crear tu contrasena:',
+            shareableLink,
+            '',
+            `Luego podras ingresar al portal de pacientes con tu DNI (${dni}) y la contrasena creada.`,
+            '',
+            'Si tenes dudas, contactanos.'
+        ]
+
+        const message = encodeURIComponent(messageLines.join('\n'))
+        const whatsappUrl = `https://wa.me/?text=${message}`
+        window.open(whatsappUrl, '_blank', 'noopener,noreferrer')
+        setTimeout(() => {
+            if (onSuccess) {
+                onSuccess()
+            } else {
+                router.push('/dashboard')
+            }
+        }, 900)
+    }
+
+    const handleGeneratePatientAccessLink = async () => {
+        const normalizedDni = dni.trim()
+        const normalizedEmail = emailPaciente.trim().toLowerCase()
+
+        if (!normalizedDni) {
+            showValidationAlert('Ingresa el DNI del paciente para generar el acceso')
+            return
+        }
+
+        if (!normalizedEmail) {
+            showValidationAlert('Ingresa un email del paciente para generar el acceso')
+            return
+        }
+
+        if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(normalizedEmail)) {
+            showValidationAlert('El email del paciente no es valido')
+            return
+        }
+
+        try {
+            setIsGeneratingPasswordLink(true)
+            const response = await authFetch(`${API_URL}/api/auth/patient-access-link`, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ dni: normalizedDni, email: normalizedEmail }),
+            })
+
+            const payload = await response.json().catch(() => ({}))
+            if (!response.ok) {
+                throw new Error(payload?.message || 'No se pudo generar el link de contraseña')
+            }
+
+            const patientAccessLink = payload?.accessLink || payload?.activationLink || payload?.debugRecoveryLink || null
+            if (patientAccessLink) {
+                setDebugInviteLink(patientAccessLink)
+                if (payload?.accessType === 'login') {
+                    showToastMessage('Paciente ya registrado: se generó link de acceso al login', 'success')
+                } else {
+                    showToastMessage('Link de acceso para crear/restablecer contraseña generado', 'success')
+                }
+                setTimeout(() => {
+                    if (onSuccess) {
+                        onSuccess()
+                    } else {
+                        router.push('/dashboard')
+                    }
+                }, 1200)
+                return
+            }
+
+            showToastMessage('No se pudo obtener link directo. Se envio un correo al paciente.', 'info')
+            setTimeout(() => {
+                if (onSuccess) {
+                    onSuccess()
+                } else {
+                    router.push('/dashboard')
+                }
+            }, 1200)
+        } catch (error: any) {
+            console.error('Error generando link de contraseña:', error)
+            showToastMessage(error?.message || 'Error al generar acceso del paciente', 'error')
+        } finally {
+            setIsGeneratingPasswordLink(false)
+        }
+    }
+
+    const shareableInviteLink = debugInviteLink ? normalizeShareableLink(debugInviteLink) : null
+
     const handleDeleteAttachment = async (attachmentId: number) => {
         if (!confirm('¿Estás seguro de que deseas eliminar este archivo?')) return;
 
@@ -304,9 +471,16 @@ export function EstudioForm({
         return missing
     }
 
+    const isValidEmail = (value: string): boolean => {
+        const normalized = value.trim()
+        return /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(normalized)
+    }
+
     const handleSubmit = async (e: React.FormEvent) => {
         e.preventDefault()
         setIsSubmitting(true)
+        setDebugInviteLink(null)
+        let generatedShareLink: string | null = null
 
         try {
             // Validaciones básicas siempre requeridas
@@ -314,6 +488,20 @@ export function EstudioForm({
                 showValidationAlert('Complete DNI y Nombre del paciente')
                 setIsSubmitting(false)
                 return
+            }
+
+            if (!modoEdicion) {
+                if (!emailPaciente.trim()) {
+                    showValidationAlert('Complete el email del paciente para enviar acceso al portal')
+                    setIsSubmitting(false)
+                    return
+                }
+
+                if (!isValidEmail(emailPaciente)) {
+                    showValidationAlert('Ingrese un email válido para el paciente')
+                    setIsSubmitting(false)
+                    return
+                }
             }
 
             const missingRequiredFields = getMissingRequiredFields()
@@ -340,6 +528,7 @@ export function EstudioForm({
                 fechaEstudio: fechaEstudio || todayLocal(), // Asegurar que siempre haya fecha
                 obraSocial,
                 medico,
+                emailPaciente,
                 estado,
                 status: estado, // Para compatibilidad con backend
                 pdfs: pdfs.map(f => f.name),
@@ -381,6 +570,7 @@ export function EstudioForm({
 
                 // Paso 1: Verificar/Crear paciente (solo cuando se crea un nuevo estudio)
                 let pacienteId = null
+                const normalizedPatientEmail = emailPaciente.trim().toLowerCase()
 
                 if (!modoEdicion) {
                     // Buscar si el paciente ya existe
@@ -388,7 +578,63 @@ export function EstudioForm({
 
                     if (buscarResponse.ok) {
                         const pacienteData = await buscarResponse.json()
-                        pacienteId = pacienteData.data?.id
+                        const existingPatient = pacienteData.data
+                        pacienteId = existingPatient?.id
+
+                        const existingEmail = String(existingPatient?.email || '').trim().toLowerCase()
+                        const shouldSyncPatientRegistration = Boolean(normalizedPatientEmail) && (
+                            Boolean(existingPatient?.registrationPending) ||
+                            !existingEmail ||
+                            existingEmail !== normalizedPatientEmail
+                        )
+
+                        if (shouldSyncPatientRegistration) {
+                            const [nombre, ...apellidos] = nombreApellido.split(' ')
+                            const apellido = apellidos.join(' ') || nombre
+
+                            const syncPacienteResponse = await authFetch(`${API_URL}/api/auth/register-patient`, {
+                                method: 'POST',
+                                headers: { 'Content-Type': 'application/json' },
+                                body: JSON.stringify({
+                                    dni,
+                                    firstName: nombre,
+                                    lastName: apellido,
+                                    email: normalizedPatientEmail,
+                                    birthDate: new Date().toISOString().split('T')[0],
+                                })
+                            })
+
+                            const syncPayload = await syncPacienteResponse.json().catch(() => ({}))
+                            if (!syncPacienteResponse.ok) {
+                                const backendMessage = String(syncPayload?.message || '')
+                                if (syncPacienteResponse.status === 409 && /email ya registrado/i.test(backendMessage)) {
+                                    showValidationAlert('El email ingresado ya esta asociado a otra cuenta. Verifica DNI y email del paciente.')
+                                    return
+                                }
+                                throw new Error(syncPayload?.message || 'No se pudo actualizar el email del paciente')
+                            }
+
+                            const inviteLink = syncPayload?.activationLink || syncPayload?.debugRecoveryLink || null
+
+                            if (inviteLink) {
+                                setDebugInviteLink(inviteLink)
+                                generatedShareLink = inviteLink
+                            } else {
+                                const loginLink = getPatientPortalLoginLink()
+                                setDebugInviteLink(loginLink)
+                                generatedShareLink = loginLink
+                            }
+
+                            if (syncPayload?.inviteEmailSent) {
+                                showToastMessage('Acceso enviado al paciente por correo para crear su contraseña', 'success')
+                            } else if (syncPayload?.debugRecoveryLink) {
+                                showToastMessage('Paciente actualizado. SMTP no disponible, revisa el link de debug en la respuesta del backend', 'info')
+                            }
+                        } else {
+                            const loginLink = getPatientPortalLoginLink()
+                            setDebugInviteLink(loginLink)
+                            generatedShareLink = loginLink
+                        }
                     } else if (buscarResponse.status === 404) {
                         // El paciente no existe, crearlo
 
@@ -402,15 +648,38 @@ export function EstudioForm({
                                 dni,
                                 firstName: nombre,
                                 lastName: apellido,
+                                email: normalizedPatientEmail,
                                 birthDate: new Date().toISOString().split('T')[0] // Fecha por defecto
                             })
                         })
 
                         if (crearPacienteResponse.ok) {
                             const nuevoPaciente = await crearPacienteResponse.json()
-                            pacienteId = nuevoPaciente.data?.user?.id
+                            pacienteId = nuevoPaciente.data?.id ?? nuevoPaciente.data?.user?.id ?? null
+
+                            const inviteLink = nuevoPaciente?.activationLink || nuevoPaciente?.debugRecoveryLink || null
+
+                            if (inviteLink) {
+                                setDebugInviteLink(inviteLink)
+                                generatedShareLink = inviteLink
+                            } else {
+                                const loginLink = getPatientPortalLoginLink()
+                                setDebugInviteLink(loginLink)
+                                generatedShareLink = loginLink
+                            }
+
+                            if (nuevoPaciente?.inviteEmailSent) {
+                                showToastMessage('Paciente creado y correo de acceso enviado para completar registro', 'success')
+                            } else if (nuevoPaciente?.debugRecoveryLink) {
+                                showToastMessage('Paciente creado. SMTP no disponible, usa el link de debug para completar registro', 'info')
+                            }
                         } else {
                             const errorData = await crearPacienteResponse.json()
+                            const backendMessage = String(errorData?.message || '')
+                            if (crearPacienteResponse.status === 409 && /email ya registrado/i.test(backendMessage)) {
+                                showValidationAlert('El email ingresado ya esta registrado en otra cuenta. Usa otro email o corrige el DNI del paciente.')
+                                return
+                            }
                             throw new Error(`No se pudo crear el paciente: ${errorData.message}`)
                         }
                     } else {
@@ -639,7 +908,11 @@ export function EstudioForm({
             if (onSuccess) {
                 onSuccess()
             } else {
-                setTimeout(() => router.push('/dashboard'), 1500)
+                if (generatedShareLink) {
+                    showToastMessage('Enlace listo para compartir. Cuando termines, usa el menu para volver al dashboard.', 'info')
+                } else {
+                    setTimeout(() => router.push('/dashboard'), 4000)
+                }
             }
         } catch (error) {
             console.error('Error al guardar estudio:', error)
@@ -650,7 +923,7 @@ export function EstudioForm({
     }
 
     const mostrarPdf = estado === 'completado' || estado === 'parcial'
-    const camposDeshabilitados = modoEdicion && !permitirCambioEstado
+    const camposDeshabilitados = (modoEdicion && !permitirCambioEstado) || datosPacienteBloqueados
 
     const getEstadoBadgeClass = (est: EstadoEstudio) => {
         switch (est) {
@@ -785,6 +1058,30 @@ export function EstudioForm({
                             />
                         </div>
 
+                        {/* Email del paciente */}
+                        <div className="md:col-span-2">
+                            <label htmlFor="emailPaciente" className="block text-sm font-medium text-gray-700 mb-2">
+                                Email del Paciente
+                            </label>
+                            <input
+                                id="emailPaciente"
+                                type="email"
+                                placeholder="paciente@email.com"
+                                value={emailPaciente}
+                                onChange={(e) => setEmailPaciente(e.target.value)}
+                                disabled={camposDeshabilitados || (pacienteEncontrado && !pacienteRequiereRegistro)}
+                                required={!modoEdicion}
+                                className={`w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent ${camposDeshabilitados || (pacienteEncontrado && !pacienteRequiereRegistro) ? 'bg-gray-100 cursor-not-allowed' : 'bg-white'
+                                    } text-gray-900`}
+                            />
+                            {pacienteEncontrado && !pacienteRequiereRegistro && (
+                                <p className="text-xs text-gray-500 mt-1">Este paciente ya tiene email registrado.</p>
+                            )}
+                            {pacienteEncontrado && pacienteRequiereRegistro && (
+                                <p className="text-xs text-blue-600 mt-1">Este paciente aún no completó su registro. Al guardar, se enviará el link para crear contraseña.</p>
+                            )}
+                        </div>
+
                         {/* Fecha del Estudio */}
                         <div>
                             <label htmlFor="fechaEstudio" className="block text-sm font-medium text-gray-700 mb-2">
@@ -845,6 +1142,65 @@ export function EstudioForm({
                         </div>
                     </div>
                 </div>
+
+                {shareableInviteLink && (
+                    <div className="bg-amber-50 border border-amber-200 rounded-lg p-4">
+                        <h3 className="text-sm font-semibold text-amber-900 mb-1">
+                            {shareableInviteLink.includes('/recuperar-contrasena?token=')
+                                ? 'Enlace de activacion del paciente'
+                                : 'Acceso al portal del paciente'}
+                        </h3>
+                        <p className="text-sm text-amber-800 mb-3">
+                            {shareableInviteLink.includes('/recuperar-contrasena?token=')
+                                ? 'Comparte este enlace para que el paciente cree su contrasena y luego ingrese con DNI + password.'
+                                : 'Este paciente ya tiene su cuenta completa. Comparte este enlace para ingresar al login con DNI + password.'}
+                        </p>
+                        <div className="flex flex-col sm:flex-row gap-2 sm:items-center">
+                            <div className="flex gap-2">
+                                <a
+                                    href={shareableInviteLink}
+                                    target="_blank"
+                                    rel="noreferrer"
+                                    className="inline-flex items-center justify-center px-3 py-2 rounded-lg bg-amber-600 text-white text-sm font-medium hover:bg-amber-700 transition"
+                                >
+                                    {shareableInviteLink.includes('/recuperar-contrasena?token=')
+                                        ? 'Abrir enlace de activacion'
+                                        : 'Abrir login del paciente'}
+                                </a>
+                                <button
+                                    type="button"
+                                    onClick={handleCopyDebugInviteLink}
+                                    className="inline-flex items-center justify-center px-3 py-2 rounded-lg bg-white border border-amber-300 text-amber-900 text-sm font-medium hover:bg-amber-100 transition"
+                                >
+                                    Copiar enlace
+                                </button>
+                                <button
+                                    type="button"
+                                    onClick={handleShareDebugInviteByWhatsApp}
+                                    className="inline-flex items-center justify-center px-3 py-2 rounded-lg bg-green-600 text-white text-sm font-medium hover:bg-green-700 transition"
+                                >
+                                    Enviar por WhatsApp
+                                </button>
+                                <button
+                                    type="button"
+                                    onClick={handleGeneratePatientAccessLink}
+                                    disabled={isGeneratingPasswordLink}
+                                    className="inline-flex items-center justify-center px-3 py-2 rounded-lg bg-slate-700 text-white text-sm font-medium hover:bg-slate-800 transition disabled:opacity-60 disabled:cursor-not-allowed"
+                                >
+                                    {isGeneratingPasswordLink ? 'Generando acceso...' : 'Generar acceso paciente'}
+                                </button>
+                            </div>
+                            <a
+                                href={shareableInviteLink}
+                                target="_blank"
+                                rel="noreferrer"
+                                className="text-xs text-blue-700 underline break-all"
+                            >
+                                {shareableInviteLink}
+                            </a>
+                        </div>
+                    </div>
+                )}
 
                 {/* Carga de PDF - solo mostrar si NO es en_proceso O si está en modo edición */}
                 {(estado !== 'en_proceso' || modoEdicion) && (
