@@ -10,35 +10,35 @@ type TokenPayload = {
 export async function authMiddleware(req: Request, res: Response, next: NextFunction) {
     try {
         const authHeader = req.headers.authorization;
-        if(!authHeader){
+        if (!authHeader) {
             return res.status(401).json({
-                success: false, 
+                success: false,
                 message: 'Token no proporcionado'
 
             });
         }
-        if(!authHeader.startsWith('Bearer ')){
+        if (!authHeader.startsWith('Bearer ')) {
             return res.status(401).json({
                 success: false,
                 message: 'Formato de token invalido'
             })
         }
-        const token = authHeader.substring(7); 
+        const token = authHeader.substring(7);
         const tokenverify = await verifyToken(token) as TokenPayload | null;
-        if(!tokenverify || !tokenverify.userId || !tokenverify.tenantId){
-            return res.status(401).json({
-                success: false, 
-                message: 'Token expirado'
-            }); 
-        }
-        const user = await prisma.user.findUnique({
-            where:{id: tokenverify.userId},
-            include:{profile: true, role:true, tenant: true}
-        })
-        if(!user){
+        if (!tokenverify || !tokenverify.userId || !tokenverify.tenantId) {
             return res.status(401).json({
                 success: false,
-                message:'usuario no encontrado' 
+                message: 'Token expirado'
+            });
+        }
+        const user = await prisma.user.findUnique({
+            where: { id: tokenverify.userId },
+            include: { profile: true, role: true, tenant: true }
+        })
+        if (!user) {
+            return res.status(401).json({
+                success: false,
+                message: 'usuario no encontrado'
             })
         }
 
@@ -57,11 +57,11 @@ export async function authMiddleware(req: Request, res: Response, next: NextFunc
             suspended: user.tenant.suspended,
         };
         req.user = user
-       return  next()
+        return next()
     } catch (error) {
-        return res.status(401).json({ 
-            success: false, 
-            message: 'Token inválido' 
+        return res.status(401).json({
+            success: false,
+            message: 'Token inválido'
         });
     }
 }
