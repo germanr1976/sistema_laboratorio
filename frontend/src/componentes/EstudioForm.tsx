@@ -122,13 +122,11 @@ export function EstudioForm({
         }
     }, [estudioExistente, permitirCambioEstado])
 
-    // Buscar paciente cuando cambia el DNI (solo si no es modo edición)
+    // Buscar paciente cuando cambia el DNI (tambien en modo edicion para reflejar email/estado real)
     useEffect(() => {
-        if (modoEdicion || dni.length < 7) {
-            if (!modoEdicion) {
-                setPacienteEncontrado(false)
-                setPacienteRequiereRegistro(false)
-            }
+        if (dni.length < 7) {
+            setPacienteEncontrado(false)
+            setPacienteRequiereRegistro(false)
             return
         }
 
@@ -142,11 +140,13 @@ export function EstudioForm({
                     if (patient) {
                         const firstName = patient?.firstName ?? patient?.profile?.firstName ?? ''
                         const lastName = patient?.lastName ?? patient?.profile?.lastName ?? ''
-                        setNombreApellido(`${firstName} ${lastName}`.trim())
+                        if (!modoEdicion) {
+                            setNombreApellido(`${firstName} ${lastName}`.trim())
+                        }
                         setEmailPaciente(patient?.email ?? '')
                         setPacienteRequiereRegistro(Boolean(patient?.registrationPending))
-                        // Solo precargar obra social si NO es en_proceso (es decir, si es parcial o completado)
-                        if (patient?.socialInsurance && estado !== 'en_proceso') {
+                        // Solo precargar obra social en alta nueva
+                        if (!modoEdicion && patient?.socialInsurance && estado !== 'en_proceso') {
                             setObraSocial(patient.socialInsurance)
                             console.log('✅ Paciente cargado - Obra Social:', patient?.socialInsurance)
                         }
@@ -165,7 +165,7 @@ export function EstudioForm({
 
         const timeoutId = setTimeout(buscarPaciente, 500)
         return () => clearTimeout(timeoutId)
-    }, [dni, modoEdicion])
+    }, [dni, modoEdicion, estado])
 
     const handleFileChange = useCallback((e: React.ChangeEvent<HTMLInputElement>) => {
         const files = Array.from(e.target.files || [])
@@ -1078,7 +1078,11 @@ export function EstudioForm({
                                 <p className="text-xs text-gray-500 mt-1">Este paciente ya tiene email registrado.</p>
                             )}
                             {pacienteEncontrado && pacienteRequiereRegistro && (
-                                <p className="text-xs text-blue-600 mt-1">Este paciente aún no completó su registro. Al guardar, se enviará el link para crear contraseña.</p>
+                                <p className="text-xs text-blue-600 mt-1">
+                                    {emailPaciente.trim()
+                                        ? 'Este paciente tiene email registrado, pero aun no creo su contrasena. Al guardar, se enviara el link para completar registro.'
+                                        : 'Este paciente aun no tiene email registrado. Cargalo y al guardar se enviara el link para completar registro.'}
+                                </p>
                             )}
                         </div>
 
