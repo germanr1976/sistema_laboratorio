@@ -2,7 +2,7 @@
 
 import Link from 'next/link'
 import { usePathname, useRouter } from 'next/navigation'
-import { FilePlus, FolderOpen, History, LogOut, Menu, X, ClipboardList } from 'lucide-react'
+import { FilePlus, FolderOpen, History, LogOut, Menu, X, ClipboardList, ShieldCheck } from 'lucide-react'
 import { useState, useEffect } from 'react'
 import { useAuth } from '../utils/useAuth'
 import authFetch from '../utils/authFetch'
@@ -67,6 +67,9 @@ export function Sidebar() {
         return () => window.clearInterval(intervalId)
     }, [pathname, API_URL])
 
+    const userRole = String(userData?.role || '').toUpperCase()
+    const isTenantAdmin = userRole === 'ADMIN'
+
     const navItems = [
         {
             label: 'Gestionar Estudios',
@@ -88,6 +91,11 @@ export function Sidebar() {
             href: '/historial',
             icon: History,
         },
+        ...(isTenantAdmin ? [{
+            label: 'Admin Tenant',
+            href: '/tenant-admin',
+            icon: ShieldCheck,
+        }] : []),
     ]
 
     const isActive = (href: string) => {

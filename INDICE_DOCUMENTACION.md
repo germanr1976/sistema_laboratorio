@@ -2,7 +2,7 @@
 
 > **Compilación del Sistema completada**: 21 de enero de 2026
 
-Esta carpeta contiene 4 documentos que forman un análisis completo del sistema **Laboratorio Digital**.
+Esta carpeta contiene 5 documentos que forman un análisis completo del sistema **Laboratorio Digital**.
 
 ---
 
@@ -78,6 +78,21 @@ Esta carpeta contiene 4 documentos que forman un análisis completo del sistema 
 - Hoja de ruta para mejorar
 
 **Acción recomendada**: Usar para control de calidad
+
+---
+
+### 5. 🏢 INSTRUCTIVO_MULTITENANT.md
+**Para**: Administradores de plataforma, admins de tenant, soporte técnico  
+**Tiempo de lectura**: 15-20 minutos  
+**Contenido**:
+- Arquitectura multitenant actual (frontend + backend)
+- Flujos operativos para alta de tenant y creación de admin tenant
+- Gestión de planes y suspensión/reactivación
+- Reglas de acceso y aislamiento por tenant
+- Troubleshooting rápido
+- Riesgos actuales y recomendaciones de corto plazo
+
+**Acción recomendada**: Usar como guía operativa diaria del módulo multitenant
 
 ---
 

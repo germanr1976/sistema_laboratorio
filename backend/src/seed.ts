@@ -28,6 +28,12 @@ async function main() {
     create: { name: "BIOCHEMIST" },
   });
 
+  await prisma.role.upsert({
+    where: { name: "PLATFORM_ADMIN" },
+    update: {},
+    create: { name: "PLATFORM_ADMIN" },
+  });
+
   const demoDni = "12345678";
   const bioDni = "23456789";
 

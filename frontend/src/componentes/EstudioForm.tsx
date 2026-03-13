@@ -39,6 +39,7 @@ interface EstudioFormProps {
     }
     modoEdicion?: boolean
     permitirCambioEstado?: boolean
+    datosPacienteBloqueados?: boolean
     onSuccess?: () => void
 }
 
@@ -46,6 +47,7 @@ export function EstudioForm({
     estudioExistente,
     modoEdicion = false,
     permitirCambioEstado = false,
+    datosPacienteBloqueados = false,
     onSuccess,
 }: EstudioFormProps) {
     const router = useRouter()

@@ -18,7 +18,8 @@ export async function generateToken(userData: {
     tenantId: number,
     dni: string,
     roleId: number,
-    roleName: string
+    roleName: string,
+    isPlatformAdmin?: boolean,
 }): Promise<string> {
     const jwtSecret = process.env.JWT_SECRET || 'fallback-secret';
     const expiresIn = process.env.JWT_EXPIRES_IN || '24h';

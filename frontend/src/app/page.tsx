@@ -97,6 +97,16 @@ export default function HomePage() {
                         <p className="text-center text-xs text-gray-400">Acceso solo para pacientes registrados</p>
                     </div>
                 )}
+
+                <div className="w-full mt-4 border-t border-slate-200 pt-4">
+                    <button
+                        className="w-full bg-slate-900 text-white font-medium py-2.5 rounded hover:bg-slate-800 transition"
+                        onClick={() => router.push('/platform/login')}
+                    >
+                        Acceso Plataforma (Empresa)
+                    </button>
+                    <p className="text-center text-xs text-gray-500 mt-2">Solo para administración global del servicio SaaS</p>
+                </div>
             </section>
         </main>
     );

@@ -5,6 +5,8 @@ import prisma from '@/config/prisma';
 type TokenPayload = {
     userId: number;
     tenantId: number;
+    roleName?: string;
+    isPlatformAdmin?: boolean;
 };
 
 export async function authMiddleware(req: Request, res: Response, next: NextFunction) {
@@ -56,7 +58,20 @@ export async function authMiddleware(req: Request, res: Response, next: NextFunc
             slug: user.tenant.slug,
             suspended: user.tenant.suspended,
         };
-        req.user = user
+        req.user = {
+            id: user.id,
+            dni: user.dni,
+            roleId: user.roleId,
+            tenantId: user.tenantId,
+            // Backward-compatible: role is the primary source, boolean remains transitional.
+            isPlatformAdmin: user.role.name === 'PLATFORM_ADMIN' || user.isPlatformAdmin,
+            email: user.email,
+            password: user.password,
+            role: {
+                name: user.role.name,
+            },
+            profile: user.profile,
+        };
         return next()
     } catch (error) {
         return res.status(401).json({
@@ -140,6 +155,33 @@ export async function isPatient(req: Request, res: Response, next: NextFunction)
         return res.status(500).json({
             success: false,
             message: 'Error al verificar permisos de paciente'
+        });
+    }
+}
+
+export async function isPlatformAdmin(req: Request, res: Response, next: NextFunction) {
+    try {
+        if (!req.user) {
+            return res.status(401).json({
+                success: false,
+                message: 'Usuario no autenticado',
+            });
+        }
+
+        const hasPlatformRole = req.user.role.name === 'PLATFORM_ADMIN';
+        const hasLegacyFlag = req.user.isPlatformAdmin === true;
+        if (!hasPlatformRole && !hasLegacyFlag) {
+            return res.status(403).json({
+                success: false,
+                message: 'Acceso denegado. Se requieren permisos de administrador de plataforma',
+            });
+        }
+
+        return next();
+    } catch (error) {
+        return res.status(500).json({
+            success: false,
+            message: 'Error al verificar permisos de plataforma',
         });
     }
 }

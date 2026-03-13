@@ -15,6 +15,7 @@ interface RequestUser {
     dni: string;
     roleId: number;
     tenantId: number;
+    isPlatformAdmin: boolean;
     email?: string | null;
     password?: string | null;
     role: RequestRole;

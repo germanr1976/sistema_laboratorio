@@ -10,7 +10,8 @@ export default function LoginProfesional() {
     const formRef = useRef<HTMLFormElement | null>(null);
     const [dni, setDni] = useState("");
     const [dniError, setDniError] = useState("");
-    const DNI_MAX = 8;
+    const DNI_MIN = 7;
+    const DNI_MAX = 18;
 
     const [password, setPassword] = useState("");
     const [showPassword, setShowPassword] = useState(false);
@@ -23,8 +24,8 @@ export default function LoginProfesional() {
             toast.error('Ingrese DNI válido');
             return;
         }
-        if (dni.length < 8) {
-            setDniError('El DNI debe tener al menos 8 dígitos');
+        if (dni.length < DNI_MIN) {
+            setDniError(`El DNI debe tener al menos ${DNI_MIN} dígitos`);
             toast.error('DNI inválido');
             return;
         }
@@ -48,6 +49,17 @@ export default function LoginProfesional() {
             }
 
             const role = String(json?.data?.user?.role || '').toUpperCase();
+            const platformRole = role === 'PLATFORM_ADMIN';
+            const legacyPlatformFlag = Boolean(json?.data?.user?.isPlatformAdmin);
+            if (platformRole || legacyPlatformFlag) {
+                localStorage.removeItem('authToken');
+                localStorage.removeItem('userType');
+                localStorage.removeItem('userData');
+                toast.error('Este usuario pertenece al portal de plataforma. Ingresá por Acceso Plataforma.');
+                window.location.href = '/platform/login';
+                return;
+            }
+
             if (role !== 'BIOCHEMIST' && role !== 'ADMIN') {
                 localStorage.removeItem('authToken');
                 localStorage.removeItem('userType');
@@ -118,7 +130,7 @@ export default function LoginProfesional() {
                                 const filtered = e.target.value.replace(/\D/g, '');
                                 setDni(filtered);
                                 if (!filtered) setDniError('Ingrese DNI');
-                                else if (filtered.length < 8) setDniError('El DNI debe tener al menos 8 dígitos');
+                                else if (filtered.length < DNI_MIN) setDniError(`El DNI debe tener al menos ${DNI_MIN} dígitos`);
                                 else setDniError('');
                             }}
                             onPaste={(e: React.ClipboardEvent<HTMLInputElement>) => {

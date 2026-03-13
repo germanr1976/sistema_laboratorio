@@ -28,20 +28,31 @@ async function resolveTenantFromRequest(req: Request, createIfMissing = false) {
 
 export async function loginController(req: Request, res: Response) {
     try {
-        const tenant = await resolveTenantFromRequest(req);
-        if (!tenant) {
-            return res.status(401).json({
-                success: false,
-                message: 'Credenciales inválidas'
+        const validationResult = validateLogin(req.body);
+        const requestedTenantSlug = String(req.headers['x-tenant-slug'] || '').trim().toLowerCase();
+        let requestedTenantId: number | null = null;
+
+        if (requestedTenantSlug) {
+            const requestedTenant = await prisma.tenant.findUnique({
+                where: { slug: requestedTenantSlug },
+                select: { id: true },
             });
+
+            if (!requestedTenant) {
+                return res.status(401).json({
+                    success: false,
+                    message: 'Credenciales inválidas'
+                });
+            }
+
+            requestedTenantId = requestedTenant.id;
         }
 
-        const validationResult = validateLogin(req.body);
         if (validationResult.error) {
             await recordAuditEvent({
                 req,
                 eventType: AUDIT_EVENT_TYPES.LOGIN_FAILED,
-                tenantId: tenant.id,
+                tenantId: requestedTenantId,
                 metadata: {
                     reason: 'invalid_input',
                 },
@@ -56,14 +67,14 @@ export async function loginController(req: Request, res: Response) {
         const password: string | undefined = validatedData.password;
 
         const user = await prisma.user.findFirst({
-            where: { dni, tenantId: tenant.id },
+            where: requestedTenantId ? { dni, tenantId: requestedTenantId } : { dni },
             include: { profile: true, role: true }
         })
         if (!user) {
             await recordAuditEvent({
                 req,
                 eventType: AUDIT_EVENT_TYPES.LOGIN_FAILED,
-                tenantId: tenant.id,
+                tenantId: requestedTenantId,
                 metadata: {
                     reason: 'user_not_found',
                     dni,
@@ -74,6 +85,8 @@ export async function loginController(req: Request, res: Response) {
                 message: 'Usuario no encontrado'
             })
         } else {
+            const auditTenantId = user.tenantId;
+            const hasPlatformPortalAccess = user.role.name === 'PLATFORM_ADMIN' || user.isPlatformAdmin;
             switch (user.role.name) {
                 case 'PATIENT':
                     const patientEmail = user.email ?? '';
@@ -83,7 +96,7 @@ export async function loginController(req: Request, res: Response) {
                         await recordAuditEvent({
                             req,
                             eventType: AUDIT_EVENT_TYPES.LOGIN_FAILED,
-                            tenantId: tenant.id,
+                            tenantId: auditTenantId,
                             actorUserId: user.id,
                             metadata: {
                                 reason: 'patient_pending_registration',
@@ -99,7 +112,7 @@ export async function loginController(req: Request, res: Response) {
                         await recordAuditEvent({
                             req,
                             eventType: AUDIT_EVENT_TYPES.LOGIN_FAILED,
-                            tenantId: tenant.id,
+                            tenantId: auditTenantId,
                             actorUserId: user.id,
                             metadata: {
                                 reason: 'missing_password',
@@ -116,7 +129,7 @@ export async function loginController(req: Request, res: Response) {
                         await recordAuditEvent({
                             req,
                             eventType: AUDIT_EVENT_TYPES.LOGIN_FAILED,
-                            tenantId: tenant.id,
+                            tenantId: auditTenantId,
                             actorUserId: user.id,
                             metadata: {
                                 reason: 'invalid_password',
@@ -133,12 +146,13 @@ export async function loginController(req: Request, res: Response) {
                         tenantId: user.tenantId,
                         dni: user.dni,
                         roleId: user.roleId,
-                        roleName: user.role.name
+                        roleName: user.role.name,
+                        isPlatformAdmin: hasPlatformPortalAccess,
                     });
                     await recordAuditEvent({
                         req,
                         eventType: AUDIT_EVENT_TYPES.LOGIN_SUCCESS,
-                        tenantId: tenant.id,
+                        tenantId: auditTenantId,
                         actorUserId: user.id,
                         metadata: {
                             role: user.role.name,
@@ -155,17 +169,20 @@ export async function loginController(req: Request, res: Response) {
                                 profile: {
                                     firstName: user.profile?.firstName,
                                     lastName: user.profile?.lastName
-                                }
+                                },
+                                isPlatformAdmin: hasPlatformPortalAccess,
                             },
                             token: tokenGenerated
                         }
                     });
                 case 'BIOCHEMIST':
+                case 'ADMIN':
+                case 'PLATFORM_ADMIN':
                     if (!password) {
                         await recordAuditEvent({
                             req,
                             eventType: AUDIT_EVENT_TYPES.LOGIN_FAILED,
-                            tenantId: tenant.id,
+                            tenantId: auditTenantId,
                             actorUserId: user.id,
                             metadata: {
                                 reason: 'missing_password',
@@ -181,7 +198,7 @@ export async function loginController(req: Request, res: Response) {
                         await recordAuditEvent({
                             req,
                             eventType: AUDIT_EVENT_TYPES.LOGIN_FAILED,
-                            tenantId: tenant.id,
+                            tenantId: auditTenantId,
                             actorUserId: user.id,
                             metadata: {
                                 reason: 'missing_password_config',
@@ -198,7 +215,7 @@ export async function loginController(req: Request, res: Response) {
                         await recordAuditEvent({
                             req,
                             eventType: AUDIT_EVENT_TYPES.LOGIN_FAILED,
-                            tenantId: tenant.id,
+                            tenantId: auditTenantId,
                             actorUserId: user.id,
                             metadata: {
                                 reason: 'invalid_password',
@@ -214,12 +231,13 @@ export async function loginController(req: Request, res: Response) {
                             tenantId: user.tenantId,
                             dni: user.dni,
                             roleId: user.roleId,
-                            roleName: user.role.name
+                            roleName: user.role.name,
+                            isPlatformAdmin: hasPlatformPortalAccess,
                         });
                         await recordAuditEvent({
                             req,
                             eventType: AUDIT_EVENT_TYPES.LOGIN_SUCCESS,
-                            tenantId: tenant.id,
+                            tenantId: auditTenantId,
                             actorUserId: user.id,
                             metadata: {
                                 role: user.role.name,
@@ -236,7 +254,8 @@ export async function loginController(req: Request, res: Response) {
                                     profile: {
                                         firstName: user.profile?.firstName,
                                         lastName: user.profile?.lastName
-                                    }
+                                    },
+                                    isPlatformAdmin: hasPlatformPortalAccess,
                                 },
                                 token: tokenGenerated
                             }
@@ -339,7 +358,8 @@ export async function registerDoctorController(req: Request, res: Response) {
             tenantId: result.user.tenantId,
             dni: result.user.dni,
             roleId: result.user.roleId,
-            roleName: doctorRole.name
+            roleName: doctorRole.name,
+            isPlatformAdmin: result.user.isPlatformAdmin,
         });
         return res.status(201).json({
             success: true,

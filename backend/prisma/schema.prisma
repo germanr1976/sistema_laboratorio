@@ -12,6 +12,7 @@ model User {
   dni             String   @unique
   roleId          Int
   tenantId        Int
+  isPlatformAdmin Boolean  @default(false)
   createdAt       DateTime @default(now())
   email           String? @unique  @db.VarChar(255)
   license         String?
@@ -31,12 +32,35 @@ model User {
   @@index([dni])
   @@index([tenantId])
   @@index([tenantId, createdAt])
+  @@index([isPlatformAdmin])
 }
 
 model Role {
-  id    Int    @id @default(autoincrement())
-  name  String @unique
-  users User[]
+  id              Int              @id @default(autoincrement())
+  name            String           @unique
+  users           User[]
+  rolePermissions RolePermission[]
+}
+
+model Permission {
+  id              Int              @id @default(autoincrement())
+  key             String           @unique @db.VarChar(120)
+  description     String?          @db.VarChar(255)
+  rolePermissions RolePermission[]
+  createdAt       DateTime         @default(now())
+}
+
+model RolePermission {
+  id           Int        @id @default(autoincrement())
+  roleId       Int
+  permissionId Int
+  role         Role       @relation(fields: [roleId], references: [id], onDelete: Cascade)
+  permission   Permission @relation(fields: [permissionId], references: [id], onDelete: Cascade)
+  createdAt    DateTime   @default(now())
+
+  @@unique([roleId, permissionId])
+  @@index([roleId])
+  @@index([permissionId])
 }
 
 model Profile {
@@ -140,12 +164,54 @@ model Tenant {
   name             String            @db.VarChar(150)
   slug             String            @unique @db.VarChar(80)
   suspended        Boolean           @default(false)
+  contactEmail     String?           @db.VarChar(255)
+  supportPhone     String?           @db.VarChar(50)
+  address          String?           @db.VarChar(255)
   createdAt        DateTime          @default(now())
   updatedAt        DateTime          @updatedAt
   users            User[]
   studies          Study[]
   studyAttachments StudyAttachment[]
   auditEvents      AuditEvent[]
+  subscriptions    TenantSubscription[]
+}
+
+enum SubscriptionStatus {
+  ACTIVE
+  SUSPENDED
+  CANCELED
+  TRIAL
+}
+
+model Plan {
+  id               Int                  @id @default(autoincrement())
+  code             String               @unique @db.VarChar(60)
+  name             String               @db.VarChar(120)
+  description      String?              @db.VarChar(255)
+  maxUsers         Int?
+  maxStudiesPerMonth Int?
+  maxStorageMb     Int?
+  isActive         Boolean              @default(true)
+  createdAt        DateTime             @default(now())
+  updatedAt        DateTime             @updatedAt
+  subscriptions    TenantSubscription[]
+}
+
+model TenantSubscription {
+  id         Int                @id @default(autoincrement())
+  tenantId   Int
+  planId     Int
+  status     SubscriptionStatus @default(ACTIVE)
+  startsAt   DateTime           @default(now())
+  endsAt     DateTime?
+  createdAt  DateTime           @default(now())
+  updatedAt  DateTime           @updatedAt
+  tenant     Tenant             @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  plan       Plan               @relation(fields: [planId], references: [id], onDelete: Restrict)
+
+  @@unique([tenantId])
+  @@index([planId])
+  @@index([status])
 }
 
 enum AuditEventType {
@@ -157,6 +223,13 @@ enum AuditEventType {
   STUDY_DOWNLOADED
   ROLE_CHANGED
   TENANT_SUSPENDED
+  USER_CREATED
+  USER_UPDATED
+  USER_DELETED
+  TENANT_SETTINGS_UPDATED
+  PLATFORM_TENANT_CREATED
+  PLATFORM_PLAN_ASSIGNED
+  PERMISSION_CHANGED
 }
 
 model AuditEvent {
