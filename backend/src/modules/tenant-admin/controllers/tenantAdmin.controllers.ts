@@ -17,7 +17,14 @@ export async function listTenantUsersController(req: Request, res: Response): Pr
         }
 
         const users = await prisma.user.findMany({
-            where: { tenantId },
+            where: {
+                tenantId,
+                role: {
+                    name: {
+                        in: ['ADMIN', 'BIOCHEMIST', 'PATIENT'],
+                    },
+                },
+            },
             orderBy: [{ createdAt: 'desc' }],
             include: {
                 role: { select: { id: true, name: true } },

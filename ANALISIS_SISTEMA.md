@@ -1,221 +1,389 @@
-# 📊 ANÁLISIS DEL SISTEMA - ENFOQUE AUDITORÍA + ADMINISTRACIÓN (SaaS)
+# ANALISIS DEL SISTEMA - ESTADO ACTUAL Y RUTA A SISTEMA COMPLETO
 
-**Fecha:** 22 de febrero de 2026  
-**Versión:** 2.0  
-**Objetivo:** preparar el sistema para ser alquilado de forma segura, auditable y administrable.
+Fecha: 13 de marzo de 2026
+Version: 3.0
 
----
-
-## 1) Resumen ejecutivo
-
-El sistema actual ya tiene una base sólida para operación clínica (autenticación JWT, roles, gestión de estudios y adjuntos), pero **todavía no está listo para un modelo de alquiler multi-cliente**.
-
-Para alquilarlo de manera profesional necesitás incorporar tres capacidades estructurales:
-
-1. **Aislamiento por cliente (tenant)** para separar datos y operación entre laboratorios.
-2. **Auditoría inmutable** para trazabilidad legal y operativa.
-3. **Módulo de administración** para gobierno del sistema (usuarios, permisos, configuración y facturación/plan).
-
-Sin estas tres capas, existe riesgo alto de mezcla de datos entre clientes, dificultad para investigar incidentes y poca gobernanza comercial.
+Objetivo:
+- responder claramente donde estamos hoy,
+- definir a donde debemos llegar,
+- y ordenar el plan para lograr un sistema funcional, seguro, escalable y comercializable.
 
 ---
 
-## 2) Estado actual (base existente)
+## 1. Resumen ejecutivo
 
-### Fortalezas técnicas detectadas
-- Backend modular con Express + Prisma y separación por dominio (`auth`, `patients`, `studies`).
-- JWT con roles principales (`PATIENT`, `BIOCHEMIST`, `ADMIN`).
-- Modelo de estudios funcional con adjuntos (`StudyAttachment`) y estados.
-- Frontend Next.js con rutas protegidas y flujo operativo ya usable.
+El sistema ya supero la etapa de producto interno basico y hoy tiene una base SaaS real:
+- multi-tenant en modelo de datos,
+- panel de plataforma,
+- panel de admin tenant,
+- auditoria global,
+- gestion de planes y estado de tenants.
 
-### Brechas críticas para alquilarlo
-- No hay concepto de **tenant** en el esquema (usuarios y estudios no están particionados por cliente).
-- No hay tabla/servicio de **eventos de auditoría**.
-- `ADMIN` es global y limitado (no hay permisos granulares por módulo/acción).
-- No hay módulo de **suscripción/plan/licenciamiento**.
-- Logging actual basado en `console.log`, insuficiente para soporte comercial y cumplimiento.
+Estado actual: madurez media-alta para operacion controlada.
 
----
-
-## 3) Requisitos del nuevo escenario (alquiler)
-
-### Requisitos funcionales mínimos
-1. Alta de laboratorio/cliente (tenant).
-2. Alta/baja/modificación de usuarios por tenant.
-3. Control de acceso por roles + permisos granulares.
-4. Registro de auditoría de acciones críticas.
-5. Panel de administración con métricas operativas.
-6. Estado comercial por tenant (plan, vencimiento, límites, suspensión).
-
-### Requisitos no funcionales mínimos
-1. Trazabilidad completa (quién, qué, cuándo, dónde, resultado).
-2. Aislamiento de datos entre tenants a nivel consulta y escritura.
-3. Observabilidad (logs estructurados, métricas, correlación por request).
-4. Escalabilidad para múltiples laboratorios concurrentes.
-5. Políticas de retención y exportación de auditoría.
+Conclusion:
+- Ya es util y operable.
+- Aun no esta "completo" para escala comercial sin riesgo.
+- El siguiente salto no es de funcionalidad principal, sino de confiabilidad, seguridad profunda, testing y operacion.
 
 ---
 
-## 4) Diseño objetivo recomendado
+## 2. Donde estamos hoy
 
-## 4.1 Dominio multi-tenant
+## 2.1 Capacidades funcionales implementadas
 
-Agregar entidad `Tenant` y vincularla a los datos de negocio:
+Plataforma (rol PLATFORM_ADMIN):
+- alta de tenant,
+- editar y eliminar tenant con validaciones de seguridad,
+- crear admin tenant,
+- suspender/reactivar tenant,
+- asignar plan,
+- metricas globales,
+- auditoria global con filtros y paginacion.
 
-- `User.tenantId` (excepto superadmin de plataforma si aplica).
-- `Study.tenantId`.
-- `StudyAttachment` heredando tenant por relación con estudio.
-- Índices compuestos recomendados:
-  - `(tenantId, id)`
-  - `(tenantId, createdAt)`
-  - `(tenantId, statusId)`
+Tenant (rol ADMIN dentro de tenant):
+- gestion de usuarios internos,
+- configuracion del laboratorio,
+- consulta de plan,
+- gestion de permisos por rol.
 
-**Regla de oro:** toda query de negocio debe filtrar por `tenantId`.
+Operacion clinica:
+- login con JWT,
+- gestion de estudios,
+- flujo de solicitudes (principalmente orientado a bioquimicos/pacientes),
+- historial y descarga de informacion.
 
-## 4.2 Módulo de auditoría
+## 2.2 Fundaciones tecnicas ya consolidadas
 
-Agregar entidad `AuditEvent` (inmutable):
+- Prisma con modelos clave para SaaS: Tenant, Plan, TenantSubscription, Permission, RolePermission, AuditEvent.
+- Middleware de tenantContext y auth.
+- Rutas separadas por modulo (auth, studies, study-requests, platform, tenant-admin, audit).
+- Frontend modular con rutas protegidas para plataforma y tenant.
 
-- `id`, `tenantId`, `actorUserId`, `actorRole`
-- `action` (ej: `STUDY_STATUS_UPDATED`)
-- `entityType` (`Study`, `User`, `Tenant`, etc.)
-- `entityId`
-- `before` (JSON), `after` (JSON)
-- `result` (`SUCCESS` / `FAILURE`)
-- `ip`, `userAgent`, `requestId`
-- `createdAt`
+## 2.3 Deuda actual relevante
 
-Eventos obligatorios iniciales:
-- Login/logout/fallo de login.
-- Creación/edición/anulación de estudio.
-- Descarga/visualización de PDF.
-- Cambios de permisos/roles.
-- Cambios de plan, suspensión/reactivación de tenant.
-
-## 4.3 Módulo de administración
-
-Separar dos niveles:
-
-1. **Admin de plataforma (tu equipo):**
-   - alta de tenants,
-   - asignación de plan,
-   - suspensión/reactivación,
-   - métricas globales.
-
-2. **Admin de tenant (cliente):**
-   - gestión de usuarios internos,
-   - permisos,
-   - parámetros del laboratorio,
-   - lectura de auditoría de su tenant.
+- Cobertura de tests baja (riesgo alto de regresiones).
+- Permisos todavia mayormente por rol fijo en varios endpoints (falta enforcement fino por permission key en toda la API).
+- Observabilidad parcial (falta madurar logs estructurados + tableros + alertas operativas de backend).
+- Controles de seguridad productivos incompletos (rate limiting, hardening de sesion, monitoreo de abuso).
+- Inconsistencias UX/rol en algunos flujos heredados (ejemplo: visibilidad de opciones que luego backend rechaza).
 
 ---
 
-## 5) Modelo de permisos sugerido (RBAC + permisos)
+## 3. Nivel de madurez por atributo
 
-Mantener roles base pero agregar permisos por acción:
+Escala: 1 (muy bajo) a 5 (alto)
 
-- `studies.read`, `studies.create`, `studies.update`, `studies.cancel`
-- `patients.read`, `patients.manage`
-- `users.read`, `users.manage`
-- `audit.read`, `audit.export`
-- `tenant.settings.manage`
-- `billing.read`, `billing.manage`
+- Funcionalidad: 4/5
+  - El negocio core funciona y hay administracion multi-tenant.
 
-Esto evita depender solo del nombre del rol y permite vender planes con capacidades diferentes.
+- Seguridad: 3/5
+  - Buen punto de partida (JWT, roles, tenantContext), pero falta cierre de capas productivas.
 
----
+- Confiabilidad: 3/5
+  - El sistema funciona, pero faltan pruebas automatizadas y controles de regresion.
 
-## 6) Riesgos actuales si se alquila sin estos cambios
+- Rendimiento: 3/5
+  - Aceptable para carga baja/media; falta estrategia formal de indices, profiling y SLO.
 
-1. **Riesgo de mezcla de datos** entre clientes (crítico).
-2. **Riesgo legal/compliance** por falta de trazabilidad robusta.
-3. **Riesgo operativo**: soporte lento ante incidentes sin eventos auditables.
-4. **Riesgo comercial**: sin plan/límites no hay monetización controlada.
+- Escalabilidad: 3/5
+  - El modelo soporta crecimiento, pero faltan guardrails operativos y de infraestructura.
 
----
+- Observabilidad: 2.5/5
+  - Hay trazas funcionales y auditoria de negocio, pero falta observabilidad de plataforma completa.
 
-## 7) Roadmap propuesto (implementación incremental)
+- Mantenibilidad: 3.5/5
+  - Arquitectura modular buena; falta estandarizar contratos y disciplina de testing.
 
-## Fase 1 (7-10 días) — Fundaciones SaaS
-- Incorporar `Tenant` en Prisma y migrar entidades clave (`User`, `Study`).
-- Resolver tenant desde JWT/middleware.
-- Aplicar filtro obligatorio por tenant en servicios.
-- Agregar seed de tenant inicial + superadmin.
-
-**Resultado:** aislamiento de datos operativo.
-
-## Fase 2 (7-10 días) — Auditoría mínima viable
-- Crear `AuditEvent` + servicio de escritura central.
-- Instrumentar eventos críticos de auth y studies.
-- Endpoint de consulta de auditoría con paginación y filtros.
-
-**Resultado:** trazabilidad base para producción.
-
-## Fase 3 (10-14 días) — Administración
-- CRUD de usuarios y roles por tenant.
-- Panel admin tenant (frontend) para gestión y auditoría.
-- Gestión de estado de tenant (activo/suspendido).
-
-**Resultado:** operación delegable al cliente.
-
-## Fase 4 (5-8 días) — Comercialización
-- Modelo de plan/suscripción y límites.
-- Bloqueos por cuota (usuarios, almacenamiento, etc.).
-- Métricas de uso para facturación.
-
-**Resultado:** base de negocio para alquiler recurrente.
+Lectura ejecutiva:
+- producto viable y util,
+- no listo aun para expansion comercial agresiva ni auditorias exigentes sin fortalecer capas NFR.
 
 ---
 
-## 8) Cambios técnicos concretos por capa
+## 4. Riesgos prioritarios hoy
 
-### Backend
-- Nuevo módulo `admin` y nuevo módulo `audit`.
-- Middleware `tenantContext` + `permissionGuard`.
-- Logger estructurado (pino/winston) con `requestId`.
-- Validaciones Joi para acciones administrativas.
+1) Riesgo de regresiones por cambios rapidos sin suite de pruebas robusta.
 
-### Base de datos (Prisma)
-- Nuevos modelos sugeridos:
-  - `Tenant`
-  - `AuditEvent`
-  - `Permission`
-  - `RolePermission` (si avanzás a RBAC granular)
-  - `Subscription` / `Plan`
+2) Riesgo de seguridad operativa por:
+- falta de limites de intentos y throttling en puntos sensibles,
+- controles incompletos para abuso automatizado,
+- manejo de sesiones aun mejorable para contexto SaaS.
 
-### Frontend
-- Sección `/admin` separada por rol y permisos.
-- Pantallas iniciales:
-  - Gestión de usuarios
-  - Configuración tenant
-  - Auditoría (tabla + filtros)
-  - Estado del plan
+3) Riesgo de soporte por falta de observabilidad integral:
+- hoy hay auditoria funcional,
+- pero no toda la telemetria tecnica necesaria para incident response rapido.
+
+4) Riesgo de coherencia funcional por diferencias entre permisos UI y permisos backend en algunos modulos heredados.
 
 ---
 
-## 9) KPI para validar que está listo para alquilar
+## 5. A donde debemos llegar (vision objetivo)
 
-1. 100% de lecturas/escrituras con contexto de `tenantId`.
-2. 100% de acciones críticas registradas en `AuditEvent`.
-3. 0 endpoints administrativos sin control de permisos granulares.
-4. Consulta de auditoría paginada < 400 ms para 50k eventos/tenant.
-5. Capacidad de suspender un tenant y bloquear acceso en tiempo real.
+Sistema completo en este contexto significa:
+
+1. Funcionalmente completo
+- plataforma admin madura,
+- tenant admin maduro,
+- operacion clinica consistente por rol,
+- flujos sin ambiguedad para usuario final.
+
+2. Seguro por diseno
+- tenant isolation validado extremo a extremo,
+- permisos granulares aplicados en toda API,
+- controles anti abuso y hardening de autenticacion,
+- trazabilidad suficiente para auditoria externa.
+
+3. Confiable en produccion
+- pruebas automatizadas por capas,
+- pipelines con quality gates,
+- politicas de rollback y manejo de incidentes.
+
+4. Escalable y observable
+- SLO/SLA definidos,
+- monitoreo tecnico + negocio,
+- alertas accionables,
+- capacidad de crecer en tenants sin degradacion significativa.
+
+5. Operable como negocio SaaS
+- control por plan/cuotas,
+- reportes de uso,
+- soporte con tiempos de respuesta razonables,
+- gobierno de cambios y seguridad continuo.
 
 ---
 
-## 10) Recomendación final
+## 6. Brechas clave para cerrar
 
-Tu sistema está **maduro para evolucionar a SaaS**, pero no para alquilarse hoy sin riesgo.
+## 6.1 Seguridad
 
-La decisión correcta es ejecutar primero **multi-tenant + auditoría + administración** como bloque fundacional. Con eso, pasás de un producto funcional interno a una plataforma comercializable, con control operativo, trazabilidad y base para escalar ventas por suscripción.
+- implementar rate limiting por endpoint critico (login, password recovery, acciones admin),
+- politicas de bloqueo temporal por intentos fallidos,
+- revisar almacenamiento de tokens y estrategia de sesion para mayor robustez,
+- completar matriz de autorizacion basada en permisos (no solo rol),
+- revisar y endurecer CORS/headers/validaciones en entorno productivo.
+
+## 6.2 Calidad y confiabilidad
+
+- tests unitarios en servicios criticos,
+- tests de integracion API (auth, platform, tenant-admin, studies),
+- tests E2E para flujos principales por rol,
+- smoke tests de despliegue.
+
+## 6.3 Observabilidad
+
+- logs estructurados con correlacion por requestId en todos los modulos,
+- metricas tecnicas (latencia, error rate, saturacion),
+- dashboards por dominio (auth, studies, platform),
+- alertas con umbrales y playbooks.
+
+## 6.4 Performance y escalabilidad
+
+- validar y optimizar indices en consultas frecuentes,
+- establecer presupuestos de latencia para endpoints criticos,
+- pruebas de carga baseline por escenario multi-tenant,
+- plan de escalado y tuning de base de datos.
+
+## 6.5 Producto y UX
+
+- consolidar experiencia por rol evitando opciones no permitidas,
+- unificar mensajes de error operativos (claros, accionables),
+- completar flujos de administracion recurrentes (reseteo de credenciales, exportes, etc.).
 
 ---
 
-## 11) Próximo paso sugerido
+## 7. Hoja de ruta recomendada
 
-Comenzar por una **implementación MVP** de 30 días enfocada en:
-- `Tenant` + aislamiento de datos,
-- `AuditEvent` de eventos críticos,
-- Panel admin mínimo (usuarios + auditoría + estado del tenant).
+## Fase A (0-30 dias) - Estabilizacion productiva
 
-Con ese alcance ya podés iniciar pilotos de alquiler con riesgo significativamente menor.
+Objetivo: bajar riesgo inmediato.
+
+- cerrar inconsistencias de permisos UI/backend,
+- agregar rate limiting y hardening basico,
+- cubrir con tests los flujos criticos de auth y tenant onboarding,
+- formalizar checklist de release y rollback.
+
+Entregable:
+- version estable para pilotos ampliados con menor riesgo operativo.
+
+## Fase B (30-60 dias) - Seguridad y observabilidad profunda
+
+Objetivo: profesionalizar operacion.
+
+- enforcement de permisos granulares en endpoints administrativos y clinicos,
+- telemetria tecnica completa + alertas,
+- auditoria funcional + tecnica integrada,
+- reportes de seguridad operativa.
+
+Entregable:
+- plataforma preparada para auditorias internas y soporte escalable.
+
+## Fase C (60-90 dias) - Escala y completitud SaaS
+
+Objetivo: readiness comercial robusta.
+
+- pruebas de carga y tuning,
+- reglas de cuota/limites por plan mas estrictas,
+- exportes operativos y reportes de gestion,
+- playbooks de incidentes y continuidad operativa.
+
+Entregable:
+- sistema comercializable con menor deuda estructural y mayor previsibilidad.
+
+---
+
+## 8. Indicadores de salida (Definition of Ready para "sistema completo")
+
+El sistema se considera listo para operacion SaaS madura cuando cumpla:
+
+1. Seguridad
+- 100% endpoints criticos con control de permisos y validacion de tenant,
+- rate limiting activo en auth y acciones sensibles,
+- 0 vulnerabilidades criticas abiertas.
+
+2. Calidad
+- cobertura minima en modulos criticos (objetivo inicial >= 70% en servicios core),
+- pipeline con tests automáticos obligatorios antes de merge a rama principal.
+
+3. Confiabilidad
+- SLO definido y medido para endpoints principales,
+- tasa de error controlada bajo umbral acordado.
+
+4. Observabilidad
+- dashboard operativo por dominio,
+- alertas con responsables y tiempos de respuesta definidos.
+
+5. Negocio
+- onboarding de tenant repetible sin intervencion manual tecnica,
+- soporte de incidencias con trazabilidad completa de eventos.
+
+---
+
+## 9. Recomendacion final
+
+La direccion actual es correcta: el sistema ya esta en etapa avanzada de evolucion SaaS.
+
+El foco desde hoy no debe ser "mas pantallas", sino consolidar:
+- seguridad,
+- testing,
+- observabilidad,
+- consistencia de permisos,
+- y disciplina operativa.
+
+Si se ejecuta la hoja de ruta propuesta en 90 dias, el sistema pasa de "funcional y prometedor" a "plataforma completa y confiable" para crecimiento real.
+
+---
+
+## 10. Plan de ejecucion semanal (12 semanas)
+
+Roles de referencia:
+- Producto: priorizacion, criterios de aceptacion, validacion funcional.
+- Backend: seguridad, autorizacion, APIs, datos, performance.
+- Frontend: UX por rol, flujos, manejo de errores, consistencia funcional.
+- DevOps: pipelines, observabilidad, despliegue, operacion.
+- Seguridad/QA: pruebas de seguridad, automatizacion de pruebas, quality gates.
+
+## Semana 1
+- Objetivo: alinear alcance y riesgos.
+- Acciones:
+  - Producto: congelar backlog de 90 dias (MUST/SHOULD/COULD).
+  - Backend + Frontend: mapear endpoints y pantallas criticas por rol.
+  - Seguridad/QA: definir matriz de riesgos y casos de prueba criticos.
+- Entregable verificable: roadmap firmado y matriz de riesgos base publicada.
+
+## Semana 2
+- Objetivo: cerrar inconsistencias de permisos visibles.
+- Acciones:
+  - Backend: inventario de endpoints por rol/permiso.
+  - Frontend: ocultar/mostrar acciones segun permisos reales.
+  - Producto: aprobar comportamiento esperado por rol.
+- Entregable verificable: 0 pantallas con accion visible que backend rechace por diseño.
+
+## Semana 3
+- Objetivo: hardening inicial de autenticacion.
+- Acciones:
+  - Backend: rate limiting en login, recovery y endpoints sensibles.
+  - Seguridad/QA: pruebas de fuerza bruta y abuso basico.
+  - DevOps: parametrizacion por ambiente.
+- Entregable verificable: limites activos y testeados en ambiente de QA.
+
+## Semana 4
+- Objetivo: base de testing automatizado.
+- Acciones:
+  - Backend: tests de integracion para auth, platform, tenant-admin.
+  - Frontend: tests de smoke para rutas protegidas y flujos principales.
+  - DevOps: pipeline con ejecucion obligatoria de tests.
+- Entregable verificable: pipeline bloquea merge si falla testing critico.
+
+## Semana 5
+- Objetivo: observabilidad tecnica minima operativa.
+- Acciones:
+  - Backend: logs estructurados y requestId en toda API.
+  - DevOps: tablero de errores, latencia y tasa de requests.
+  - Seguridad/QA: validacion de trazabilidad extremo a extremo.
+- Entregable verificable: dashboard operativo base con alertas iniciales.
+
+## Semana 6
+- Objetivo: permisos granulares en modulos administrativos.
+- Acciones:
+  - Backend: enforcement por permission key en platform y tenant-admin.
+  - Frontend: ajuste fino de UI segun permisos efectivos.
+  - Producto: test funcional guiado por roles.
+- Entregable verificable: autorizacion granular activa en administracion.
+
+## Semana 7
+- Objetivo: permisos granulares en operacion clinica.
+- Acciones:
+  - Backend: aplicar permission guard en estudios/solicitudes donde corresponda.
+  - Frontend: mensajes de acceso denegado claros y accionables.
+  - Seguridad/QA: regression suite de autorizacion.
+- Entregable verificable: matriz de autorizacion cubierta por tests automatizados.
+
+## Semana 8
+- Objetivo: rendimiento baseline y tuning inicial.
+- Acciones:
+  - Backend: revisar indices y consultas de mayor costo.
+  - DevOps: medir p95/p99 en endpoints criticos.
+  - Producto: validar umbrales de experiencia aceptable.
+- Entregable verificable: reporte de performance con mejoras aplicadas.
+
+## Semana 9
+- Objetivo: confiabilidad de despliegue y rollback.
+- Acciones:
+  - DevOps: estrategia de despliegue segura (checklist + rollback).
+  - Backend/Frontend: smoke post-deploy automatizado.
+  - Seguridad/QA: prueba de recuperacion ante fallo.
+- Entregable verificable: procedimiento de rollback probado en entorno de staging.
+
+## Semana 10
+- Objetivo: operacion SaaS por plan y limites.
+- Acciones:
+  - Backend: consolidar reglas de cuota/limites por plan.
+  - Frontend: feedback de limites alcanzados sin ambiguedad.
+  - Producto: validar reglas comerciales finales.
+- Entregable verificable: limites por plan activos y testeados.
+
+## Semana 11
+- Objetivo: readiness de soporte e incidentes.
+- Acciones:
+  - DevOps + Seguridad: playbooks de incidentes (auth, datos, disponibilidad).
+  - Backend: endpoints/herramientas de diagnostico controlado.
+  - Producto: protocolo de comunicacion a clientes.
+- Entregable verificable: playbooks documentados y simulacro ejecutado.
+
+## Semana 12
+- Objetivo: cierre de release y Go/No-Go.
+- Acciones:
+  - Todos los frentes: auditoria final de criterios de salida.
+  - QA/Security: reporte final de riesgos residuales.
+  - Producto: decision Go/No-Go y plan de rollout.
+- Entregable verificable: acta de salida con decision y plan de despliegue.
+
+## KPIs semanales de seguimiento
+
+- % historias criticas cerradas por semana.
+- % endpoints criticos con test automatizado.
+- tasa de error en staging y produccion.
+- p95 de endpoints principales.
+- numero de hallazgos de seguridad abiertos/cerrados.
+- tiempo promedio de resolucion de incidentes (MTTR).

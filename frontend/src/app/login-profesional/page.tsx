@@ -64,7 +64,7 @@ export default function LoginProfesional() {
                 localStorage.removeItem('authToken');
                 localStorage.removeItem('userType');
                 localStorage.removeItem('userData');
-                toast.error('Tu cuenta no tiene acceso al modulo profesional');
+                toast.error('Tu cuenta no tiene acceso al portal interno del laboratorio');
                 return;
             }
 
@@ -84,8 +84,8 @@ export default function LoginProfesional() {
                 }
             } catch { }
             toast.success('Login exitoso');
-            // Redirigir al dashboard
-            window.location.href = '/dashboard';
+            // Redirigir según rol interno del laboratorio
+            window.location.href = role === 'ADMIN' ? '/tenant-admin' : '/dashboard';
         } catch (error: any) {
             console.error('Login error', error);
             toast.error(error?.message || 'Error al conectar con el servidor');
@@ -116,8 +116,8 @@ export default function LoginProfesional() {
                     style={{ clipPath: "polygon(0 0, 100% 0, 100% 70%, 0 100%)" }}
                 />
                 <section className="bg-white rounded-2xl shadow-xl p-8 max-w-md w-full mx-auto mt-16 flex flex-col items-center">
-                    <h2 className="text-center text-black font-semibold text-2xl mb-1">Acceso administrativo</h2>
-                    <p className="text-center text-gray-500 text-sm mb-6">Acceso para personal administrativo del laboratorio. Ingresá con tu DNI y contraseña.</p>
+                    <h2 className="text-center text-black font-semibold text-2xl mb-1">Acceso interno del laboratorio</h2>
+                    <p className="text-center text-gray-500 text-sm mb-6">Bioquímicos, profesionales autorizados y administradores del laboratorio ingresan desde aquí. Según tu rol accederás a la sección correspondiente.</p>
                     <form ref={formRef} className="w-full flex flex-col gap-4" onSubmit={handleSubmit}>
                         <input
                             type="text"
@@ -186,10 +186,10 @@ export default function LoginProfesional() {
                         </Link>
                     </form>
                     <p className="text-center text-sm mt-6">
-                        ¿No tenés cuenta administrativa? {" "}
+                        ¿Sos profesional y todavía no tenés cuenta? {" "}
                         <Link href="/registro-profesional" className="font-bold underline">Registrate aquí</Link>
                     </p>
-                    <p className="text-xs text-gray-400 mt-2 text-center">El personal administrativo gestiona pacientes y carga de estudios.</p>
+                    <p className="text-xs text-gray-400 mt-2 text-center">Este acceso corresponde al portal interno del laboratorio y habilita funciones según el rol asignado.</p>
                     <Link href="/" className="text-blue-500 underline mt-4">Volver al inicio</Link>
                 </section>
             </main>

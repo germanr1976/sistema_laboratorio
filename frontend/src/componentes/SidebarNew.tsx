@@ -1,7 +1,7 @@
 "use client"
 
 import Link from 'next/link'
-import { usePathname, useRouter } from 'next/navigation'
+import { usePathname } from 'next/navigation'
 import { FilePlus, FolderOpen, History, LogOut, Menu, X, ClipboardList, ShieldCheck } from 'lucide-react'
 import { useState, useEffect } from 'react'
 import { useAuth } from '../utils/useAuth'
@@ -15,6 +15,8 @@ export function Sidebar() {
 
     const [isOpen, setIsOpen] = useState(false)
     const { logout, userData } = useAuth()
+    const userRole = String(userData?.role || '').toUpperCase()
+    const isTenantAdmin = userRole === 'ADMIN'
     const [userName, setUserName] = useState<string>('Bioquímico')
     const [userInitials, setUserInitials] = useState<string>('BQ')
     const [pendingRequestsCount, setPendingRequestsCount] = useState(0)
@@ -45,6 +47,11 @@ export function Sidebar() {
     }, [userData])
 
     useEffect(() => {
+        if (isTenantAdmin) {
+            setPendingRequestsCount(0)
+            return
+        }
+
         const loadPendingRequests = async () => {
             try {
                 const response = await authFetch(`${API_URL}/api/study-requests?status=PENDING`)
@@ -65,38 +72,36 @@ export function Sidebar() {
         const intervalId = window.setInterval(loadPendingRequests, AUTO_REFRESH_MS)
 
         return () => window.clearInterval(intervalId)
-    }, [pathname, API_URL])
+    }, [pathname, API_URL, isTenantAdmin])
 
-    const userRole = String(userData?.role || '').toUpperCase()
-    const isTenantAdmin = userRole === 'ADMIN'
-
-    const navItems = [
-        {
-            label: 'Gestionar Estudios',
-            href: '/dashboard',
-            icon: FolderOpen,
-        },
-        {
-            label: 'Cargar Nuevo Estudio',
-            href: '/cargar-nuevo',
-            icon: FilePlus,
-        },
-        {
-            label: 'Solicitudes',
-            href: '/solicitudes',
-            icon: ClipboardList,
-        },
-        {
-            label: 'Historial',
-            href: '/historial',
-            icon: History,
-        },
-        ...(isTenantAdmin ? [{
-            label: 'Admin Tenant',
+    const navItems = isTenantAdmin
+        ? [{
+            label: 'Administración del laboratorio',
             href: '/tenant-admin',
             icon: ShieldCheck,
-        }] : []),
-    ]
+        }]
+        : [
+            {
+                label: 'Gestionar Estudios',
+                href: '/dashboard',
+                icon: FolderOpen,
+            },
+            {
+                label: 'Cargar Nuevo Estudio',
+                href: '/cargar-nuevo',
+                icon: FilePlus,
+            },
+            {
+                label: 'Solicitudes',
+                href: '/solicitudes',
+                icon: ClipboardList,
+            },
+            {
+                label: 'Historial',
+                href: '/historial',
+                icon: History,
+            },
+        ]
 
     const isActive = (href: string) => {
         return pathname === href || pathname.startsWith(href + '/')

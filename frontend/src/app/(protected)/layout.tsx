@@ -2,7 +2,7 @@
 
 import { useEffect, useState } from "react";
 import { Sidebar } from "../../componentes/SidebarNew";
-import { useRouter } from "next/navigation";
+import { usePathname, useRouter } from "next/navigation";
 
 export default function ProtectedLayout({
     children,
@@ -10,6 +10,7 @@ export default function ProtectedLayout({
     children: React.ReactNode;
 }) {
     const router = useRouter();
+    const pathname = usePathname();
     const [canAccess, setCanAccess] = useState(false);
 
     useEffect(() => {
@@ -45,8 +46,21 @@ export default function ProtectedLayout({
             return;
         }
 
+        // Segmentar rutas por rol dentro del área protegida.
+        // ADMIN (tenant) solo debe usar el módulo de administración.
+        if (role === "ADMIN" && !pathname.startsWith("/tenant-admin")) {
+            router.replace("/tenant-admin");
+            return;
+        }
+
+        // BIOCHEMIST no debe ingresar al módulo de administración del tenant.
+        if (role === "BIOCHEMIST" && pathname.startsWith("/tenant-admin")) {
+            router.replace("/dashboard");
+            return;
+        }
+
         setCanAccess(true);
-    }, [router]);
+    }, [router, pathname]);
 
     if (!canAccess) {
         return null;

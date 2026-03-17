@@ -9,7 +9,7 @@ function RecuperarContrasenaContent() {
     const searchParams = useSearchParams();
     const tipo = searchParams.get('tipo');
     const loginHref = tipo === 'paciente' ? '/login-paciente' : '/login-profesional';
-    const roleLabel = tipo === 'paciente' ? 'paciente' : 'profesional';
+    const roleLabel = tipo === 'paciente' ? 'paciente' : 'personal del laboratorio';
     // Intentar obtener el token de múltiples formas para máxima compatibilidad
     let token = searchParams.get('token');
 

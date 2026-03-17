@@ -1,552 +1,178 @@
-# 🔧 GUÍA DE IMPLEMENTACIÓN - OPTIMIZACIONES RECOMENDADAS
+# GUIA DE IMPLEMENTACION - TABLERO DE EJECUCION
 
-## 1. ENDPOINT DELETE CON VALIDACIÓN DE PERMISOS (CRÍTICO)
+Fecha: 13 de marzo de 2026
+Version: 1.0
 
-### Backend: Implementar en `study.controllers.ts`
-```typescript
-/**
- * Controlador para eliminar un estudio
- * Solo el bioquímico asignado puede eliminar
- */
-export const deleteStudy = async (
-  req: Request,
-  res: Response
-): Promise<void> => {
-  try {
-    const { id } = req.params;
-    const studyId = parseInt(id!, 10);
-
-    if (isNaN(studyId)) {
-      return ResponseHelper.validationError(res, "ID de estudio inválido");
-    }
-
-    // Obtener el estudio
-    const study = await studyService.getStudyById(studyId);
-
-    if (!study) {
-      return ResponseHelper.notFound(res, "Estudio");
-    }
-
-    // Verificar que el usuario es el bioquímico asignado
-    if (study.biochemistId !== req.user?.id) {
-      return ResponseHelper.forbidden(
-        res,
-        "Solo el bioquímico asignado puede eliminar este estudio"
-      );
-    }
-
-    // Eliminar el estudio
-    await studyService.deleteStudy(studyId);
-
-    ResponseHelper.success(res, null, "Estudio eliminado exitosamente");
-  } catch (error: any) {
-    console.error("Error al eliminar estudio:", error);
-    ResponseHelper.serverError(res, "Error al eliminar estudio", error);
-  }
-};
-```
-
-### Backend: Agregar en `study.routes.ts`
-```typescript
-/**
- * @route   DELETE /api/studies/:id
- * @desc    Eliminar un estudio
- * @access  Private (Biochemist)
- */
-router.delete(
-  "/:id",
-  authMiddleware,
-  isBiochemist,
-  studyController.deleteStudy
-);
-```
-
-### Frontend: Usar en componentes (Ya está parcialmente implementado)
-```typescript
-async function handleDelete(id: number | undefined): Promise<void> {
-  if (!id) return
-
-  if (confirm('¿Estás seguro?')) {
-    try {
-      const response = await authFetch(`/api/studies/${id}`, {
-        method: 'DELETE'
-      })
-      
-      if (response.ok) {
-        // Actualizar UI
-        showSuccess('Estudio eliminado')
-        // Recargar lista
-      } else {
-        showError('No tienes permiso para eliminar este estudio')
-      }
-    } catch (error) {
-      showError('Error al eliminar')
-    }
-  }
-}
-```
+Objetivo:
+- convertir el plan estrategico en seguimiento operativo semanal,
+- alinear a Producto, Backend, Frontend, DevOps y Seguridad/QA,
+- y facilitar control de avance, riesgos y decisiones Go/No-Go.
 
 ---
 
-## 2. MIGRAR DASHBOARD A API (IMPORTANTE)
+## 1. Como usar este tablero
 
-### Antes: Componente con localStorage
-```typescript
-// MALO: Dashboard.tsx
-const [completados, setCompletados] = useState(0)
+Frecuencia recomendada:
+- seguimiento semanal (60 minutos),
+- checkpoint de riesgo de 15 minutos a mitad de semana.
 
-useEffect(() => {
-  const raw = localStorage.getItem('estudios_metadata')
-  const metas = JSON.parse(raw) as EstudioMeta[]
-  const completed = metas.filter(m => m.status === 'completado').length
-  setCompletados(completed)
-}, [])
-```
+Reglas de estado:
+- No iniciado: aun no se comenzo.
+- En progreso: en ejecucion activa.
+- Bloqueado: requiere decision o dependencia externa.
+- Completado: cumple criterio de aceptacion acordado.
 
-### Después: Hook personalizado + API
-```typescript
-// hooks/useStudiesStats.ts
-export function useStudiesStats() {
-  const [stats, setStats] = useState({
-    total: 0,
-    completed: 0,
-    partial: 0,
-    inProgress: 0
-  })
-  const [loading, setLoading] = useState(true)
-
-  useEffect(() => {
-    const loadStats = async () => {
-      try {
-        const response = await authFetch('/api/studies/biochemist/me')
-        const studies = response.data || []
-
-        setStats({
-          total: studies.length,
-          completed: studies.filter((s: any) => s.status?.name === 'COMPLETED').length,
-          partial: studies.filter((s: any) => s.status?.name === 'PARTIAL').length,
-          inProgress: studies.filter((s: any) => s.status?.name === 'IN_PROGRESS').length
-        })
-      } catch (error) {
-        console.error('Error loading stats:', error)
-      } finally {
-        setLoading(false)
-      }
-    }
-
-    loadStats()
-  }, [])
-
-  return { stats, loading }
-}
-
-// Dashboard.tsx
-export default function Dashboard() {
-  const { stats, loading } = useStudiesStats()
-  
-  if (loading) return <div>Cargando...</div>
-  
-  return (
-    <div>
-      <div className="grid grid-cols-4 gap-4">
-        <StatCard title="Total" value={stats.total} />
-        <StatCard title="Completados" value={stats.completed} color="green" />
-        <StatCard title="Parciales" value={stats.partial} color="yellow" />
-        <StatCard title="En proceso" value={stats.inProgress} color="blue" />
-      </div>
-    </div>
-  )
-}
-```
+Campos minimos por item:
+- responsable,
+- fecha objetivo,
+- evidencia (PR, test, dashboard, acta),
+- riesgo actual,
+- estado.
 
 ---
 
-## 3. IMPLEMENTAR ERROR BOUNDARIES (UX CRÍTICA)
+## 2. Tablero maestro (12 semanas)
 
-### Crear componente ErrorBoundary
-```typescript
-// components/ErrorBoundary.tsx
-'use client'
-
-import React, { ReactNode } from 'react'
-import { AlertCircle } from 'lucide-react'
-
-interface Props {
-  children: ReactNode
-  fallback?: ReactNode
-}
-
-interface State {
-  hasError: boolean
-  error?: Error
-}
-
-export class ErrorBoundary extends React.Component<Props, State> {
-  constructor(props: Props) {
-    super(props)
-    this.state = { hasError: false }
-  }
-
-  static getDerivedStateFromError(error: Error): State {
-    return { hasError: true, error }
-  }
-
-  componentDidCatch(error: Error, errorInfo: React.ErrorInfo) {
-    console.error('Error capturado:', error, errorInfo)
-  }
-
-  render() {
-    if (this.state.hasError) {
-      return (
-        <div className="min-h-screen bg-red-50 flex items-center justify-center p-4">
-          <div className="bg-white rounded-lg shadow-lg p-6 max-w-md">
-            <div className="flex items-center gap-3 mb-4">
-              <AlertCircle className="w-6 h-6 text-red-600" />
-              <h1 className="text-xl font-bold text-red-600">Algo salió mal</h1>
-            </div>
-            <p className="text-gray-600 mb-4">
-              {this.state.error?.message || 'Error desconocido'}
-            </p>
-            <button
-              onClick={() => window.location.reload()}
-              className="w-full bg-blue-600 text-white px-4 py-2 rounded hover:bg-blue-700"
-            >
-              Recargar página
-            </button>
-          </div>
-        </div>
-      )
-    }
-
-    return this.props.children
-  }
-}
-```
-
-### Usar en layout principal
-```typescript
-// app/layout.tsx
-import { ErrorBoundary } from '@/components/ErrorBoundary'
-
-export default function RootLayout({ children }: { children: React.ReactNode }) {
-  return (
-    <html lang="es">
-      <body>
-        <ErrorBoundary>
-          {/* Tu contenido aquí */}
-          {children}
-        </ErrorBoundary>
-      </body>
-    </html>
-  )
-}
-```
+| Semana | Objetivo | Equipo lider | Entregable verificable | Estado | Riesgo principal |
+|---|---|---|---|---|---|
+| 1 | Cerrar alcance y riesgos | Producto | Roadmap 90 dias y matriz de riesgo aprobada | No iniciado | Desalineacion de prioridades |
+| 2 | Corregir incoherencias de permisos UX/API | Backend + Frontend | 0 acciones visibles no autorizadas por backend | No iniciado | Regresiones por cambios de acceso |
+| 3 | Hardening inicial de autenticacion | Backend + Seguridad | Rate limiting activo en login/recovery/admin | No iniciado | Impacto en usuarios legitimos |
+| 4 | Base de testing automatizado | QA + Backend + Frontend | Pipeline bloquea merge si fallan tests criticos | No iniciado | Cobertura insuficiente |
+| 5 | Observabilidad tecnica minima | DevOps + Backend | Dashboard con error rate, latencia y volumen | No iniciado | Telemetria incompleta |
+| 6 | Permisos granulares en administracion | Backend | Enforcement por permission key en admin | No iniciado | Complejidad de migracion de permisos |
+| 7 | Permisos granulares en operacion clinica | Backend + Frontend | Matriz de autorizacion validada por pruebas | No iniciado | Casos edge no cubiertos |
+| 8 | Performance baseline y tuning inicial | Backend + DevOps | Reporte p95/p99 y mejoras aplicadas | No iniciado | Cuellos de botella en DB |
+| 9 | Despliegue seguro y rollback probado | DevOps | Procedimiento de rollback validado en staging | No iniciado | Fallas en release |
+| 10 | Reglas de cuota y limites por plan | Producto + Backend | Limites por plan activos y testeados | No iniciado | Impacto comercial no previsto |
+| 11 | Playbooks de incidentes | DevOps + Seguridad | Simulacro de incidente ejecutado | No iniciado | Respuesta lenta ante incidentes |
+| 12 | Cierre Go/No-Go | Todos | Acta final con decision y plan de rollout | No iniciado | Criterios de salida no cumplidos |
 
 ---
 
-## 4. SISTEMA GLOBAL DE NOTIFICACIONES
+## 3. Backlog operativo por frente
 
-### Hook personalizado
-```typescript
-// hooks/useNotification.ts
-import { useState, useCallback } from 'react'
+## 3.1 Producto
 
-export type NotificationType = 'success' | 'error' | 'warning' | 'info'
+| Item | Criterio de aceptacion | Prioridad | Estado |
+|---|---|---|---|
+| Matriz de capacidades por plan | Cada plan define limites y permisos claros | Alta | No iniciado |
+| Politica de errores al usuario | Mensajes claros y accionables por escenario | Alta | No iniciado |
+| Criterios Go/No-Go | Checklist firmado por todos los frentes | Alta | No iniciado |
 
-export interface Notification {
-  id: string
-  type: NotificationType
-  message: string
-  duration?: number
-}
+## 3.2 Backend
 
-export function useNotification() {
-  const [notifications, setNotifications] = useState<Notification[]>([])
+| Item | Criterio de aceptacion | Prioridad | Estado |
+|---|---|---|---|
+| Rate limiting y anti abuso | Login y endpoints sensibles protegidos | Alta | No iniciado |
+| Permission guard completo | Endpoints criticos con permisos granulares | Alta | No iniciado |
+| Optimizacion de consultas | p95 dentro de umbral definido | Media | No iniciado |
 
-  const show = useCallback((
-    message: string,
-    type: NotificationType = 'info',
-    duration = 3000
-  ) => {
-    const id = Math.random().toString(36)
-    
-    setNotifications(prev => [...prev, { id, message, type, duration }])
-    
-    if (duration > 0) {
-      setTimeout(() => {
-        setNotifications(prev => prev.filter(n => n.id !== id))
-      }, duration)
-    }
-  }, [])
+## 3.3 Frontend
 
-  return { notifications, show }
-}
+| Item | Criterio de aceptacion | Prioridad | Estado |
+|---|---|---|---|
+| UX por rol consistente | No se muestran acciones sin permiso | Alta | No iniciado |
+| Manejo uniforme de errores | Mensajes estandar y comprensibles | Alta | No iniciado |
+| Flujos admin completos | Operaciones frecuentes sin friccion | Media | No iniciado |
 
-// Componente para mostrar notificaciones
-export function NotificationCenter({ notifications }: { notifications: Notification[] }) {
-  return (
-    <div className="fixed top-4 right-4 space-y-2 z-50">
-      {notifications.map(notif => (
-        <div
-          key={notif.id}
-          className={`px-4 py-3 rounded-lg text-white shadow-lg ${
-            notif.type === 'success' ? 'bg-green-500' :
-            notif.type === 'error' ? 'bg-red-500' :
-            notif.type === 'warning' ? 'bg-yellow-500' :
-            'bg-blue-500'
-          }`}
-        >
-          {notif.message}
-        </div>
-      ))}
-    </div>
-  )
-}
-```
+## 3.4 DevOps
 
-### Usar en app
-```typescript
-// app/layout.tsx
-'use client'
+| Item | Criterio de aceptacion | Prioridad | Estado |
+|---|---|---|---|
+| Pipeline con quality gates | Build + tests + checks obligatorios | Alta | No iniciado |
+| Observabilidad y alertas | Dashboard operativo y alertas activas | Alta | No iniciado |
+| Runbooks de release/rollback | Procedimiento probado y documentado | Alta | No iniciado |
 
-import { useNotification, NotificationCenter } from '@/hooks/useNotification'
+## 3.5 Seguridad y QA
 
-export default function RootLayout({ children }: { children: React.ReactNode }) {
-  const { notifications, show } = useNotification()
-  
-  // Hacer disponible globalmente vía context
-  return (
-    <NotificationContext.Provider value={{ show }}>
-      {children}
-      <NotificationCenter notifications={notifications} />
-    </NotificationContext.Provider>
-  )
-}
-
-// Usar en cualquier componente
-import { useContext } from 'react'
-
-export function MyComponent() {
-  const { show } = useContext(NotificationContext)
-  
-  const handleSave = async () => {
-    try {
-      const response = await authFetch('/api/studies', { method: 'POST' })
-      show('Estudio guardado correctamente', 'success')
-    } catch (error) {
-      show('Error al guardar estudio', 'error')
-    }
-  }
-  
-  return <button onClick={handleSave}>Guardar</button>
-}
-```
+| Item | Criterio de aceptacion | Prioridad | Estado |
+|---|---|---|---|
+| Suite de pruebas criticas | Auth, permisos y tenant isolation cubiertos | Alta | No iniciado |
+| Validacion de hardening | Sin hallazgos criticos abiertos | Alta | No iniciado |
+| Pruebas E2E por rol | Flujos clave pasan sin regresiones | Media | No iniciado |
 
 ---
 
-## 5. PAGINACIÓN EN BACKEND
+## 4. KPIs de seguimiento semanal
 
-### Actualizar servicio
-```typescript
-// modules/studies/services/study.services.ts
-export async function getStudiesWithPagination(
-  biochemistId: number,
-  page: number = 1,
-  limit: number = 10,
-  status?: string
-) {
-  const skip = (page - 1) * limit
-
-  const where: any = { biochemistId }
-  if (status) {
-    where.status = { name: status }
-  }
-
-  const [studies, total] = await Promise.all([
-    prisma.study.findMany({
-      where,
-      skip,
-      take: limit,
-      include: {
-        user: {
-          include: { profile: true }
-        },
-        status: true
-      },
-      orderBy: { studyDate: 'desc' }
-    }),
-    prisma.study.count({ where })
-  ])
-
-  return {
-    studies,
-    pagination: {
-      page,
-      limit,
-      total,
-      pages: Math.ceil(total / limit),
-      hasMore: page < Math.ceil(total / limit)
-    }
-  }
-}
-```
-
-### Ruta paginada
-```typescript
-router.get('/list', authMiddleware, isBiochemist, async (req, res) => {
-  try {
-    const page = parseInt(req.query.page as string) || 1
-    const limit = parseInt(req.query.limit as string) || 10
-    const status = req.query.status as string | undefined
-
-    const result = await studyService.getStudiesWithPagination(
-      req.user!.id,
-      page,
-      limit,
-      status
-    )
-
-    ResponseHelper.success(res, result)
-  } catch (error: any) {
-    ResponseHelper.serverError(res, error)
-  }
-})
-```
-
-### Hook en frontend
-```typescript
-// hooks/useStudiesList.ts
-export function useStudiesList(page = 1, limit = 10, status?: string) {
-  const [studies, setStudies] = useState<Study[]>([])
-  const [pagination, setPagination] = useState(null)
-  const [loading, setLoading] = useState(true)
-
-  useEffect(() => {
-    const loadStudies = async () => {
-      try {
-        const params = new URLSearchParams({
-          page: page.toString(),
-          limit: limit.toString()
-        })
-        if (status) params.append('status', status)
-
-        const response = await authFetch(`/api/studies/list?${params}`)
-        const data = await response.json()
-
-        setStudies(data.data.studies)
-        setPagination(data.data.pagination)
-      } catch (error) {
-        console.error(error)
-      } finally {
-        setLoading(false)
-      }
-    }
-
-    loadStudies()
-  }, [page, limit, status])
-
-  return { studies, pagination, loading }
-}
-```
+| KPI | Meta objetivo | Frecuencia |
+|---|---|---|
+| Historias criticas completadas | >= 85% por sprint semanal | Semanal |
+| Endpoints criticos con tests | >= 70% al cierre de fase A | Semanal |
+| Error rate en staging | <= 1% en escenarios principales | Semanal |
+| p95 endpoints principales | <= 400 ms | Semanal |
+| Hallazgos criticos de seguridad abiertos | 0 | Semanal |
+| MTTR incidentes prioritarios | <= 2 horas | Semanal |
 
 ---
 
-## 6. BÚSQUEDA Y FILTRADO AVANZADO
+## 5. Criterios de avance de fase
 
-### Backend - Servicio mejorado
-```typescript
-export async function searchStudies(
-  biochemistId: number,
-  options: {
-    query?: string           // Busca en DNI, nombre, apellido, estudio
-    status?: string          // Filtro por estado
-    startDate?: Date         // Desde fecha
-    endDate?: Date           // Hasta fecha
-    page?: number
-    limit?: number
-    sortBy?: 'date' | 'name' | 'status'
-    sortOrder?: 'asc' | 'desc'
-  }
-) {
-  const {
-    query,
-    status,
-    startDate,
-    endDate,
-    page = 1,
-    limit = 10,
-    sortBy = 'date',
-    sortOrder = 'desc'
-  } = options
+Paso de Fase A a Fase B:
+- permisos UX/API coherentes,
+- hardening inicial activo,
+- pipeline con pruebas criticas.
 
-  const where: any = { biochemistId }
+Paso de Fase B a Fase C:
+- permisos granulares en modulos clave,
+- observabilidad operativa funcionando,
+- reporte de seguridad sin criticos abiertos.
 
-  // Filtro por texto
-  if (query) {
-    where.OR = [
-      { user: { profile: { firstName: { contains: query, mode: 'insensitive' } } } },
-      { user: { profile: { lastName: { contains: query, mode: 'insensitive' } } } },
-      { user: { profile: { documentNumber: { contains: query } } } },
-      { studyName: { contains: query, mode: 'insensitive' } }
-    ]
-  }
-
-  // Filtro por estado
-  if (status) {
-    where.status = { name: status }
-  }
-
-  // Filtro por rango de fechas
-  if (startDate || endDate) {
-    where.studyDate = {}
-    if (startDate) where.studyDate.gte = startDate
-    if (endDate) where.studyDate.lte = endDate
-  }
-
-  // Ordenamiento
-  const orderBy: any = {}
-  if (sortBy === 'date') orderBy.studyDate = sortOrder
-  else if (sortBy === 'name') orderBy.user = { profile: { firstName: sortOrder } }
-  else if (sortBy === 'status') orderBy.status = { name: sortOrder }
-
-  const skip = (page - 1) * limit
-
-  const [studies, total] = await Promise.all([
-    prisma.study.findMany({
-      where,
-      include: { user: { include: { profile: true } }, status: true },
-      orderBy,
-      skip,
-      take: limit
-    }),
-    prisma.study.count({ where })
-  ])
-
-  return {
-    studies,
-    pagination: {
-      page,
-      limit,
-      total,
-      pages: Math.ceil(total / limit)
-    }
-  }
-}
-```
+Cierre final (Go):
+- criterios de ANALISIS_SISTEMA.md cumplidos,
+- acta de salida firmada,
+- plan de rollout y soporte activo.
 
 ---
 
-## RESUMEN DE CAMBIOS
+## 6. Checklist operativo listo para usar
 
-| Cambio | Archivo | Líneas | Complejidad |
-|--------|---------|--------|-------------|
-| DELETE endpoint | study.controllers.ts | +30 | 🟢 Baja |
-| DELETE ruta | study.routes.ts | +5 | 🟢 Baja |
-| Error Boundary | components/ErrorBoundary.tsx | +60 | 🟢 Baja |
-| useNotification | hooks/useNotification.ts | +80 | 🟡 Media |
-| Migrar Dashboard | componentes/Dashboard.tsx | +40 | 🟡 Media |
-| Paginación | modules/studies/ | +50 | 🟡 Media |
-| Búsqueda | modules/studies/ | +70 | 🟡 Media |
+Instruccion de uso:
+- duplicar la tabla semanal al inicio de cada semana,
+- actualizar estado en tiempo real,
+- y adjuntar evidencia concreta por cada item (PR, test, dashboard, acta).
 
-**Tiempo total estimado**: 12-15 horas  
-**Impacto**: 🚀 Muy alto en UX, seguridad y rendimiento
+Estados validos:
+- No iniciado
+- En progreso
+- Bloqueado
+- Completado
+
+## 6.1 Plantilla semanal (copiar y completar)
+
+| Semana | Item | Responsable | Fecha objetivo | Estado | Evidencia | Riesgo actual | Proximo paso |
+|---|---|---|---|---|---|---|---|
+| _N_ | _Definir alcance y riesgos_ | _Producto_ | _AAAA-MM-DD_ | No iniciado | _Link PR/Doc_ | _Bajo/Medio/Alto_ | _Accion concreta_ |
+| _N_ | _Permisos UI/backend coherentes_ | _Backend + Frontend_ | _AAAA-MM-DD_ | No iniciado | _Link PR/Test_ | _Bajo/Medio/Alto_ | _Accion concreta_ |
+| _N_ | _Hardening auth (rate limiting)_ | _Backend + Seguridad_ | _AAAA-MM-DD_ | No iniciado | _Link test QA_ | _Bajo/Medio/Alto_ | _Accion concreta_ |
+| _N_ | _Testing automatizado en pipeline_ | _QA + DevOps_ | _AAAA-MM-DD_ | No iniciado | _Link CI_ | _Bajo/Medio/Alto_ | _Accion concreta_ |
+| _N_ | _Observabilidad base (logs + dashboard)_ | _DevOps + Backend_ | _AAAA-MM-DD_ | No iniciado | _Link dashboard_ | _Bajo/Medio/Alto_ | _Accion concreta_ |
+| _N_ | _Permisos granulares admin/clinico_ | _Backend_ | _AAAA-MM-DD_ | No iniciado | _Link PR/Test_ | _Bajo/Medio/Alto_ | _Accion concreta_ |
+| _N_ | _Performance (p95/p99)_ | _Backend + DevOps_ | _AAAA-MM-DD_ | No iniciado | _Link reporte_ | _Bajo/Medio/Alto_ | _Accion concreta_ |
+| _N_ | _Release seguro + rollback_ | _DevOps_ | _AAAA-MM-DD_ | No iniciado | _Link runbook_ | _Bajo/Medio/Alto_ | _Accion concreta_ |
+| _N_ | _Cuotas y limites por plan_ | _Producto + Backend_ | _AAAA-MM-DD_ | No iniciado | _Link validacion_ | _Bajo/Medio/Alto_ | _Accion concreta_ |
+| _N_ | _Playbooks y simulacro_ | _DevOps + Seguridad_ | _AAAA-MM-DD_ | No iniciado | _Link acta_ | _Bajo/Medio/Alto_ | _Accion concreta_ |
+| _N_ | _Go/No-Go final_ | _Todos_ | _AAAA-MM-DD_ | No iniciado | _Link acta final_ | _Bajo/Medio/Alto_ | _Accion concreta_ |
+
+## 6.2 Checklist semanal de control (tildable)
+
+- [ ] Se realizo reunion semanal de seguimiento (60 min).
+- [ ] Se realizo checkpoint de riesgo de mitad de semana (15 min).
+- [ ] Hay responsables y fechas objetivo en todos los items activos.
+- [ ] Cada item en progreso tiene evidencia asociada.
+- [ ] Se actualizaron bloqueos y dependencias externas.
+- [ ] Se revisaron KPIs semanales (cobertura, error rate, p95, hallazgos, MTTR).
+- [ ] Se definio accion correctiva para cada KPI fuera de meta.
+- [ ] Se validaron criterios de avance de fase vigentes.
+
+## 6.3 Checklist de salida (Semana 12)
+
+- [ ] 100% endpoints criticos con validacion tenant + permisos.
+- [ ] Rate limiting activo en auth y acciones sensibles.
+- [ ] 0 vulnerabilidades criticas abiertas.
+- [ ] Cobertura objetivo alcanzada en modulos core.
+- [ ] Pipeline con quality gates obligatorios en rama principal.
+- [ ] Dashboards y alertas con responsables definidos.
+- [ ] Onboarding de tenant repetible sin intervencion tecnica manual.
+- [ ] Acta Go/No-Go firmada y plan de rollout aprobado.
