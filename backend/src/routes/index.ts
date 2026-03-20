@@ -13,6 +13,16 @@ router.get("/", (_req, res) => {
   res.json({ message: "🚀 API is running!" });
 });
 
+router.get('/health', (req, res) => {
+  res.status(200).json({
+    success: true,
+    message: 'ok',
+    requestId: req.id,
+    uptimeSeconds: Math.floor(process.uptime()),
+    timestamp: new Date().toISOString(),
+  });
+});
+
 router.use('/auth', authRoutes)
 router.use('/patients', patientsRoutes)
 router.use('/studies', studyRoutes)

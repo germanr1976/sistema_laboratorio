@@ -1,5 +1,6 @@
 import bcrypt from 'bcryptjs'
 import jwt from 'jsonwebtoken'
+import crypto from 'crypto'
 import logger from '@/config/logger';
 
 export async function hashPassword(password: string): Promise<string> {
@@ -45,14 +46,30 @@ export async function verifyToken(token: string): Promise<any> {
  * @param dni - DNI del usuario
  * @returns Token con expiración de 1 hora
  */
-export async function generatePasswordRecoveryToken(userId: number, tenantId: number, dni: string): Promise<string> {
+export async function generatePasswordRecoveryToken(
+    userId: number,
+    tenantId: number,
+    dni: string,
+    passwordHash: string
+): Promise<string> {
     const jwtSecret = process.env.JWT_SECRET || 'fallback-secret';
+    const passwordVersion = buildRecoveryPasswordVersion(passwordHash);
     const token = jwt.sign(
-        { userId, tenantId, dni, type: 'password-recovery' },
+        { userId, tenantId, dni, type: 'password-recovery', passwordVersion },
         jwtSecret,
         { expiresIn: '1h' }
     );
     return token;
+}
+
+/**
+ * Deriva una versión estable de contraseña para invalidar tokens de recovery
+ * cuando la contraseña ya cambió.
+ */
+export function buildRecoveryPasswordVersion(passwordHash: string): string {
+    const jwtSecret = process.env.JWT_SECRET || 'fallback-secret';
+    const source = `${passwordHash}::${jwtSecret}`;
+    return crypto.createHash('sha256').update(source).digest('hex').slice(0, 24);
 }
 
 /**

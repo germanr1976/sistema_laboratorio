@@ -102,6 +102,9 @@ model Study {
   @@index([tenantId])
   @@index([tenantId, createdAt])
   @@index([tenantId, studyDate])
+  @@index([tenantId, biochemistId, createdAt])
+  @@index([tenantId, userId, createdAt])
+  @@index([tenantId, userId, studyDate])
 }
 
 enum StudyRequestStatus {
@@ -135,6 +138,9 @@ model StudyRequest {
   @@index([patientId])
   @@index([validatedByUserId])
   @@index([convertedStudyId])
+  @@index([patientId, createdAt])
+  @@index([status, createdAt])
+  @@index([validatedByUserId, createdAt])
 }
 
 model Status {
@@ -212,6 +218,7 @@ model TenantSubscription {
   @@unique([tenantId])
   @@index([planId])
   @@index([status])
+  @@index([status, updatedAt])
 }
 
 enum AuditEventType {

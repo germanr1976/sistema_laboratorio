@@ -9,6 +9,7 @@ import { ResponseHelper } from "../helpers/response.helper";
 import { ValidationHelper } from "../helpers/validation.helper";
 import prisma from "@/config/prisma";
 import { AUDIT_EVENT_TYPES, recordAuditEvent } from "@/modules/audit/services/audit.services";
+import { canAccessStudy } from "../services/studyAuthorization.service";
 
 export { deleteAttachment } from "./deleteAttachment";
 
@@ -230,19 +231,7 @@ export const getStudyById = async (
       return ResponseHelper.notFound(res, "Estudio");
     }
 
-    // Verificar permisos: el paciente propietario, el bioquímico asignado
-    // o cualquier bioquímico (para estudios solicitados por pacientes) puede ver.
-    const isPatient = study.userId === req.user?.id;
-    const isAdmin = req.user?.role?.name === "ADMIN";
-
-    let isBiochemist = false;
-    if (req.user?.role?.name === "BIOCHEMIST") {
-      // Si el estudio tiene un bioquímico asignado, debe coincidir.
-      // Si no tiene ninguno (p.ej. creado por un paciente), permitimos ver.
-      isBiochemist = study.biochemistId == null || study.biochemistId === req.user?.id;
-    }
-
-    if (!isPatient && !isBiochemist && !isAdmin) {
+    if (!canAccessStudy(req.user, study)) {
       return ResponseHelper.forbidden(res, "No tienes permiso para ver este estudio");
     }
 
@@ -280,11 +269,7 @@ export const downloadStudy = async (
       return ResponseHelper.notFound(res, "Estudio");
     }
 
-    const isPatient = study.userId === req.user?.id;
-    const isAdmin = req.user?.role?.name === "ADMIN";
-    const isBiochemist = req.user?.role?.name === "BIOCHEMIST" && (study.biochemistId == null || study.biochemistId === req.user?.id);
-
-    if (!isPatient && !isBiochemist && !isAdmin) {
+    if (!canAccessStudy(req.user, study)) {
       return ResponseHelper.forbidden(res, "No tienes permiso para descargar este estudio");
     }
 

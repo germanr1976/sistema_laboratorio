@@ -4,11 +4,16 @@ import {
   authMiddleware,
   isBiochemist,
   isAdmin,
+  isPatient,
 } from "@/modules/auth/middlewares/auth.middleware";
+import { TENANT_PERMISSION_KEYS } from '@/modules/auth/constants/permissions';
+import { requireTenantPermission } from '@/modules/auth/middlewares/permissions.middleware';
 import { upload } from "@/config/upload";
 import { tenantContext } from '@/middlewares/tenantContext.middleware';
+import { quotaGuard } from '@/middlewares/quotaGuard.middleware';
 
 const router = Router();
+const requirePermission = requireTenantPermission;
 
 /**
  * @route   POST /api/studies
@@ -20,6 +25,8 @@ router.post(
   authMiddleware,
   tenantContext,
   isBiochemist,
+  requirePermission(TENANT_PERMISSION_KEYS.STUDIES_CREATE),
+  quotaGuard('studies'),
   upload.fields([{ name: 'pdf', maxCount: 1 }, { name: 'pdfs', maxCount: 20 }]),
   studyController.createStudy
 );
@@ -41,6 +48,7 @@ router.get(
   authMiddleware,
   tenantContext,
   isBiochemist,
+  requirePermission(TENANT_PERMISSION_KEYS.STUDIES_READ_ASSIGNED),
   studyController.getMyStudies
 );
 
@@ -60,6 +68,7 @@ router.get(
   "/patient/me",
   authMiddleware,
   tenantContext,
+  isPatient,
   studyController.getMyStudiesAsPatient
 );
 
@@ -73,6 +82,7 @@ router.get(
   authMiddleware,
   tenantContext,
   isBiochemist,
+  requirePermission(TENANT_PERMISSION_KEYS.STUDIES_PATIENT_LOOKUP),
   studyController.getPatientByDni
 );
 
@@ -95,6 +105,7 @@ router.patch(
   authMiddleware,
   tenantContext,
   isBiochemist,
+  requirePermission(TENANT_PERMISSION_KEYS.STUDIES_UPDATE),
   studyController.updateStudy
 );
 
@@ -108,6 +119,7 @@ router.patch(
   authMiddleware,
   tenantContext,
   isBiochemist,
+  requirePermission(TENANT_PERMISSION_KEYS.STUDIES_STATUS_UPDATE),
   studyController.updateStudyStatus
 );
 
@@ -121,6 +133,7 @@ router.patch(
   authMiddleware,
   tenantContext,
   isBiochemist,
+  requirePermission(TENANT_PERMISSION_KEYS.STUDIES_UPDATE),
   upload.fields([{ name: 'pdf', maxCount: 1 }, { name: 'pdfs', maxCount: 20 }]),
   studyController.updateStudyPdf
 );
@@ -135,6 +148,7 @@ router.delete(
   authMiddleware,
   tenantContext,
   isBiochemist,
+  requirePermission(TENANT_PERMISSION_KEYS.STUDIES_ATTACHMENTS_DELETE),
   studyController.deleteAttachment
 );
 
@@ -148,6 +162,7 @@ router.post(
   authMiddleware,
   tenantContext,
   isBiochemist,
+  requirePermission(TENANT_PERMISSION_KEYS.STUDIES_CANCEL),
   studyController.cancelStudy
 );
 

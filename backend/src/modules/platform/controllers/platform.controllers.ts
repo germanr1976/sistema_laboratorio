@@ -1,5 +1,6 @@
 import { Request, Response } from 'express';
 import prisma from '@/config/prisma';
+import { getRuntimeMetricsSnapshot } from '@/config/runtimeMetrics';
 import { AUDIT_EVENT_TYPES, recordAuditEvent } from '@/modules/audit/services/audit.services';
 import { hashPassword } from '@/modules/auth/services/auth.services';
 import {
@@ -13,6 +14,18 @@ import {
 
 export async function bootstrapPlatformAdminController(req: Request, res: Response): Promise<Response> {
     try {
+        const bootstrapEnabledRaw = String(process.env.PLATFORM_BOOTSTRAP_ENABLED || '').trim().toLowerCase();
+        const bootstrapEnabled = bootstrapEnabledRaw
+            ? bootstrapEnabledRaw === 'true'
+            : process.env.NODE_ENV !== 'production';
+
+        if (!bootstrapEnabled) {
+            return res.status(410).json({
+                success: false,
+                message: 'Bootstrap de platform admin deshabilitado en este entorno',
+            });
+        }
+
         const providedSecret = String(req.headers['x-platform-bootstrap-secret'] || '').trim();
         const expectedSecret = String(process.env.PLATFORM_BOOTSTRAP_SECRET || '').trim();
 
@@ -655,6 +668,24 @@ export async function getGlobalMetricsController(_req: Request, res: Response): 
         return res.status(500).json({
             success: false,
             message: 'Error interno del servidor',
+        });
+    }
+}
+
+export async function getRuntimeMetricsController(req: Request, res: Response): Promise<Response> {
+    try {
+        return res.status(200).json({
+            success: true,
+            message: 'Métricas runtime obtenidas exitosamente',
+            requestId: req.id,
+            data: getRuntimeMetricsSnapshot(),
+        });
+    } catch (error) {
+        req.log.error({ err: error }, 'Error obteniendo métricas runtime');
+        return res.status(500).json({
+            success: false,
+            message: 'Error interno del servidor',
+            requestId: req.id,
         });
     }
 }

@@ -72,6 +72,11 @@ export async function authMiddleware(req: Request, res: Response, next: NextFunc
             },
             profile: user.profile,
         };
+        req.log = req.log.child({
+            userId: user.id,
+            tenantId: user.tenantId,
+            role: user.role.name,
+        });
         return next()
     } catch (error) {
         return res.status(401).json({

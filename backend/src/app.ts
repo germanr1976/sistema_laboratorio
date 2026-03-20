@@ -7,6 +7,7 @@ import multer from 'multer';
 import dotenv from 'dotenv';
 import logger from '@/config/logger';
 import { requestIdMiddleware } from '@/middlewares/requestId.middleware';
+import { requestTelemetryMiddleware } from '@/middlewares/requestTelemetry.middleware';
 import { httpsRedirect } from '@/middlewares/httpsRedirect.middleware';
 import { errorHandler } from '@/middlewares/errorHandler.middleware';
 
@@ -16,6 +17,9 @@ const app = express();
 
 // Agregar requestId a cada request (debe ir primero)
 app.use(requestIdMiddleware);
+
+// Registrar telemetría estructurada por request (duración, status, userId, tenantId)
+app.use(requestTelemetryMiddleware);
 
 // Redirigir HTTP a HTTPS en producción
 app.use(httpsRedirect);

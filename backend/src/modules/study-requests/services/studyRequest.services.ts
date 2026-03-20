@@ -10,6 +10,21 @@ const STUDY_REQUEST_STATUS = {
 type StudyRequestStatusValue = (typeof STUDY_REQUEST_STATUS)[keyof typeof STUDY_REQUEST_STATUS];
 const prismaAny = prisma as any;
 
+const buildStudyRequestTenantScope = (tenantId: number) => ({
+    OR: [
+        {
+            patient: {
+                tenantId,
+            },
+        },
+        {
+            convertedStudy: {
+                tenantId,
+            },
+        },
+    ],
+});
+
 interface CreateStudyRequestData {
     tenantId: number;
     patientId: number;
@@ -79,18 +94,7 @@ export const listStudyRequestsForProfessional = async (tenantId: number, filters
         where: {
             ...(filters.dni ? { dni: filters.dni } : {}),
             ...(filters.status ? { status: filters.status } : {}),
-            OR: [
-                {
-                    patient: {
-                        tenantId,
-                    },
-                },
-                {
-                    convertedStudy: {
-                        tenantId,
-                    },
-                },
-            ],
+            ...buildStudyRequestTenantScope(tenantId),
         },
         include: {
             patient: { include: { profile: true } },
@@ -110,18 +114,7 @@ export const getStudyRequestById = async (id: number, tenantId: number) => {
     return prismaAny.studyRequest.findFirst({
         where: {
             id,
-            OR: [
-                {
-                    patient: {
-                        tenantId,
-                    },
-                },
-                {
-                    convertedStudy: {
-                        tenantId,
-                    },
-                },
-            ],
+            ...buildStudyRequestTenantScope(tenantId),
         },
         include: {
             patient: { include: { profile: true, role: true } },
@@ -137,15 +130,22 @@ export const validateStudyRequest = async (id: number, tenantId: number, validat
         throw new Error('Solicitud no encontrada');
     }
 
-    // First update to VALIDATED
-    await prismaAny.studyRequest.update({
-        where: { id },
+    // First update to VALIDATED with tenant scope
+    const updatedRows = await prismaAny.studyRequest.updateMany({
+        where: {
+            id,
+            ...buildStudyRequestTenantScope(tenantId),
+        },
         data: {
             status: STUDY_REQUEST_STATUS.VALIDATED,
             validatedByUserId,
             validatedAt: new Date(),
         },
     });
+
+    if (!updatedRows || updatedRows.count === 0) {
+        throw new Error('Solicitud no encontrada');
+    }
 
     // Then convert to study
     const converted = await convertStudyRequestToStudy(id, tenantId, validatedByUserId);
@@ -158,26 +158,45 @@ export const rejectStudyRequest = async (id: number, tenantId: number, validated
         throw new Error('Solicitud no encontrada');
     }
 
-    return prismaAny.studyRequest.update({
-        where: { id },
+    const updatedRows = await prismaAny.studyRequest.updateMany({
+        where: {
+            id,
+            ...buildStudyRequestTenantScope(tenantId),
+        },
         data: {
             status: STUDY_REQUEST_STATUS.REJECTED,
             validatedByUserId,
             validatedAt: new Date(),
             observations: observations ?? undefined,
         },
-        include: {
-            patient: { include: { profile: true } },
-            validatedBy: { include: { profile: true } },
-            convertedStudy: true,
-        },
     });
+
+    if (!updatedRows || updatedRows.count === 0) {
+        throw new Error('Solicitud no encontrada');
+    }
+
+    const refreshed = await getStudyRequestById(id, tenantId);
+    if (!refreshed) {
+        throw new Error('Solicitud no encontrada');
+    }
+
+    return refreshed;
 };
 
 export const convertStudyRequestToStudy = async (id: number, tenantId: number, validatedByUserId: number) => {
     return prisma.$transaction(async (tx) => {
         const txAny = tx as any;
-        const request = await getStudyRequestById(id, tenantId);
+        const request = await txAny.studyRequest.findFirst({
+            where: {
+                id,
+                ...buildStudyRequestTenantScope(tenantId),
+            },
+            include: {
+                patient: { include: { profile: true, role: true } },
+                validatedBy: { include: { profile: true } },
+                convertedStudy: { include: { status: true } },
+            },
+        });
 
         if (!request) {
             throw new Error('Solicitud no encontrada');
@@ -225,13 +244,27 @@ export const convertStudyRequestToStudy = async (id: number, tenantId: number, v
             studyId = createdStudy.id;
         }
 
-        const updatedRequest = await txAny.studyRequest.update({
-            where: { id },
+        const updatedRows = await txAny.studyRequest.updateMany({
+            where: {
+                id,
+                ...buildStudyRequestTenantScope(tenantId),
+            },
             data: {
                 status: STUDY_REQUEST_STATUS.CONVERTED,
                 convertedStudyId: studyId,
                 validatedByUserId,
                 validatedAt: new Date(),
+            },
+        });
+
+        if (!updatedRows || updatedRows.count === 0) {
+            throw new Error('Solicitud no encontrada');
+        }
+
+        const updatedRequest = await txAny.studyRequest.findFirst({
+            where: {
+                id,
+                ...buildStudyRequestTenantScope(tenantId),
             },
             include: {
                 patient: { include: { profile: true } },
@@ -239,6 +272,10 @@ export const convertStudyRequestToStudy = async (id: number, tenantId: number, v
                 convertedStudy: { include: { status: true } },
             },
         });
+
+        if (!updatedRequest) {
+            throw new Error('Solicitud no encontrada');
+        }
 
         return updatedRequest;
     });

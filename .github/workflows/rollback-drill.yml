@@ -1,0 +1,31 @@
+name: Rollback Drill
+
+on:
+  workflow_dispatch:
+    inputs:
+      from_url:
+        description: URL de la version actual a validar (ej: https://app-v2.example.com)
+        required: true
+        type: string
+      to_url:
+        description: URL objetivo de rollback a validar (ej: https://app-v1.example.com)
+        required: true
+        type: string
+
+jobs:
+  rollback-drill:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: 22
+
+      - name: Ejecutar rollback drill
+        env:
+          ROLLBACK_FROM_URL: ${{ inputs.from_url }}
+          ROLLBACK_TO_URL: ${{ inputs.to_url }}
+        run: npm run rollback:drill

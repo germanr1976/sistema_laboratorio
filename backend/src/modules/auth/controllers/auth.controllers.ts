@@ -1,6 +1,6 @@
 import { Request, Response } from 'express';
 import { validateLogin } from '../validators/validators';
-import { comparePassword, generateToken, generatePasswordRecoveryToken, verifyPasswordRecoveryToken, hashPassword } from '../services/auth.services';
+import { buildRecoveryPasswordVersion, comparePassword, generateToken, generatePasswordRecoveryToken, verifyPasswordRecoveryToken, hashPassword } from '../services/auth.services';
 import { enviarCorreoRecuperacion } from '../services/emailService';
 import prisma from '@/config/prisma';
 import { validateDoctor, validatePatient } from '../validators/validators';
@@ -282,6 +282,18 @@ export async function loginController(req: Request, res: Response) {
 
 export async function registerDoctorController(req: Request, res: Response) {
     try {
+        const selfRegisterRaw = String(process.env.BIOCHEMIST_SELF_REGISTER_ENABLED || '').trim().toLowerCase();
+        const selfRegisterEnabled = selfRegisterRaw
+            ? selfRegisterRaw === 'true'
+            : process.env.NODE_ENV !== 'production';
+
+        if (!selfRegisterEnabled) {
+            return res.status(403).json({
+                success: false,
+                message: 'El registro libre de bioquímicos está deshabilitado. Contacta al ADMIN de tu tenant.',
+            });
+        }
+
         const tenant = await resolveTenantFromRequest(req, true);
         if (!tenant) {
             return res.status(500).json({
@@ -601,7 +613,7 @@ export async function requestPasswordRecoveryController(req: Request, res: Respo
         }
 
         // Generar token de recuperación
-        const recoveryToken = await generatePasswordRecoveryToken(user.id, user.tenantId, user.dni);
+        const recoveryToken = await generatePasswordRecoveryToken(user.id, user.tenantId, user.dni, user.password || '');
         const baseUrl = process.env.APP_FRONTEND_URL || 'http://localhost:3001';
         const recoveryLink = `${baseUrl}/recuperar-contrasena?token=${encodeURIComponent(recoveryToken)}`;
 
@@ -696,6 +708,14 @@ export async function resetPasswordController(req: Request, res: Response) {
             return res.status(404).json({
                 success: false,
                 message: 'Usuario no encontrado'
+            });
+        }
+
+        const expectedPasswordVersion = buildRecoveryPasswordVersion(user.password || '');
+        if (decodedToken.passwordVersion !== expectedPasswordVersion) {
+            return res.status(401).json({
+                success: false,
+                message: 'Token inválido o expirado'
             });
         }
 

@@ -2,6 +2,7 @@
 
 # dependencies
 /node_modules
+**/node_modules/
 /.pnp
 .pnp.*
 .yarn/*
@@ -43,3 +44,6 @@ next-env.d.ts
 
 # backend runtime uploads
 backend/uploads/
+
+# generated operational reports
+reports/
