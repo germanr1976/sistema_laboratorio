@@ -44,6 +44,60 @@ type OperationalAlert = {
     href: string;
 };
 
+type RuntimeRouteMetric = {
+    route: string;
+    requests: number;
+    errors4xx: number;
+    errors5xx: number;
+    rateLimited: number;
+    avgLatencyMs: number;
+    maxLatencyMs: number;
+};
+
+type RuntimeAlert = {
+    id: string;
+    severity: AlertSeverity;
+    title: string;
+    detail: string;
+    metric: string;
+    value: number;
+    threshold: number;
+};
+
+type RuntimeMetrics = {
+    uptimeSeconds: number;
+    process: {
+        pid: number;
+        nodeVersion: string;
+        memory: {
+            rss: number;
+            heapTotal: number;
+            heapUsed: number;
+            external: number;
+            arrayBuffers: number;
+        };
+    };
+    totals: {
+        requests: number;
+        errors4xx: number;
+        errors5xx: number;
+        rateLimited: number;
+        errorRate4xx: number;
+        errorRate5xx: number;
+    };
+    thresholds: {
+        minRequests: number;
+        errorRate5xx: number;
+        errorRate4xx: number;
+        rateLimited: number;
+        avgLatencyMs: number;
+        maxLatencyMs: number;
+    };
+    alerts: RuntimeAlert[];
+    routes: RuntimeRouteMetric[];
+    topRoutes: RuntimeRouteMetric[];
+};
+
 function getApiBase() {
     return process.env.NEXT_PUBLIC_API_URL || 'http://localhost:3000';
 }
@@ -53,6 +107,7 @@ export default function PlatformMetricasPage() {
     const [metrics, setMetrics] = useState<GlobalMetrics | null>(null);
     const [tenants, setTenants] = useState<TenantRow[]>([]);
     const [recentAuditEvents, setRecentAuditEvents] = useState<AuditEventRow[]>([]);
+    const [runtimeMetrics, setRuntimeMetrics] = useState<RuntimeMetrics | null>(null);
     const [message, setMessage] = useState('');
     const [messageType, setMessageType] = useState<'success' | 'error' | 'info'>('info');
 
@@ -64,24 +119,26 @@ export default function PlatformMetricasPage() {
         setMessageType('info');
         try {
             const dateFrom72h = new Date(Date.now() - 72 * 60 * 60 * 1000).toISOString();
-            const [metricsRes, tenantsRes] = await Promise.all([
+            const [metricsRes, tenantsRes, runtimeRes] = await Promise.all([
                 platformAuthFetch(`${apiBase}/api/platform/metrics/global`),
                 platformAuthFetch(`${apiBase}/api/platform/tenants`),
+                platformAuthFetch(`${apiBase}/api/platform/metrics/runtime`),
             ]);
 
-            if (metricsRes.status === 403 || tenantsRes.status === 403) {
+            if (metricsRes.status === 403 || tenantsRes.status === 403 || runtimeRes.status === 403) {
                 setMessage('No tenes permisos de administrador de plataforma.');
                 setMessageType('error');
                 return;
             }
 
-            const [metricsJson, tenantsJson] = await Promise.all([
+            const [metricsJson, tenantsJson, runtimeJson] = await Promise.all([
                 metricsRes.json().catch(() => ({})),
                 tenantsRes.json().catch(() => ({})),
+                runtimeRes.json().catch(() => ({})),
             ]);
 
-            if (!metricsRes.ok || !tenantsRes.ok) {
-                setMessage(metricsJson?.message || tenantsJson?.message || 'No se pudieron cargar las métricas.');
+            if (!metricsRes.ok || !tenantsRes.ok || !runtimeRes.ok) {
+                setMessage(runtimeJson?.message || metricsJson?.message || tenantsJson?.message || 'No se pudieron cargar las métricas.');
                 setMessageType('error');
                 return;
             }
@@ -106,6 +163,7 @@ export default function PlatformMetricasPage() {
 
             setMetrics(metricsJson?.data || null);
             setTenants(Array.isArray(tenantsJson?.data) ? tenantsJson.data : []);
+            setRuntimeMetrics(runtimeJson?.data || null);
             setRecentAuditEvents(auditEvents);
 
             if (!auditUnavailable) {
@@ -193,6 +251,19 @@ export default function PlatformMetricasPage() {
             });
         }
 
+        const runtimeAlerts = Array.isArray(runtimeMetrics?.alerts) ? runtimeMetrics.alerts : [];
+        runtimeAlerts
+            .filter((alert) => alert.id !== 'runtime-healthy')
+            .forEach((alert) => {
+                alertsList.push({
+                    id: `runtime-${alert.id}`,
+                    title: `Runtime: ${alert.title}`,
+                    detail: `${alert.detail} (umbral: ${alert.threshold})`,
+                    severity: alert.severity,
+                    href: '/platform/metricas',
+                });
+            });
+
         if (alertsList.length === 0) {
             alertsList.push({
                 id: 'healthy',
@@ -204,7 +275,13 @@ export default function PlatformMetricasPage() {
         }
 
         return alertsList;
-    }, [recentAuditEvents, tenants]);
+    }, [recentAuditEvents, runtimeMetrics?.alerts, tenants]);
+
+    const memoryUsageMb = useMemo(() => {
+        const rss = runtimeMetrics?.process?.memory?.rss;
+        if (!rss) return 0;
+        return Number((rss / 1024 / 1024).toFixed(1));
+    }, [runtimeMetrics?.process?.memory?.rss]);
 
     if (loading) {
         return <div className="p-6">Cargando métricas...</div>;
@@ -248,6 +325,60 @@ export default function PlatformMetricasPage() {
                 <MetricCard label="Suscripciones activas" value={metrics?.activeSubscriptions ?? 0} />
             </section>
 
+            <section className="rounded-xl border border-slate-200 bg-white p-4 space-y-4">
+                <div className="flex items-center justify-between">
+                    <h2 className="font-semibold text-slate-900">Runtime técnico (en vivo)</h2>
+                    <span className="text-xs text-slate-500">Fuente: /api/platform/metrics/runtime</span>
+                </div>
+
+                <div className="grid grid-cols-1 md:grid-cols-3 xl:grid-cols-6 gap-3">
+                    <MetricCard label="Req totales" value={runtimeMetrics?.totals.requests ?? 0} />
+                    <MetricCard label="Errores 4xx" value={runtimeMetrics?.totals.errors4xx ?? 0} />
+                    <MetricCard label="Errores 5xx" value={runtimeMetrics?.totals.errors5xx ?? 0} />
+                    <MetricCard label="429" value={runtimeMetrics?.totals.rateLimited ?? 0} />
+                    <MetricCard label="5xx %" value={runtimeMetrics?.totals.errorRate5xx ?? 0} suffix="%" />
+                    <MetricCard label="Memoria RSS" value={memoryUsageMb} suffix="MB" />
+                </div>
+
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-3 text-sm text-slate-700">
+                    <div className="rounded border border-slate-200 bg-slate-50 px-3 py-2">
+                        <p><span className="font-semibold">Uptime:</span> {runtimeMetrics?.uptimeSeconds ?? 0}s</p>
+                        <p><span className="font-semibold">Node:</span> {runtimeMetrics?.process.nodeVersion ?? '-'}</p>
+                    </div>
+                    <div className="rounded border border-slate-200 bg-slate-50 px-3 py-2">
+                        <p><span className="font-semibold">Umbral 5xx:</span> {runtimeMetrics?.thresholds.errorRate5xx ?? 0}%</p>
+                        <p><span className="font-semibold">Umbral avg latencia:</span> {runtimeMetrics?.thresholds.avgLatencyMs ?? 0} ms</p>
+                    </div>
+                </div>
+
+                <div className="overflow-x-auto">
+                    <table className="min-w-full text-sm border border-slate-200 rounded-lg overflow-hidden">
+                        <thead className="bg-slate-50 text-slate-700">
+                            <tr>
+                                <th className="text-left px-3 py-2">Ruta</th>
+                                <th className="text-right px-3 py-2">Req</th>
+                                <th className="text-right px-3 py-2">4xx</th>
+                                <th className="text-right px-3 py-2">5xx</th>
+                                <th className="text-right px-3 py-2">Avg ms</th>
+                                <th className="text-right px-3 py-2">Max ms</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            {(runtimeMetrics?.topRoutes || []).map((route) => (
+                                <tr key={route.route} className="border-t border-slate-100">
+                                    <td className="px-3 py-2 font-mono text-xs text-slate-800">{route.route}</td>
+                                    <td className="px-3 py-2 text-right">{route.requests}</td>
+                                    <td className="px-3 py-2 text-right">{route.errors4xx}</td>
+                                    <td className="px-3 py-2 text-right">{route.errors5xx}</td>
+                                    <td className="px-3 py-2 text-right">{route.avgLatencyMs}</td>
+                                    <td className="px-3 py-2 text-right">{route.maxLatencyMs}</td>
+                                </tr>
+                            ))}
+                        </tbody>
+                    </table>
+                </div>
+            </section>
+
             <section className="rounded-xl border border-slate-200 bg-white p-4">
                 <div className="flex items-center justify-between mb-3">
                     <h2 className="font-semibold text-slate-900">Alertas operativas</h2>
@@ -284,11 +415,11 @@ export default function PlatformMetricasPage() {
     );
 }
 
-function MetricCard({ label, value }: { label: string; value: number }) {
+function MetricCard({ label, value, suffix = '' }: { label: string; value: number; suffix?: string }) {
     return (
         <div className="rounded-lg border border-slate-200 bg-white p-4">
             <p className="text-xs uppercase tracking-wide text-slate-500">{label}</p>
-            <p className="text-2xl font-semibold text-slate-900">{value}</p>
+            <p className="text-2xl font-semibold text-slate-900">{value}{suffix}</p>
         </div>
     );
 }

@@ -35,7 +35,7 @@ export const getStatusBadgeClass = (status?: string) => {
     }
 }
 
-export default {
+const uiClasses = {
     cardClasses,
     leftColClasses,
     nameClasses,
@@ -51,3 +51,5 @@ export default {
     badgeAnulado,
     getStatusBadgeClass,
 }
+
+export default uiClasses

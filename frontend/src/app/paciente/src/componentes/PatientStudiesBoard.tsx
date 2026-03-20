@@ -53,6 +53,28 @@ type Props = {
   emptyHint?: string
 }
 
+interface BackendStudyItem {
+  id?: string | number
+  studyName?: string
+  studyDate?: string
+  socialInsurance?: string
+  doctor?: string
+  pdfUrl?: string
+  pdfs?: string[]
+  status?: {
+    name?: string
+  }
+  patient?: {
+    dni?: string
+    profile?: {
+      firstName?: string
+      lastName?: string
+    }
+  }
+}
+
+type ToastType = "success" | "error" | "info"
+
 function formatDate(value?: string) {
   if (!value) return "-"
   const parsed = new Date(value)
@@ -90,7 +112,7 @@ export default function PatientStudiesBoard({
   const [activeFilter, setActiveFilter] = useState<StudyFilter>(initialFilter)
   const [currentPage, setCurrentPage] = useState(1)
   const itemsPerPage = 10
-  const [toast, setToast] = useState<{ message: string; type?: string; show: boolean }>({ message: '', type: 'success', show: false })
+  const [toast, setToast] = useState<{ message: string; type: ToastType; show: boolean }>({ message: '', type: 'success', show: false })
 
   useEffect(() => {
     let mounted = true
@@ -109,7 +131,7 @@ export default function PatientStudiesBoard({
           console.warn("Respuesta inesperada en /patient/me, se esperaba array:", result)
         }
 
-        const transformed: Study[] = backendStudies.map((s: any) => {
+        const transformed: Study[] = backendStudies.map((s: BackendStudyItem) => {
           const pdfs = Array.isArray(s.pdfs) ? s.pdfs : (s.pdfUrl ? [s.pdfUrl] : [])
           const pdfLinks = pdfs.map((p: string) => p.startsWith('http') ? p : `${API_URL}${p}`)
           return {
@@ -168,7 +190,7 @@ export default function PatientStudiesBoard({
     try {
       await navigator.clipboard.writeText(url)
       setToast({ message: 'Enlace copiado al portapapeles', type: 'success', show: true })
-    } catch (e) {
+    } catch {
       setToast({ message: 'No se pudo copiar el enlace', type: 'error', show: true })
       prompt('Copiá el enlace:', url)
     }
@@ -180,7 +202,7 @@ export default function PatientStudiesBoard({
         <div className="fixed bottom-6 right-6 z-50">
           <Toast
             message={toast.message}
-            type={toast.type as any}
+            type={toast.type}
             show={toast.show}
             onClose={() => setToast({ ...toast, show: false })}
           />
@@ -383,7 +405,7 @@ export default function PatientStudiesBoard({
                                         a.remove()
                                         window.URL.revokeObjectURL(url)
                                         setToast({ message: 'Descarga iniciada en segundo plano', type: 'success', show: true })
-                                      } catch (e) {
+                                      } catch {
                                         setToast({ message: 'Error al descargar el PDF', type: 'error', show: true })
                                       }
                                     }}

@@ -1,10 +1,9 @@
 "use client";
-import { useState, useEffect } from 'react';
+import { useEffect, useState } from 'react';
 import { useRouter } from 'next/navigation';
 
 export default function HomePage() {
     const [selected, setSelected] = useState<'paciente' | 'profesional' | null>(null);
-    const [isChecking, setIsChecking] = useState(true);
     const router = useRouter();
 
     useEffect(() => {
@@ -13,18 +12,7 @@ export default function HomePage() {
         if (justLoggedOut) {
             sessionStorage.removeItem('justLoggedOut');
         }
-        setIsChecking(false);
     }, [router]);
-
-    if (isChecking) {
-        return (
-            <div className="min-h-screen flex items-center justify-center bg-white">
-                <div className="text-center">
-                    <div className="inline-block animate-spin rounded-full h-12 w-12 border-b-2 border-blue-500"></div>
-                </div>
-            </div>
-        );
-    }
 
     return (
         <main className="min-h-screen flex flex-col items-center justify-center bg-linear-to-br from-blue-50 via-slate-50 to-gray-50 relative overflow-hidden z-10">

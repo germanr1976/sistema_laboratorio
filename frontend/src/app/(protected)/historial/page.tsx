@@ -1,13 +1,47 @@
 "use client"
 
-import { useEffect, useState } from "react"
+import { useCallback, useEffect, useState } from "react"
 import { Search, FileText, Calendar } from "lucide-react"
 import { StudiesTable } from "../../../componentes/Historial-Fecha"
 import Toast from "../../../componentes/Toast"
 import { cancelStudy, getMyStudies } from "../../../utils/studiesApi"
 import type { Study } from "../../../utils/tipos"
+import { useAuth } from "../../../utils/useAuth"
 
 const DATE_ONLY_REGEX = /^(\d{4})-(\d{2})-(\d{2})$/
+
+interface ApiStudyAttachment {
+    url?: string | null
+}
+
+interface ApiStudyItem {
+    id: string | number
+    patient?: {
+        fullName?: string | null
+        dni?: string | null
+        profile?: {
+            firstName?: string | null
+            lastName?: string | null
+        } | null
+    } | null
+    socialInsurance?: string | null
+    studyDate?: string | null
+    createdAt?: string | null
+    status?: {
+        name?: string | null
+    } | null
+    doctor?: string | null
+    attachments?: ApiStudyAttachment[] | null
+    pdfs?: string[] | null
+    pdfUrl?: string | null
+}
+
+const getErrorMessage = (error: unknown, fallback: string) => {
+    if (error instanceof Error && error.message) {
+        return error.message
+    }
+    return fallback
+}
 
 const parseDateSafe = (value?: string) => {
     if (!value) return new Date(NaN)
@@ -25,6 +59,8 @@ const parseDateSafe = (value?: string) => {
 }
 
 export default function LabHistoryPage() {
+    const { userData } = useAuth('')
+    const isBiochemist = String(userData?.role || '').toUpperCase() === 'BIOCHEMIST'
     const [startDate, setStartDate] = useState("")
     const [endDate, setEndDate] = useState("")
     const [statusFilter, setStatusFilter] = useState<"todos" | Study["status"]>("todos")
@@ -44,7 +80,7 @@ export default function LabHistoryPage() {
         return "En Proceso"
     }
 
-    const sortStudiesByDate = (studies: Study[], order: "desc" | "asc") => {
+    const sortStudiesByDate = useCallback((studies: Study[], order: "desc" | "asc") => {
         return [...studies].sort((a, b) => {
             const dateA = parseDateSafe(a.date).getTime()
             const dateB = parseDateSafe(b.date).getTime()
@@ -55,9 +91,9 @@ export default function LabHistoryPage() {
 
             return order === "desc" ? dateB - dateA : dateA - dateB
         })
-    }
+    }, [])
 
-    const applyFilters = (
+    const applyFilters = useCallback((
         studies: Study[],
         status: "todos" | Study["status"],
         order: "desc" | "asc",
@@ -88,7 +124,7 @@ export default function LabHistoryPage() {
         })
 
         return sortStudiesByDate(filteredByDate, order)
-    }
+    }, [sortStudiesByDate])
 
     const showToastMessage = (message: string, type: "success" | "error" | "info" = "info") => {
         setToastMessage(message)
@@ -96,19 +132,19 @@ export default function LabHistoryPage() {
         setShowToast(true)
     }
 
-    const loadStudies = async (order: "desc" | "asc" = sortOrder) => {
+    const loadStudies = useCallback(async (order: "desc" | "asc" = sortOrder) => {
         try {
             setLoading(true)
             const studies = await getMyStudies()
 
-            const transformedStudies: Study[] = studies.map((s: any) => {
+            const transformedStudies: Study[] = studies.map((s: ApiStudyItem) => {
                 const patientName = (
                     s.patient?.fullName ||
                     `${s.patient?.profile?.firstName || ""} ${s.patient?.profile?.lastName || ""}`
                 ).trim()
 
                 const attachmentUrls = Array.isArray(s.attachments)
-                    ? s.attachments.map((a: any) => a?.url).filter(Boolean)
+                    ? s.attachments.map((a: ApiStudyAttachment) => a?.url).filter((url): url is string => Boolean(url))
                     : []
                 const rawPdfs = attachmentUrls.length > 0
                     ? attachmentUrls
@@ -134,19 +170,19 @@ export default function LabHistoryPage() {
             const sortedStudies = sortStudiesByDate(transformedStudies, order)
             setAllStudies(sortedStudies)
             setFilteredStudies(applyFilters(sortedStudies, statusFilter, order, startDate, endDate))
-        } catch (error: any) {
+        } catch (error: unknown) {
             console.error("Error cargando historial profesional:", error)
-            showToastMessage(error.message || "No se pudieron cargar los estudios", "error")
+            showToastMessage(getErrorMessage(error, "No se pudieron cargar los estudios"), "error")
             setAllStudies([])
             setFilteredStudies([])
         } finally {
             setLoading(false)
         }
-    }
+    }, [applyFilters, endDate, sortOrder, startDate, statusFilter, sortStudiesByDate])
 
     useEffect(() => {
-        loadStudies()
-    }, [])
+        void loadStudies()
+    }, [loadStudies])
 
     const handleSearch = () => {
         setFilteredStudies(applyFilters(allStudies, statusFilter, sortOrder, startDate, endDate))
@@ -185,9 +221,9 @@ export default function LabHistoryPage() {
             await cancelStudy(numericStudyId)
             showToastMessage("Estudio anulado exitosamente", "success")
             await loadStudies(sortOrder)
-        } catch (error: any) {
+        } catch (error: unknown) {
             console.error("Error anulando estudio:", error)
-            showToastMessage(error.message || "Error al anular el estudio", "error")
+            showToastMessage(getErrorMessage(error, "Error al anular el estudio"), "error")
         } finally {
             setCancellingStudyId(null)
         }
@@ -331,7 +367,7 @@ export default function LabHistoryPage() {
                             <div className="p-6">
                                 <StudiesTable
                                     studies={filteredStudies}
-                                    onCancelStudy={handleCancelStudy}
+                                    onCancelStudy={isBiochemist ? handleCancelStudy : undefined}
                                     cancellingStudyId={cancellingStudyId}
                                 />
                             </div>

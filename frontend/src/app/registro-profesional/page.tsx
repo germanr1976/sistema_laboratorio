@@ -2,7 +2,7 @@
 
 import Link from "next/link";
 import React, { useState } from "react";
-import { Toaster, toast } from 'react-hot-toast';
+import { toast } from 'react-hot-toast';
 import { useRouter } from 'next/navigation';
 
 export default function RegistroProfesional() {
@@ -22,6 +22,13 @@ export default function RegistroProfesional() {
     const [loading, setLoading] = useState(false);
     const DNI_MAX = 8;
     const MATRICULA_MAX = 18;
+
+    const getErrorMessage = (error: unknown) => {
+        if (error instanceof Error && error.message) {
+            return error.message;
+        }
+        return 'Error al conectar con el servidor';
+    };
 
     const handleSubmit = async (e: React.FormEvent) => {
         e.preventDefault();
@@ -63,10 +70,10 @@ export default function RegistroProfesional() {
             toast.dismiss();
             toast.success('Registrado correctamente. Redirigiendo al login...');
             router.push('/login-profesional');
-        } catch (err: any) {
+        } catch (err: unknown) {
             toast.dismiss();
             console.error('Registro error', err);
-            toast.error(err?.message || 'Error al conectar con el servidor');
+            toast.error(getErrorMessage(err));
             setLoading(false);
         }
     };

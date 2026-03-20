@@ -3,8 +3,35 @@
 import Link from 'next/link';
 import { usePathname, useRouter } from 'next/navigation';
 import { Building2, BarChart3, LogOut, ClipboardList } from 'lucide-react';
-import { useEffect, useState } from 'react';
+import { useEffect } from 'react';
 import { clearPlatformSession } from '../../../utils/platformAuth';
+
+function getPlatformAppAccess() {
+    if (typeof window === 'undefined') {
+        return { canAccess: false, redirectTo: null as string | null };
+    }
+
+    const token = localStorage.getItem('platformAuthToken');
+    const rawUser = localStorage.getItem('platformUserData');
+
+    if (!token || !rawUser) {
+        return { canAccess: false, redirectTo: '/platform/login' as string | null };
+    }
+
+    try {
+        const user = JSON.parse(rawUser);
+        const role = String(user?.role || '').toUpperCase();
+        const hasPlatformAccess = role === 'PLATFORM_ADMIN' || Boolean(user?.isPlatformAdmin);
+
+        if (!hasPlatformAccess) {
+            return { canAccess: false, redirectTo: '/platform/login' as string | null };
+        }
+
+        return { canAccess: true, redirectTo: null as string | null };
+    } catch {
+        return { canAccess: false, redirectTo: '/platform/login' as string | null };
+    }
+}
 
 export default function PlatformAppLayout({
     children,
@@ -13,32 +40,15 @@ export default function PlatformAppLayout({
 }) {
     const router = useRouter();
     const pathname = usePathname();
-    const [canAccess, setCanAccess] = useState(false);
+    const access = getPlatformAppAccess();
 
     useEffect(() => {
-        const token = localStorage.getItem('platformAuthToken');
-        const rawUser = localStorage.getItem('platformUserData');
-
-        if (!token || !rawUser) {
-            router.replace('/platform/login');
-            return;
+        if (access.redirectTo) {
+            router.replace(access.redirectTo);
         }
+    }, [access.redirectTo, router]);
 
-        try {
-            const user = JSON.parse(rawUser);
-            const role = String(user?.role || '').toUpperCase();
-            const hasPlatformAccess = role === 'PLATFORM_ADMIN' || Boolean(user?.isPlatformAdmin);
-            if (!hasPlatformAccess) {
-                router.replace('/platform/login');
-                return;
-            }
-            setCanAccess(true);
-        } catch {
-            router.replace('/platform/login');
-        }
-    }, [router]);
-
-    if (!canAccess) {
+    if (!access.canAccess) {
         return null;
     }
 

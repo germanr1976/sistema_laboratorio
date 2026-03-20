@@ -1,6 +1,5 @@
 "use client"
 
-import { useState, useEffect } from "react"
 import Link from "next/link"
 import { usePathname } from "next/navigation"
 import { Home, User, Settings, HelpCircle, LogOut, FilePlus2 } from "lucide-react"
@@ -9,50 +8,49 @@ interface SidebarProps {
   className?: string
 }
 
+function getPatientSidebarUserData() {
+  if (typeof window === 'undefined') {
+    return { userName: 'Paciente', userInitials: 'P', userDni: '' }
+  }
+
+  try {
+    const userDataStr = localStorage.getItem('userData')
+    if (!userDataStr) {
+      return { userName: 'Paciente', userInitials: 'P', userDni: '' }
+    }
+
+    const userData = JSON.parse(userDataStr)
+    let fullName = 'Paciente'
+    if (userData.profile?.firstName && userData.profile?.lastName) {
+      fullName = `${userData.profile.firstName} ${userData.profile.lastName}`
+    } else if (userData.profile?.firstName) {
+      fullName = userData.profile.firstName
+    } else if (userData.profile?.lastName) {
+      fullName = userData.profile.lastName
+    }
+
+    const initials = fullName
+      .split(' ')
+      .map((n: string) => n[0])
+      .join('')
+      .toUpperCase()
+      .slice(0, 2) || 'P'
+
+    return {
+      userName: fullName,
+      userInitials: initials,
+      userDni: userData.dni || '',
+    }
+  } catch (e) {
+    console.error('Error loading user data', e)
+    return { userName: 'Paciente', userInitials: 'P', userDni: '' }
+  }
+}
+
 export function Sidebar({ className = "" }: SidebarProps) {
   const pathname = usePathname()
   const basePath = "/paciente"
-  const [userName, setUserName] = useState<string>("Paciente")
-  const [userInitials, setUserInitials] = useState<string>("P")
-  const [userDni, setUserDni] = useState<string>("")
-
-  useEffect(() => {
-    // Cargar datos del usuario desde localStorage
-    try {
-      const userDataStr = localStorage.getItem("userData")
-      if (userDataStr) {
-        const userData = JSON.parse(userDataStr)
-
-        // Obtener nombre completo desde profile
-        let fullName = "Paciente"
-        if (userData.profile?.firstName && userData.profile?.lastName) {
-          fullName = `${userData.profile.firstName} ${userData.profile.lastName}`
-        } else if (userData.profile?.firstName) {
-          fullName = userData.profile.firstName
-        } else if (userData.profile?.lastName) {
-          fullName = userData.profile.lastName
-        }
-
-        setUserName(fullName)
-
-        // Calcular iniciales
-        const initials = fullName
-          .split(" ")
-          .map((n: string) => n[0])
-          .join("")
-          .toUpperCase()
-          .slice(0, 2)
-        setUserInitials(initials)
-
-        // Obtener DNI
-        if (userData.dni) {
-          setUserDni(userData.dni)
-        }
-      }
-    } catch (e) {
-      console.error("Error loading user data", e)
-    }
-  }, [])
+  const { userName, userInitials, userDni } = getPatientSidebarUserData()
 
   const menuItems = [
     { id: "dashboard", label: "Mis estudios", icon: Home, href: `${basePath}/dashboard` },

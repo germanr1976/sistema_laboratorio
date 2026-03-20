@@ -9,6 +9,29 @@ import type { Study } from "../../utils/tipos"
 const API_URL = process.env.NEXT_PUBLIC_API_URL || "http://localhost:3000"
 const DATE_ONLY_REGEX = /^(\d{4})-(\d{2})-(\d{2})$/
 
+interface ApiAttachment {
+  url?: string | null
+}
+
+interface ApiPatientStudy {
+  id?: string | number
+  attachments?: ApiAttachment[]
+  pdfs?: string[]
+  pdfUrl?: string
+  patient?: {
+    profile?: {
+      firstName?: string
+      lastName?: string
+    }
+  }
+  socialInsurance?: string
+  studyDate?: string
+  status?: {
+    name?: string
+  }
+  doctor?: string
+}
+
 const parseDateSafe = (value?: string) => {
   if (!value) return new Date(NaN)
   const raw = value.trim()
@@ -68,9 +91,9 @@ export default function LabHistoryPage() {
           console.warn('Formato inesperado en /patient/me:', result);
         }
         // Transformar datos del backend al formato del componente
-        const transformedStudies: Study[] = backendStudies.map((s: any) => {
+        const transformedStudies: Study[] = backendStudies.map((s: ApiPatientStudy) => {
           const attachmentUrls = Array.isArray(s.attachments)
-            ? s.attachments.map((a: any) => a?.url).filter(Boolean)
+            ? s.attachments.map((a: ApiAttachment) => a?.url).filter((url): url is string => Boolean(url))
             : [];
           const rawPdfs = attachmentUrls.length > 0
             ? attachmentUrls

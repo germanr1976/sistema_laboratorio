@@ -2,9 +2,16 @@
 
 
 import { useState, useRef } from "react";
-import { Toaster, toast } from "react-hot-toast";
+import { toast } from "react-hot-toast";
 
 import Link from "next/link";
+
+const getErrorMessage = (error: unknown) => {
+    if (error instanceof Error && error.message) {
+        return error.message;
+    }
+    return 'Error al conectar con el servidor';
+};
 
 export default function LoginPaciente() {
     const [dni, setDni] = useState("");
@@ -85,9 +92,9 @@ export default function LoginPaciente() {
             toast.success('Login exitoso');
             // Redirigir al dashboard del paciente
             window.location.href = '/paciente/dashboard';
-        } catch (error: any) {
+        } catch (error: unknown) {
             console.error('Login error', error);
-            toast.error(error?.message || 'Error al conectar con el servidor');
+            toast.error(getErrorMessage(error));
         }
     };
 

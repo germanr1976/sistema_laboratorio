@@ -27,27 +27,42 @@ interface EstudioExistente {
     estado?: 'completado' | 'en_proceso' | 'parcial'
 }
 
+interface LocalStudyMeta {
+    id?: string
+    backendId?: number | string
+    serverId?: number | string
+    nombreApellido?: string
+    studyName?: string
+    dni?: string
+    fechaEstudio?: string
+    fecha?: string
+    obraSocial?: string
+    socialInsurance?: string
+    medico?: string
+    pdfs?: string[]
+    estado?: 'completado' | 'en_proceso' | 'parcial'
+    status?: 'completado' | 'en_proceso' | 'parcial'
+}
+
 function CargarNuevoContent() {
     const searchParams = useSearchParams()
+    const datosPacienteBloqueados = searchParams?.get('bloqDatos') === 'true'
     const [estudioExistente, setEstudioExistente] = useState<EstudioExistente | null>(null)
     const [loading, setLoading] = useState(false)
     const [permitirCambio, setPermitirCambio] = useState(false)
-    const [datosPacienteBloqueados, setDatosPacienteBloqueados] = useState(false)
 
     // Cargar estudio si viene con ID en params
     useEffect(() => {
         const id = searchParams?.get('id')
-        const bloqDatos = searchParams?.get('bloqDatos') === 'true'
 
         if (!id) return
 
-        setDatosPacienteBloqueados(bloqDatos)
-        setLoading(true)
+        const loadingTimer = window.setTimeout(() => setLoading(true), 0)
         const loadFromLocal = () => {
             try {
                 const raw = localStorage.getItem('estudios_metadata')
-                const metas = raw ? JSON.parse(raw) : []
-                const encontrado = metas.find((m: any) => m.id === id)
+                const metas = raw ? (JSON.parse(raw) as LocalStudyMeta[]) : []
+                const encontrado = metas.find((m: LocalStudyMeta) => m.id === id)
 
                 if (encontrado) {
                     const estudioMapeado: EstudioExistente = {
@@ -141,8 +156,9 @@ function CargarNuevoContent() {
         if (!foundLocal) {
             loadFromBackend().finally(() => setLoading(false))
         } else {
-            setLoading(false)
+            window.setTimeout(() => setLoading(false), 0)
         }
+        return () => window.clearTimeout(loadingTimer)
     }, [searchParams])
 
     if (loading) {

@@ -23,9 +23,17 @@ function getApiBase() {
     return process.env.NEXT_PUBLIC_API_URL || 'http://localhost:3000';
 }
 
-function getApiErrorMessage(json: any, fallback: string) {
+type ApiErrorPayload = {
+    message?: string;
+    errors?: Array<{
+        message?: string;
+        path?: string[];
+    }>;
+};
+
+function getApiErrorMessage(json: ApiErrorPayload | null | undefined, fallback: string) {
     if (json?.message && typeof json.message === 'string' && json.message.trim()) {
-        if (Array.isArray(json?.errors) && json.errors.length > 0) {
+        if (Array.isArray(json.errors) && json.errors.length > 0) {
             const first = json.errors[0];
             const detail = first?.message || first?.path?.join('.') || '';
             return detail ? `${json.message}: ${String(detail).replaceAll('"', '')}` : json.message;

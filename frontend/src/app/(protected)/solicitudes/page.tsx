@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useState } from "react";
 import authFetch from "../../../utils/authFetch";
 import RequestDetail from './_requestDetail';
 
@@ -27,6 +27,49 @@ interface StudyRequestRow {
         } | null;
     } | null;
 }
+
+interface StudyAttachment {
+    id: number;
+    url?: string | null;
+}
+
+interface StudyDetail {
+    id: number;
+    pdfUrl?: string | null;
+    attachments?: StudyAttachment[];
+    [key: string]: unknown;
+}
+
+const asRecord = (value: unknown): Record<string, unknown> | null => {
+    if (typeof value === "object" && value !== null) {
+        return value as Record<string, unknown>;
+    }
+    return null;
+};
+
+const parseApiData = async (response: Response): Promise<Record<string, unknown>> => {
+    const parsed = await response.json().catch(() => ({}));
+    const record = asRecord(parsed);
+    return record || {};
+};
+
+const getMessage = (value: unknown, fallback: string): string => {
+    if (typeof value === "string" && value.trim().length > 0) {
+        return value;
+    }
+    if (value instanceof Error && value.message) {
+        return value.message;
+    }
+    return fallback;
+};
+
+const getActionableMessage = (status: number, value: unknown, fallback: string): string => {
+    const base = getMessage(value, fallback);
+    if (status === 403) {
+        return `${base}. Contacta al ADMIN del tenant para revisar tus permisos de solicitudes.`;
+    }
+    return base;
+};
 
 const statusLabel: Record<StudyRequestStatus, string> = {
     PENDING: "En proceso",
@@ -66,12 +109,6 @@ export default function SolicitudesPage() {
     const [lastUpdatedAt, setLastUpdatedAt] = useState<Date | null>(null);
     const [rejectTargetId, setRejectTargetId] = useState<number | null>(null);
     const [rejectReason, setRejectReason] = useState("");
-    // ya no se usa convertTargetId
-
-    const resolveOrderUrl = (value?: string | null) => {
-        if (!value) return null;
-        return value.startsWith("http") ? value : `${API_URL}${value}`;
-    };
 
     const queryString = useMemo(() => {
         const params = new URLSearchParams();
@@ -81,17 +118,17 @@ export default function SolicitudesPage() {
         return qs ? `?${qs}` : "";
     }, [dniFilter]);
 
-    const loadRows = async (showSpinner = true) => {
+    const loadRows = useCallback(async (showSpinner = true) => {
         try {
             if (showSpinner) {
                 setLoading(true);
             }
             const response = await authFetch(`${API_URL}/api/study-requests${queryString}`);
-            const data = await response.json().catch(() => ({}));
+            const data = await parseApiData(response);
 
             if (!response.ok) {
                 setRows([]);
-                setError(data?.message || "No se pudieron cargar las solicitudes");
+                setError(getActionableMessage(response.status, data.message, "No se pudieron cargar las solicitudes"));
                 return [];
             }
 
@@ -110,22 +147,22 @@ export default function SolicitudesPage() {
                 setLoading(false);
             }
         }
-    };
+    }, [queryString]);
 
     useEffect(() => {
-        loadRows(true);
-    }, [queryString]);
+        void loadRows(true);
+    }, [loadRows]);
 
     useEffect(() => {
         const intervalId = window.setInterval(() => {
             if (actingId !== null || rejectTargetId !== null) {
                 return;
             }
-            loadRows(false);
+            void loadRows(false);
         }, AUTO_REFRESH_MS);
 
         return () => window.clearInterval(intervalId);
-    }, [queryString, actingId, rejectTargetId]);
+    }, [actingId, rejectTargetId, loadRows]);
 
     const runAction = async (
         id: number,
@@ -137,7 +174,7 @@ export default function SolicitudesPage() {
 
             let url = `${API_URL}/api/study-requests/${id}`;
             let method: "PATCH" | "POST" = "PATCH";
-            let body: any = undefined;
+            let body: string | undefined;
 
             if (action === "validate") {
                 url += "/validate";
@@ -155,21 +192,21 @@ export default function SolicitudesPage() {
                 body,
             });
 
-            const data = await response.json().catch(() => ({}));
+            const data = await parseApiData(response);
             if (!response.ok) {
                 // Conflict errors suelen indicar double-convert; ignorar silenciosamente
                 if (response.status === 409 && action === 'convert') {
                     console.warn('acción convert conflict, ya estaba en proceso');
                     return null;
                 }
-                setError(data?.message || "No se pudo ejecutar la acción");
+                setError(getActionableMessage(response.status, data.message, "No se pudo ejecutar la acción"));
                 return null;
             }
 
             await loadRows();
             setError(null);
             // Devolver payload para que el caller pueda extraer convertedStudyId/studyId sin depender del listado filtrado.
-            return data?.data || data || null;
+            return asRecord(data.data) || data || null;
         } catch (e) {
             console.error(e);
             setError("Error al conectar con el servidor");
@@ -180,25 +217,32 @@ export default function SolicitudesPage() {
     };
 
     const [selectedRequest, setSelectedRequest] = useState<StudyRequestRow | null>(null);
-    const [selectedStudy, setSelectedStudy] = useState<any | null>(null);
+    const [selectedStudy, setSelectedStudy] = useState<StudyDetail | null>(null);
     const [loadingStudy, setLoadingStudy] = useState(false);
     const [uploading, setUploading] = useState(false);
     const [successMessage, setSuccessMessage] = useState<string | null>(null);
 
-    const extractStudyIdFromPayload = (payload: any): number | null => {
+    const extractStudyIdFromPayload = (payload: unknown): number | null => {
         if (!payload) return null;
 
+        const root = asRecord(payload);
+        const rootData = asRecord(root?.data);
+        const convertedStudy = asRecord(root?.convertedStudy);
+        const study = asRecord(root?.study);
+        const dataConvertedStudy = asRecord(rootData?.convertedStudy);
+        const dataStudy = asRecord(rootData?.study);
+
         const candidates = [
-            payload?.convertedStudyId,
-            payload?.convertedStudy?.id,
-            payload?.studyId,
-            payload?.study?.id,
-            payload?.id,
-            payload?.data?.convertedStudyId,
-            payload?.data?.convertedStudy?.id,
-            payload?.data?.studyId,
-            payload?.data?.study?.id,
-            payload?.data?.id,
+            root?.convertedStudyId,
+            convertedStudy?.id,
+            root?.studyId,
+            study?.id,
+            root?.id,
+            rootData?.convertedStudyId,
+            dataConvertedStudy?.id,
+            rootData?.studyId,
+            dataStudy?.id,
+            rootData?.id,
         ];
 
         for (const candidate of candidates) {
@@ -211,9 +255,9 @@ export default function SolicitudesPage() {
     const fetchRequestById = async (requestId: number) => {
         try {
             const resp = await authFetch(`${API_URL}/api/study-requests/${requestId}`);
-            const j = await resp.json().catch(() => ({}));
+            const j = await parseApiData(resp);
             if (!resp.ok) return null;
-            return j?.data || j || null;
+            return j.data || j || null;
         } catch (e) {
             console.warn('[fetchRequestById] No se pudo obtener solicitud por id:', e);
             return null;
@@ -307,16 +351,16 @@ export default function SolicitudesPage() {
     const fetchStudy = async (studyId: number, retries = 3) => {
         try {
             setLoadingStudy(true);
-            let lastError: any = null;
+            let lastError: unknown = null;
 
             for (let attempt = 1; attempt <= retries; attempt++) {
                 try {
                     console.log(`[fetchStudy] Intento ${attempt}/${retries} para estudio ${studyId}`);
                     const resp = await authFetch(`${API_URL}/api/studies/${studyId}`);
-                    const j = await resp.json().catch(() => ({}));
+                    const j = await parseApiData(resp);
 
                     if (!resp.ok) {
-                        lastError = j?.message || "No se pudo obtener el estudio";
+                        lastError = j.message || "No se pudo obtener el estudio";
                         if (attempt < retries) {
                             await new Promise(r => setTimeout(r, 500));
                             continue;
@@ -324,8 +368,8 @@ export default function SolicitudesPage() {
                         break;
                     }
 
-                    setSelectedStudy(j?.data || null);
-                    console.log('[fetchStudy] Estudio obtenido exitosamente:', j?.data?.id);
+                    setSelectedStudy((asRecord(j.data) as StudyDetail) || null);
+                    console.log('[fetchStudy] Estudio obtenido exitosamente:', (asRecord(j.data)?.id as number | undefined));
                     return;
                 } catch (e) {
                     lastError = e;
@@ -336,7 +380,7 @@ export default function SolicitudesPage() {
                 }
             }
 
-            setError(lastError || "No se pudo obtener el estudio después de varios intentos");
+            setError(getMessage(lastError, "No se pudo obtener el estudio después de varios intentos"));
         } finally {
             setLoadingStudy(false);
         }
@@ -352,12 +396,12 @@ export default function SolicitudesPage() {
                 method: 'PATCH',
                 body: fd,
             });
-            const j = await resp.json().catch(() => ({}));
+            const j = await parseApiData(resp);
             if (!resp.ok) {
-                setError(j?.message || 'No se pudo subir el PDF');
+                setError((typeof j.message === 'string' ? j.message : 'No se pudo subir el PDF'));
                 return;
             }
-            setSelectedStudy(j?.data || null);
+            setSelectedStudy((asRecord(j.data) as StudyDetail) || null);
             await loadRows();
         } catch (e) {
             console.error(e);
@@ -376,20 +420,20 @@ export default function SolicitudesPage() {
                 headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify({ statusName }),
             });
-            const j = await resp.json().catch(() => ({}));
+            const j = await parseApiData(resp);
 
             console.log(`[updateStudyStatusApi] Response status: ${resp.status}`, j);
 
             if (!resp.ok) {
-                const errorMsg = j?.message || 'No se pudo actualizar el estado';
+                const errorMsg = typeof j.message === 'string' ? j.message : 'No se pudo actualizar el estado';
                 setError(errorMsg);
                 console.error(`[updateStudyStatusApi] Error updating status: ${errorMsg}`);
                 return;
             }
 
-            setSelectedStudy(j?.data || null);
+            setSelectedStudy((asRecord(j.data) as StudyDetail) || null);
             setError(null);
-            console.log(`[updateStudyStatusApi] Status updated success for study:`, j?.data?.id);
+            console.log(`[updateStudyStatusApi] Status updated success for study:`, asRecord(j.data)?.id);
 
             // Mostrar mensaje de éxito
             setSuccessMessage('Solicitud procesada');
@@ -611,10 +655,12 @@ export default function SolicitudesPage() {
                         if (!studyId) {
                             try {
                                 const response = await authFetch(`${API_URL}/api/study-requests/${selectedRequest?.id}`);
-                                const data = await response.json();
-                                if (data?.data?.convertedStudyId) {
-                                    studyId = data.data.convertedStudyId;
-                                    setSelectedRequest(data.data);
+                                const data = await parseApiData(response);
+                                const dataRecord = asRecord(data.data);
+                                const convertedStudyId = Number(dataRecord?.convertedStudyId);
+                                if (Number.isFinite(convertedStudyId) && convertedStudyId > 0) {
+                                    studyId = convertedStudyId;
+                                    setSelectedRequest(dataRecord as unknown as StudyRequestRow);
                                 }
                             } catch (e) {
                                 console.error('Error al refrescar solicitud:', e);

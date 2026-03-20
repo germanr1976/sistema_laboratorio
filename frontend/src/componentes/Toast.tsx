@@ -32,13 +32,14 @@ export default function Toast({
         // Only run in browser
         if (!show || typeof window === "undefined") return
 
-        setLeaving(false)
+        const resetTimer = setTimeout(() => setLeaving(false), 0)
 
         // schedule leave animation and end callback
         leaveTimeout.current = setTimeout(() => setLeaving(true), computedLeaveDelay)
         endTimeout.current = setTimeout(() => onClose(), duration)
 
         return () => {
+            clearTimeout(resetTimer)
             if (leaveTimeout.current) clearTimeout(leaveTimeout.current)
             if (endTimeout.current) clearTimeout(endTimeout.current)
             leaveTimeout.current = null

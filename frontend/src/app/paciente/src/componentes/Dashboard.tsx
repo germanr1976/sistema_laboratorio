@@ -1,7 +1,7 @@
 "use client"
 
 import { useEffect, useState } from "react"
-import { getPdf, deletePdf } from "../utils/estudiosStore"
+import { deletePdf } from "../utils/estudiosStore"
 import { Trash2 } from "lucide-react"
 
 const API_URL = process.env.NEXT_PUBLIC_API_URL || "http://localhost:3000"
@@ -29,6 +29,29 @@ type UltimoCompletado = {
   pdfUrl?: string
 } | null
 
+interface BackendStudyItem {
+  id?: string | number
+  studyDate?: string
+  socialInsurance?: string
+  pdfUrl?: string
+  status?: {
+    name?: string
+  }
+  patient?: {
+    dni?: string
+    profile?: {
+      firstName?: string
+      lastName?: string
+    }
+  }
+  biochemist?: {
+    profile?: {
+      firstName?: string
+      lastName?: string
+    }
+  }
+}
+
 export default function Dashboard({
   completados = 0,
   totales = 0,
@@ -55,13 +78,14 @@ export default function Dashboard({
           return
         }
         const result = await response.json()
-        const studies = result.data || []
+        const studiesRaw = result.data || []
+        const studies: BackendStudyItem[] = Array.isArray(studiesRaw) ? studiesRaw : []
 
         setLocalTotales(studies.length)
-        setLocalCompletados(studies.filter((s: any) => s.status?.name === "COMPLETED").length)
-        setLocalParciales(studies.filter((s: any) => s.status?.name === "PARTIAL").length)
+        setLocalCompletados(studies.filter((s: BackendStudyItem) => s.status?.name === "COMPLETED").length)
+        setLocalParciales(studies.filter((s: BackendStudyItem) => s.status?.name === "PARTIAL").length)
 
-        const lastCompleted = studies.filter((s: any) => s.status?.name === "COMPLETED").slice(-1)[0]
+        const lastCompleted = studies.filter((s: BackendStudyItem) => s.status?.name === "COMPLETED").slice(-1)[0]
         if (lastCompleted) {
           setLocalUltimo({
             id: lastCompleted.id?.toString(),

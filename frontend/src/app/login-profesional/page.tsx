@@ -2,9 +2,16 @@
 
 
 import { useState, useRef } from "react";
-import { Toaster, toast } from "react-hot-toast";
+import { toast } from "react-hot-toast";
 
 import Link from "next/link";
+
+const getErrorMessage = (error: unknown) => {
+    if (error instanceof Error && error.message) {
+        return error.message;
+    }
+    return 'Error al conectar con el servidor';
+};
 
 export default function LoginProfesional() {
     const formRef = useRef<HTMLFormElement | null>(null);
@@ -86,9 +93,9 @@ export default function LoginProfesional() {
             toast.success('Login exitoso');
             // Redirigir según rol interno del laboratorio
             window.location.href = role === 'ADMIN' ? '/tenant-admin' : '/dashboard';
-        } catch (error: any) {
+        } catch (error: unknown) {
             console.error('Login error', error);
-            toast.error(error?.message || 'Error al conectar con el servidor');
+            toast.error(getErrorMessage(error));
         }
     };
 
@@ -98,8 +105,8 @@ export default function LoginProfesional() {
             const form = formRef.current;
             if (!form) return;
             // prefer requestSubmit if available to trigger React onSubmit handlers
-            if (typeof (form as any).requestSubmit === 'function') {
-                (form as any).requestSubmit();
+            if (typeof form.requestSubmit === 'function') {
+                form.requestSubmit();
             } else {
                 form.dispatchEvent(new Event('submit', { bubbles: true, cancelable: true }));
             }

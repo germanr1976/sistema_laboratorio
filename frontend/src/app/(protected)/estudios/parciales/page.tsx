@@ -4,7 +4,7 @@ import { useEffect, useState } from "react"
 import { useRouter } from 'next/navigation'
 import { getPdf } from "../../../../utils/estudiosStore"
 import { Share2, Download, Trash2 } from "lucide-react"
-import { cardClasses, leftColClasses, nameClasses, metaClasses, rightActionsClasses, btnPdf, btnNoFile, iconBtn, badgeParcial } from "../../../../utils/uiClasses"
+import { cardClasses, leftColClasses, rightActionsClasses, btnPdf, btnNoFile, iconBtn, badgeParcial } from "../../../../utils/uiClasses"
 
 type EstudioMeta = {
     id?: string

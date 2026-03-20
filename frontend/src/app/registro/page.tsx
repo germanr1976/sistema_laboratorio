@@ -24,6 +24,13 @@ export default function RegistroPage() {
     const [fechaNacimiento, setFechaNacimiento] = useState<Date | null>(null);
     const DNI_MAX = 8;
 
+    const getErrorMessage = (error: unknown) => {
+        if (error instanceof Error && error.message) {
+            return error.message;
+        }
+        return 'Error al conectar con el servidor';
+    };
+
     const handleSubmit = async (e: React.FormEvent) => {
         e.preventDefault();
         // Validaciones
@@ -89,9 +96,9 @@ export default function RegistroPage() {
             toast.dismiss();
             toast.success('Registro exitoso. Ya podés iniciar sesión');
             router.push('/login-paciente');
-        } catch (error: any) {
+        } catch (error: unknown) {
             toast.dismiss();
-            toast.error(error?.message || 'Error al conectar con el servidor');
+            toast.error(getErrorMessage(error));
             setLoading(false);
         }
     };
@@ -164,10 +171,9 @@ export default function RegistroPage() {
                         <p className="text-red-600 text-sm mt-1">{dniError}</p>
                     )}
 
-                    {/* @ts-ignore */}
                     <DatePicker
                         selected={fechaNacimiento}
-                        onChange={(date) => setFechaNacimiento(Array.isArray(date) ? date[0] : date)}
+                        onChange={(date: Date | null) => setFechaNacimiento(date)}
                         dateFormat="dd/MM/yyyy"
                         placeholderText="Fecha de nacimiento"
                         className="w-full px-4 py-2 border border-gray-300 rounded focus:outline-none focus:ring-2 focus:ring-blue-400"
@@ -175,7 +181,7 @@ export default function RegistroPage() {
                         showMonthDropdown
                         showYearDropdown
                         dropdownMode="select"
-                        locale={es as any}
+                        locale={es}
                         required
                     />
                     <input

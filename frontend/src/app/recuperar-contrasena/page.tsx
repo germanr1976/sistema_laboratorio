@@ -1,6 +1,6 @@
 'use client';
 
-import React, { useState, useEffect, Suspense } from 'react';
+import React, { Suspense } from 'react';
 import { useSearchParams } from 'next/navigation';
 import ResetPasswordForm from '../../componentes/ResetPasswordForm';
 import RequestPasswordRecoveryForm from '../../componentes/RequestPasswordRecoveryForm';
@@ -23,26 +23,7 @@ function RecuperarContrasenaContent() {
         }
     }
 
-    const [isValidToken, setIsValidToken] = useState<boolean | null>(null);
-
-    useEffect(() => {
-        if (!token) {
-            setIsValidToken(false);
-        } else {
-            setIsValidToken(true);
-        }
-    }, [token]);
-
-    if (isValidToken === null) {
-        return (
-            <div className="min-h-screen flex items-center justify-center bg-linear-to-br from-blue-100 via-indigo-50 to-slate-100">
-                <div className="text-center">
-                    <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-500 mx-auto mb-4"></div>
-                    <p className="text-gray-600">Cargando...</p>
-                </div>
-            </div>
-        );
-    }
+    const isValidToken = Boolean(token);
 
     if (isValidToken === false) {
         return (

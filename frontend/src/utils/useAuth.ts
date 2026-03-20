@@ -11,7 +11,7 @@ export interface UserData {
     nombreApellido?: string;
     email?: string;
     role?: string;
-    [key: string]: any;
+    [key: string]: unknown;
 }
 
 export function useAuth(redirectTo: string = '/') {

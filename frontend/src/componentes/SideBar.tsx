@@ -1,6 +1,6 @@
 "use client"
 
-import { useState, useEffect } from "react"
+import { useState } from "react"
 import Link from "next/link"
 import { usePathname } from "next/navigation"
 import { useRouter } from "next/navigation"
@@ -10,61 +10,60 @@ interface SidebarProps {
   className?: string
 }
 
+function getSidebarUserData() {
+  if (typeof window === 'undefined') {
+    return { userName: 'Usuario', userDni: '', userRole: '', userInitials: 'U' }
+  }
+
+  try {
+    const userDataStr = localStorage.getItem('userData')
+    const userType = localStorage.getItem('userType')
+
+    if (!userDataStr) {
+      return { userName: 'Usuario', userDni: '', userRole: '', userInitials: 'U' }
+    }
+
+    const userData = JSON.parse(userDataStr)
+
+    let fullName = 'Usuario'
+    if (userData.profile?.firstName && userData.profile?.lastName) {
+      fullName = `${userData.profile.firstName} ${userData.profile.lastName}`
+    } else if (userData.profile?.firstName) {
+      fullName = userData.profile.firstName
+    } else if (userData.profile?.lastName) {
+      fullName = userData.profile.lastName
+    }
+
+    const initials = fullName
+      .split(' ')
+      .map((n: string) => n[0])
+      .join('')
+      .toUpperCase()
+      .slice(0, 2) || 'U'
+
+    const role = userType === 'professional'
+      ? (userData.role || 'PROFESIONAL')
+      : userType === 'patient'
+        ? 'PACIENTE'
+        : ''
+
+    return {
+      userName: fullName,
+      userDni: userData.dni || '',
+      userRole: role,
+      userInitials: initials,
+    }
+  } catch (e) {
+    console.error('Error loading user data', e)
+    return { userName: 'Usuario', userDni: '', userRole: '', userInitials: 'U' }
+  }
+}
+
 export function Sidebar({ className = "" }: SidebarProps) {
   const pathname = usePathname()
   const router = useRouter()
   const [isEstudiosOpen, setIsEstudiosOpen] = useState(pathname?.startsWith("/estudios"))
-  const [userName, setUserName] = useState<string>("Usuario")
-  const [userDni, setUserDni] = useState<string>("")
-  const [userRole, setUserRole] = useState<string>("")
-  const [userInitials, setUserInitials] = useState<string>("U")
-
-  useEffect(() => {
-    // Obtener datos del usuario desde localStorage
-    try {
-      const userDataStr = localStorage.getItem('userData')
-      const userType = localStorage.getItem('userType')
-
-      if (userDataStr) {
-        const userData = JSON.parse(userDataStr)
-
-        // Obtener nombre completo desde profile
-        let fullName = "Usuario";
-        if (userData.profile?.firstName && userData.profile?.lastName) {
-          fullName = `${userData.profile.firstName} ${userData.profile.lastName}`;
-        } else if (userData.profile?.firstName) {
-          fullName = userData.profile.firstName;
-        } else if (userData.profile?.lastName) {
-          fullName = userData.profile.lastName;
-        }
-
-        setUserName(fullName)
-
-        // Obtener DNI
-        if (userData.dni) {
-          setUserDni(userData.dni)
-        }
-
-        // Calcular iniciales
-        const initials = fullName
-          .split(' ')
-          .map((n: string) => n[0])
-          .join('')
-          .toUpperCase()
-          .slice(0, 2)
-        setUserInitials(initials)
-
-        // Establecer rol
-        if (userType === 'professional') {
-          setUserRole(userData.role || 'PROFESIONAL')
-        } else if (userType === 'patient') {
-          setUserRole('PACIENTE')
-        }
-      }
-    } catch (e) {
-      console.error('Error loading user data', e)
-    }
-  }, [])
+  const { userName, userDni, userRole, userInitials } = getSidebarUserData()
 
   const handleLogout = () => {
     localStorage.removeItem('authToken')
@@ -101,6 +100,7 @@ export function Sidebar({ className = "" }: SidebarProps) {
     <div className={`fixed left-0 top-0 h-screen w-64 flex flex-col bg-white border-r border-gray-200 z-40 ${className}`}>
       {/* Logo Section */}
       <div className="p-4 border-b border-gray-200 flex justify-center">
+        {/* eslint-disable-next-line @next/next/no-img-element */}
         <img
           src="/logo_lab.png"
           alt="Icono laboratorio"

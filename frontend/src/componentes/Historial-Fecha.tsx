@@ -18,12 +18,20 @@ export function StudiesTable({ studies, onCancelStudy, cancellingStudyId = null 
   const totalPages = Math.max(1, Math.ceil(studies.length / studiesPerPage))
 
   useEffect(() => {
-    setCurrentPage(1)
+    const resetTimer = window.setTimeout(() => {
+      setCurrentPage(1)
+    }, 0)
+
+    return () => window.clearTimeout(resetTimer)
   }, [studies])
 
   useEffect(() => {
     if (currentPage > totalPages) {
-      setCurrentPage(totalPages)
+      const clampTimer = window.setTimeout(() => {
+        setCurrentPage(totalPages)
+      }, 0)
+
+      return () => window.clearTimeout(clampTimer)
     }
   }, [currentPage, totalPages])
 
@@ -156,8 +164,8 @@ export function StudiesTable({ studies, onCancelStudy, cancellingStudyId = null 
                   type="button"
                   onClick={() => setCurrentPage(page)}
                   className={`rounded-md px-2.5 py-1.5 text-xs font-medium sm:text-sm ${page === currentPage
-                      ? "bg-blue-600 text-white"
-                      : "border border-gray-300 bg-white text-gray-700 hover:bg-gray-100"
+                    ? "bg-blue-600 text-white"
+                    : "border border-gray-300 bg-white text-gray-700 hover:bg-gray-100"
                     }`}
                 >
                   {page}

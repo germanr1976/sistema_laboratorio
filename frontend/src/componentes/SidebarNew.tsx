@@ -7,6 +7,12 @@ import { useState, useEffect } from 'react'
 import { useAuth } from '../utils/useAuth'
 import authFetch from '../utils/authFetch'
 
+const asRecord = (value: unknown): Record<string, unknown> => {
+    if (typeof value === 'object' && value !== null) {
+        return value as Record<string, unknown>
+    }
+    return {}
+}
 
 export function Sidebar() {
     const AUTO_REFRESH_MS = 45000
@@ -14,41 +20,31 @@ export function Sidebar() {
     const pathname = usePathname()
 
     const [isOpen, setIsOpen] = useState(false)
-    const { logout, userData } = useAuth()
+    const { logout, userData, isLoading } = useAuth()
     const userRole = String(userData?.role || '').toUpperCase()
     const isTenantAdmin = userRole === 'ADMIN'
-    const [userName, setUserName] = useState<string>('Bioquímico')
-    const [userInitials, setUserInitials] = useState<string>('BQ')
     const [pendingRequestsCount, setPendingRequestsCount] = useState(0)
 
-
-
-    useEffect(() => {
-        if (!userData) return
-
-        const profile = userData.profile || {}
-        const firstName = (profile.firstName || '').toString().trim()
-        const lastName = (profile.lastName || '').toString().trim()
-        const fullName = `${firstName} ${lastName}`.trim()
-        const fallbackName = userData.nombreApellido || userData.nombre || userData.email || userData.dni || 'Bioquímico'
-        const resolvedName = fullName || fallbackName
-
-        setUserName(resolvedName)
-
-        const initials = resolvedName
-            .split(' ')
-            .filter(Boolean)
-            .map((n: string) => n[0])
-            .join('')
-            .toUpperCase()
-            .slice(0, 2)
-
-        setUserInitials(initials || 'BQ')
-    }, [userData])
+    const profile = asRecord(userData?.profile)
+    const firstName = String(profile.firstName || '').trim()
+    const lastName = String(profile.lastName || '').trim()
+    const fullName = `${firstName} ${lastName}`.trim()
+    const fallbackName = userData?.nombreApellido || userData?.nombre || userData?.email || userData?.dni || 'Bioquímico'
+    const userName = fullName || fallbackName
+    const userInitials = userName
+        .split(' ')
+        .filter(Boolean)
+        .map((n: string) => n[0])
+        .join('')
+        .toUpperCase()
+        .slice(0, 2) || 'BQ'
 
     useEffect(() => {
+        if (isLoading) {
+            return
+        }
+
         if (isTenantAdmin) {
-            setPendingRequestsCount(0)
             return
         }
 
@@ -72,7 +68,7 @@ export function Sidebar() {
         const intervalId = window.setInterval(loadPendingRequests, AUTO_REFRESH_MS)
 
         return () => window.clearInterval(intervalId)
-    }, [pathname, API_URL, isTenantAdmin])
+    }, [pathname, API_URL, isTenantAdmin, isLoading])
 
     const navItems = isTenantAdmin
         ? [{
