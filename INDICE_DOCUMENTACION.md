@@ -2,7 +2,7 @@
 
 > **Compilación del Sistema completada**: 21 de enero de 2026
 
-Esta carpeta contiene 4 documentos que forman un análisis completo del sistema **Laboratorio Digital**.
+Esta carpeta contiene 5 documentos que forman un análisis completo del sistema **Laboratorio Digital**.
 
 ---
 
@@ -44,19 +44,11 @@ Esta carpeta contiene 4 documentos que forman un análisis completo del sistema 
 **Para**: Desarrolladores, implementadores  
 **Tiempo de lectura**: 30 minutos (consulta)  
 **Contenido**:
-- Código específico para cada mejora
-- Paso a paso de implementación
-- Ejemplos de hooks y componentes
-- Patrones recomendados
-- Fragmentos copy/paste listos
-- Arquitectura mejorada explicada
-- 6 soluciones detalladas:
-  1. DELETE endpoint con validación
-  2. Migración Dashboard a API
-  3. Error Boundaries
-  4. Sistema de notificaciones
-  5. Paginación
-  6. Búsqueda avanzada
+- Tablero maestro de ejecución de 12 semanas
+- Objetivo por semana, responsables y entregables verificables
+- Backlog operativo por frente (Producto, Backend, Frontend, DevOps, Seguridad/QA)
+- KPIs semanales de seguimiento ejecutivo
+- Criterios de avance por fase y cierre Go/No-Go
 
 **Acción recomendada**: Consultar durante la implementación
 
@@ -78,6 +70,21 @@ Esta carpeta contiene 4 documentos que forman un análisis completo del sistema 
 - Hoja de ruta para mejorar
 
 **Acción recomendada**: Usar para control de calidad
+
+---
+
+### 5. 🏢 INSTRUCTIVO_MULTITENANT.md
+**Para**: Administradores de plataforma, admins de tenant, soporte técnico  
+**Tiempo de lectura**: 15-20 minutos  
+**Contenido**:
+- Arquitectura multitenant actual (frontend + backend)
+- Flujos operativos para alta de tenant y creación de admin tenant
+- Gestión de planes y suspensión/reactivación
+- Reglas de acceso y aislamiento por tenant
+- Troubleshooting rápido
+- Riesgos actuales y recomendaciones de corto plazo
+
+**Acción recomendada**: Usar como guía operativa diaria del módulo multitenant
 
 ---
 

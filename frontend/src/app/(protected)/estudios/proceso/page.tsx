@@ -84,7 +84,7 @@ export default function ProcesoPage() {
             <div className="p-8">
                 <div className="bg-white rounded-lg p-8 shadow">
                     <h1 className="text-3xl font-bold text-gray-900 mb-4">Estudios en proceso</h1>
-                    <p className="text-gray-600">No hay estudios en proceso. Podés crear uno desde el Dashboard o desde "Cargar nuevo".</p>
+                    <p className="text-gray-600">No hay estudios en proceso. Podés crear uno desde el Dashboard o desde &quot;Cargar nuevo&quot;.</p>
                 </div>
             </div>
         )
@@ -112,7 +112,7 @@ export default function ProcesoPage() {
         try {
             await navigator.clipboard.writeText(url)
             alert('Enlace copiado al portapapeles')
-        } catch (e) {
+        } catch {
             console.warn('No se pudo copiar. Mostrando prompt.')
             prompt('Copiá el enlace:', url)
         }

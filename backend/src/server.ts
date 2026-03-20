@@ -1,6 +1,7 @@
 import app from "@/app";
 import dotenv from "dotenv";
 import { PrismaClient } from "@prisma/client";
+import logger from "@/config/logger";
 
 dotenv.config();
 
@@ -10,13 +11,13 @@ const prisma = new PrismaClient();
 async function main() {
   try {
     await prisma.$connect();
-    console.log("✅ Connected to database with Prisma");
+    logger.info("Connected to database with Prisma");
 
     app.listen(PORT, () => {
-      console.log(`🚀 Server running on http://localhost:${PORT}`);
+      logger.info({ port: PORT }, `Server running on http://localhost:${PORT}`);
     });
   } catch (err) {
-    console.error("❌ Error connecting to the database:", err);
+    logger.error({ err }, "Error connecting to the database");
     process.exit(1);
   }
 }

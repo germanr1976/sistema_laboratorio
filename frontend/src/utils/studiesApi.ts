@@ -2,6 +2,14 @@ import authFetch from './authFetch';
 
 const API_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:3000';
 
+function toActionableErrorMessage(status: number, message: string, fallback: string): string {
+    const safeMessage = message?.trim() || fallback;
+    if (status === 403) {
+        return `${safeMessage}. Si consideras que deberias tener acceso, solicita al ADMIN del tenant que revise tus permisos clinicos.`;
+    }
+    return safeMessage;
+}
+
 export interface Study {
     id: number;
     userId: number;
@@ -34,12 +42,13 @@ export interface Study {
         } | null;
     } | null;
     doctor?: string | null;
+    medico?: string | null;
 }
 
 /**
  * Normalizar datos del backend: convertir doctor a medico
  */
-function normalizeStudy(study: any): any {
+function normalizeStudy<T extends Study>(study: T): T & { medico: string | null } {
     return {
         ...study,
         medico: study.doctor || null,
@@ -55,7 +64,7 @@ export async function getMyStudies(): Promise<Study[]> {
         const data = await response.json();
 
         if (!response.ok) {
-            throw new Error(data.message || 'Error al obtener estudios');
+            throw new Error(toActionableErrorMessage(response.status, data.message || '', 'Error al obtener estudios'));
         }
 
         return (data.data || []).map(normalizeStudy);
@@ -74,7 +83,7 @@ export async function getStudyById(id: number): Promise<Study> {
         const data = await response.json();
 
         if (!response.ok) {
-            throw new Error(data.message || 'Error al obtener estudio');
+            throw new Error(toActionableErrorMessage(response.status, data.message || '', 'Error al obtener estudio'));
         }
 
         return normalizeStudy(data.data);
@@ -100,7 +109,7 @@ export async function updateStudyStatus(id: number, statusName: string): Promise
         const data = await response.json();
 
         if (!response.ok) {
-            throw new Error(data.message || 'Error al actualizar estado');
+            throw new Error(toActionableErrorMessage(response.status, data.message || '', 'Error al actualizar estado'));
         }
 
         return normalizeStudy(data.data);
@@ -125,7 +134,7 @@ export async function cancelStudy(id: number): Promise<Study> {
         const data = await response.json();
 
         if (!response.ok) {
-            throw new Error(data.message || 'Error al anular estudio');
+            throw new Error(toActionableErrorMessage(response.status, data.message || '', 'Error al anular estudio'));
         }
 
         return normalizeStudy(data.data);

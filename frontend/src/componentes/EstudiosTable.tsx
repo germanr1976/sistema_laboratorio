@@ -1,19 +1,12 @@
 "use client"
 
 import Link from 'next/link'
-import { useEffect, useState } from 'react'
+import { useCallback, useEffect, useState } from 'react'
 import authFetch from '../utils/authFetch'
-import { FileText, Plus, Trash2, Edit2, Download, CircleOff } from 'lucide-react'
+import { useAuth } from '../utils/useAuth'
+import { FileText, Plus, Edit2, CircleOff } from 'lucide-react'
 import Clock from './Clock'
 import {
-    cardClasses,
-    leftColClasses,
-    nameClasses,
-    metaClasses,
-    rightActionsClasses,
-    btnPdf,
-    btnNoFile,
-    iconBtn,
     badgeCompletado,
     badgeParcial,
     badgeEnProceso,
@@ -36,9 +29,57 @@ interface Estudio {
     status?: 'completado' | 'en_proceso' | 'parcial' | 'anulado'
 }
 
+interface BackendStudyAttachment {
+    url?: string
+}
+
+interface BackendStudy {
+    id?: string | number
+    studyDate?: string
+    socialInsurance?: string
+    doctor?: string
+    pdfs?: string[]
+    pdfUrl?: string
+    status?: {
+        name?: string
+    }
+    patient?: {
+        dni?: string
+        fullName?: string
+        profile?: {
+            firstName?: string
+            lastName?: string
+        }
+    }
+    biochemist?: {
+        fullName?: string
+        profile?: {
+            firstName?: string
+            lastName?: string
+        }
+    }
+    attachments?: BackendStudyAttachment[]
+    studyName?: string
+}
+
+type EstadoFiltro = 'todos' | 'completado' | 'en_proceso' | 'parcial' | 'anulado'
+
+const isEstadoFiltro = (value: string): value is EstadoFiltro => {
+    return ['todos', 'completado', 'en_proceso', 'parcial', 'anulado'].includes(value)
+}
+
+const getErrorMessage = (error: unknown, fallback: string) => {
+    if (error instanceof Error && error.message) {
+        return error.message
+    }
+    return fallback
+}
+
 export function EstudiosTable() {
+    const { userData } = useAuth('')
+    const isBiochemist = String(userData?.role || '').toUpperCase() === 'BIOCHEMIST'
     const [estudios, setEstudios] = useState<Estudio[]>([])
-    const [filtroEstado, setFiltroEstado] = useState<'todos' | 'completado' | 'en_proceso' | 'parcial' | 'anulado'>('todos')
+    const [filtroEstado, setFiltroEstado] = useState<EstadoFiltro>('todos')
     const [mostrarAnulados, setMostrarAnulados] = useState(false)
     const [busquedaDni, setBusquedaDni] = useState('')
     const [busquedaNombre, setBusquedaNombre] = useState('')
@@ -53,11 +94,7 @@ export function EstudiosTable() {
     const [cancellingStudyId, setCancellingStudyId] = useState<string | number | null>(null)
 
     // Cargar estudios al montar el componente
-    useEffect(() => {
-        cargarEstudios()
-    }, [])
-
-    const cargarEstudios = async () => {
+    const cargarEstudios = useCallback(async () => {
         setLoading(true)
 
         try {
@@ -66,7 +103,10 @@ export function EstudiosTable() {
 
             if (response.ok) {
                 const result = await response.json()
-                const estudiosApi = (result.data || result.studies || []).map((study: any) => {
+                const studiesSource = Array.isArray(result.data || result.studies)
+                    ? (result.data || result.studies)
+                    : []
+                const estudiosApi = studiesSource.map((study: BackendStudy) => {
                     const nombrePaciente = study.patient?.profile
                         ? `${study.patient.profile.firstName || ''} ${study.patient.profile.lastName || ''}`.trim()
                         : (study.patient?.fullName || study.studyName || '')
@@ -79,7 +119,7 @@ export function EstudiosTable() {
 
                     // Normalizar PDFs: preferir attachments (array de objetos), luego campo pdfs (array de strings), luego pdfUrl
                     const pdfsFromAttachments = Array.isArray(study.attachments)
-                        ? study.attachments.map((a: any) => a.url)
+                        ? study.attachments.map((a: BackendStudyAttachment) => a.url).filter((url): url is string => Boolean(url))
                         : []
                     const pdfsNormalized = pdfsFromAttachments.length > 0
                         ? pdfsFromAttachments
@@ -123,7 +163,7 @@ export function EstudiosTable() {
                 if (estudiosApi.length > 0) {
                     try {
                         localStorage.setItem('estudios_metadata', JSON.stringify(estudiosApi))
-                    } catch (e) {
+                    } catch {
                         console.warn('No se pudo sincronizar con localStorage')
                     }
                 }
@@ -137,7 +177,11 @@ export function EstudiosTable() {
         } finally {
             setLoading(false)
         }
-    }
+    }, [])
+
+    useEffect(() => {
+        void cargarEstudios()
+    }, [cargarEstudios])
 
     const cargarDelLocalStorage = () => {
         try {
@@ -172,9 +216,9 @@ export function EstudiosTable() {
             await cancelStudy(studyId)
             mostrarToast('Estudio anulado exitosamente', 'success')
             await cargarEstudios()
-        } catch (error: any) {
+        } catch (error: unknown) {
             console.error('❌ Error anulando estudio:', error)
-            mostrarToast(error.message || 'Error al anular el estudio', 'error')
+            mostrarToast(getErrorMessage(error, 'Error al anular el estudio'), 'error')
         } finally {
             setCancellingStudyId(null)
         }
@@ -406,7 +450,12 @@ export function EstudiosTable() {
                         <label className="block text-sm font-semibold text-gray-700 mb-1">Estado</label>
                         <select
                             value={filtroEstado}
-                            onChange={(e) => setFiltroEstado(e.target.value as any)}
+                            onChange={(e) => {
+                                const value = e.target.value
+                                if (isEstadoFiltro(value)) {
+                                    setFiltroEstado(value)
+                                }
+                            }}
                             className="w-full px-3 py-2.5 border border-gray-300 rounded-lg bg-white text-gray-900 text-sm focus:ring-2 focus:ring-blue-500 focus:border-transparent"
                         >
                             <option value="todos">Todos ({estudios.length})</option>
@@ -486,7 +535,12 @@ export function EstudiosTable() {
                         <label className="text-base font-semibold text-gray-700">Filtrar por estado:</label>
                         <select
                             value={filtroEstado}
-                            onChange={(e) => setFiltroEstado(e.target.value as any)}
+                            onChange={(e) => {
+                                const value = e.target.value
+                                if (isEstadoFiltro(value)) {
+                                    setFiltroEstado(value)
+                                }
+                            }}
                             className="px-3.5 py-2.5 border border-gray-300 rounded-lg bg-white text-gray-900 text-base focus:ring-2 focus:ring-blue-500 focus:border-transparent"
                         >
                             <option value="todos">Todos ({estudios.length})</option>
@@ -614,7 +668,7 @@ export function EstudiosTable() {
                                     </td>
                                     <td className="px-6 py-4 text-right">
                                         <div className="flex items-center justify-end gap-2">
-                                            {((estudio.estado || estudio.status) === 'parcial' || (estudio.estado || estudio.status) === 'en_proceso') && (
+                                            {isBiochemist && ((estudio.estado || estudio.status) === 'parcial' || (estudio.estado || estudio.status) === 'en_proceso') && (
                                                 <>
                                                     <Link
                                                         href={`/cargar-nuevo?id=${estudio.id}`}
@@ -625,7 +679,7 @@ export function EstudiosTable() {
                                                     </Link>
                                                 </>
                                             )}
-                                            {(estudio.estado || estudio.status) !== 'anulado' && (
+                                            {isBiochemist && (estudio.estado || estudio.status) !== 'anulado' && (
                                                 <button
                                                     onClick={() => anularEstudio(estudio.id)}
                                                     disabled={cancellingStudyId === estudio.id}
@@ -691,7 +745,7 @@ export function EstudiosTable() {
                             <div className="flex items-start justify-between gap-3">
                                 {renderEstadoBadge(estudio.estado || estudio.status)}
                                 <div className="flex items-center gap-2">
-                                    {((estudio.estado || estudio.status) === 'parcial' || (estudio.estado || estudio.status) === 'en_proceso') && (
+                                    {isBiochemist && ((estudio.estado || estudio.status) === 'parcial' || (estudio.estado || estudio.status) === 'en_proceso') && (
                                         <>
                                             <Link
                                                 href={`/cargar-nuevo?id=${estudio.id}`}
@@ -702,7 +756,7 @@ export function EstudiosTable() {
                                             </Link>
                                         </>
                                     )}
-                                    {(estudio.estado || estudio.status) !== 'anulado' && (
+                                    {isBiochemist && (estudio.estado || estudio.status) !== 'anulado' && (
                                         <button
                                             onClick={() => anularEstudio(estudio.id)}
                                             disabled={cancellingStudyId === estudio.id}

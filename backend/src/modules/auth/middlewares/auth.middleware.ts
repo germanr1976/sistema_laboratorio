@@ -1,50 +1,87 @@
 import { Request, Response, NextFunction } from 'express';
 import { verifyToken } from '../services/auth.services';
-import { PrismaClient } from '@prisma/client';
+import prisma from '@/config/prisma';
 
-
-const prisma = new PrismaClient();
+type TokenPayload = {
+    userId: number;
+    tenantId: number;
+    roleName?: string;
+    isPlatformAdmin?: boolean;
+};
 
 export async function authMiddleware(req: Request, res: Response, next: NextFunction) {
     try {
         const authHeader = req.headers.authorization;
-        if(!authHeader){
+        if (!authHeader) {
             return res.status(401).json({
-                success: false, 
+                success: false,
                 message: 'Token no proporcionado'
 
             });
         }
-        if(!authHeader.startsWith('Bearer ')){
+        if (!authHeader.startsWith('Bearer ')) {
             return res.status(401).json({
                 success: false,
                 message: 'Formato de token invalido'
             })
         }
-        const token = authHeader.substring(7); 
-        const tokenverify = await verifyToken(token);
-        if(!tokenverify){
-            return res.status(401).json({
-                success: false, 
-                message: 'Token expirado'
-            }); 
-        }
-        const user = await prisma.user.findUnique({
-            where:{id: tokenverify.userId},
-            include:{profile: true, role:true}
-        })
-        if(!user){
+        const token = authHeader.substring(7);
+        const tokenverify = await verifyToken(token) as TokenPayload | null;
+        if (!tokenverify || !tokenverify.userId || !tokenverify.tenantId) {
             return res.status(401).json({
                 success: false,
-                message:'usuario no encontrado' 
+                message: 'Token expirado'
+            });
+        }
+        const user = await prisma.user.findUnique({
+            where: { id: tokenverify.userId },
+            include: { profile: true, role: true, tenant: true }
+        })
+        if (!user) {
+            return res.status(401).json({
+                success: false,
+                message: 'usuario no encontrado'
             })
         }
-        req.user = user
-       return  next()
+
+        if (user.tenantId !== tokenverify.tenantId) {
+            return res.status(401).json({
+                success: false,
+                message: 'Token inválido para este tenant',
+            });
+        }
+
+        req.tenantId = user.tenantId;
+        req.tenant = {
+            id: user.tenant.id,
+            name: user.tenant.name,
+            slug: user.tenant.slug,
+            suspended: user.tenant.suspended,
+        };
+        req.user = {
+            id: user.id,
+            dni: user.dni,
+            roleId: user.roleId,
+            tenantId: user.tenantId,
+            // Backward-compatible: role is the primary source, boolean remains transitional.
+            isPlatformAdmin: user.role.name === 'PLATFORM_ADMIN' || user.isPlatformAdmin,
+            email: user.email,
+            password: user.password,
+            role: {
+                name: user.role.name,
+            },
+            profile: user.profile,
+        };
+        req.log = req.log.child({
+            userId: user.id,
+            tenantId: user.tenantId,
+            role: user.role.name,
+        });
+        return next()
     } catch (error) {
-        return res.status(401).json({ 
-            success: false, 
-            message: 'Token inválido' 
+        return res.status(401).json({
+            success: false,
+            message: 'Token inválido'
         });
     }
 }
@@ -123,6 +160,33 @@ export async function isPatient(req: Request, res: Response, next: NextFunction)
         return res.status(500).json({
             success: false,
             message: 'Error al verificar permisos de paciente'
+        });
+    }
+}
+
+export async function isPlatformAdmin(req: Request, res: Response, next: NextFunction) {
+    try {
+        if (!req.user) {
+            return res.status(401).json({
+                success: false,
+                message: 'Usuario no autenticado',
+            });
+        }
+
+        const hasPlatformRole = req.user.role.name === 'PLATFORM_ADMIN';
+        const hasLegacyFlag = req.user.isPlatformAdmin === true;
+        if (!hasPlatformRole && !hasLegacyFlag) {
+            return res.status(403).json({
+                success: false,
+                message: 'Acceso denegado. Se requieren permisos de administrador de plataforma',
+            });
+        }
+
+        return next();
+    } catch (error) {
+        return res.status(500).json({
+            success: false,
+            message: 'Error al verificar permisos de plataforma',
         });
     }
 }

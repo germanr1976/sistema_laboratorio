@@ -10,6 +10,11 @@ export const deleteAttachment = async (
   res: Response
 ): Promise<void> => {
   try {
+    const tenantId = req.tenantId;
+    if (!tenantId) {
+      return ResponseHelper.forbidden(res, 'Contexto de tenant no disponible');
+    }
+
     const { studyId, attachmentId } = req.params;
     const studyIdNum = parseInt(String(studyId), 10);
     const attachmentIdNum = parseInt(String(attachmentId), 10);
@@ -18,7 +23,7 @@ export const deleteAttachment = async (
       return ResponseHelper.validationError(res, "IDs inválidos");
     }
 
-    const study = await studyService.getStudyById(studyIdNum);
+    const study = await studyService.getStudyById(studyIdNum, tenantId);
     if (!study) {
       return ResponseHelper.notFound(res, "Estudio");
     }
@@ -33,11 +38,11 @@ export const deleteAttachment = async (
       return ResponseHelper.forbidden(res, "No tienes permiso para eliminar archivos de este estudio");
     }
 
-    await studyService.deleteAttachment(attachmentIdNum);
+    await studyService.deleteAttachment(attachmentIdNum, tenantId);
 
     ResponseHelper.success(res, null, "Archivo eliminado exitosamente");
   } catch (error: any) {
-    console.error("Error al eliminar attachment:", error);
+    req.log.error({ err: error }, 'Error al eliminar attachment');
     ResponseHelper.serverError(res, "Error al eliminar archivo", error);
   }
 };

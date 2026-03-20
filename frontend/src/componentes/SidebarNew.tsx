@@ -1,12 +1,18 @@
 "use client"
 
 import Link from 'next/link'
-import { usePathname, useRouter } from 'next/navigation'
-import { FilePlus, FolderOpen, History, LogOut, Menu, X, ClipboardList } from 'lucide-react'
+import { usePathname } from 'next/navigation'
+import { FilePlus, FolderOpen, History, LogOut, Menu, X, ClipboardList, ShieldCheck } from 'lucide-react'
 import { useState, useEffect } from 'react'
 import { useAuth } from '../utils/useAuth'
 import authFetch from '../utils/authFetch'
 
+const asRecord = (value: unknown): Record<string, unknown> => {
+    if (typeof value === 'object' && value !== null) {
+        return value as Record<string, unknown>
+    }
+    return {}
+}
 
 export function Sidebar() {
     const AUTO_REFRESH_MS = 45000
@@ -14,37 +20,34 @@ export function Sidebar() {
     const pathname = usePathname()
 
     const [isOpen, setIsOpen] = useState(false)
-    const { logout, userData } = useAuth()
-    const [userName, setUserName] = useState<string>('Bioquímico')
-    const [userInitials, setUserInitials] = useState<string>('BQ')
+    const { logout, userData, isLoading } = useAuth()
+    const userRole = String(userData?.role || '').toUpperCase()
+    const isTenantAdmin = userRole === 'ADMIN'
     const [pendingRequestsCount, setPendingRequestsCount] = useState(0)
 
-
-
-    useEffect(() => {
-        if (!userData) return
-
-        const profile = userData.profile || {}
-        const firstName = (profile.firstName || '').toString().trim()
-        const lastName = (profile.lastName || '').toString().trim()
-        const fullName = `${firstName} ${lastName}`.trim()
-        const fallbackName = userData.nombreApellido || userData.nombre || userData.email || userData.dni || 'Bioquímico'
-        const resolvedName = fullName || fallbackName
-
-        setUserName(resolvedName)
-
-        const initials = resolvedName
-            .split(' ')
-            .filter(Boolean)
-            .map((n: string) => n[0])
-            .join('')
-            .toUpperCase()
-            .slice(0, 2)
-
-        setUserInitials(initials || 'BQ')
-    }, [userData])
+    const profile = asRecord(userData?.profile)
+    const firstName = String(profile.firstName || '').trim()
+    const lastName = String(profile.lastName || '').trim()
+    const fullName = `${firstName} ${lastName}`.trim()
+    const fallbackName = userData?.nombreApellido || userData?.nombre || userData?.email || userData?.dni || 'Bioquímico'
+    const userName = fullName || fallbackName
+    const userInitials = userName
+        .split(' ')
+        .filter(Boolean)
+        .map((n: string) => n[0])
+        .join('')
+        .toUpperCase()
+        .slice(0, 2) || 'BQ'
 
     useEffect(() => {
+        if (isLoading) {
+            return
+        }
+
+        if (isTenantAdmin) {
+            return
+        }
+
         const loadPendingRequests = async () => {
             try {
                 const response = await authFetch(`${API_URL}/api/study-requests?status=PENDING`)
@@ -65,30 +68,36 @@ export function Sidebar() {
         const intervalId = window.setInterval(loadPendingRequests, AUTO_REFRESH_MS)
 
         return () => window.clearInterval(intervalId)
-    }, [pathname, API_URL])
+    }, [pathname, API_URL, isTenantAdmin, isLoading])
 
-    const navItems = [
-        {
-            label: 'Gestionar Estudios',
-            href: '/dashboard',
-            icon: FolderOpen,
-        },
-        {
-            label: 'Cargar Nuevo Estudio',
-            href: '/cargar-nuevo',
-            icon: FilePlus,
-        },
-        {
-            label: 'Solicitudes',
-            href: '/solicitudes',
-            icon: ClipboardList,
-        },
-        {
-            label: 'Historial',
-            href: '/historial',
-            icon: History,
-        },
-    ]
+    const navItems = isTenantAdmin
+        ? [{
+            label: 'Administración del laboratorio',
+            href: '/tenant-admin',
+            icon: ShieldCheck,
+        }]
+        : [
+            {
+                label: 'Gestionar Estudios',
+                href: '/dashboard',
+                icon: FolderOpen,
+            },
+            {
+                label: 'Cargar Nuevo Estudio',
+                href: '/cargar-nuevo',
+                icon: FilePlus,
+            },
+            {
+                label: 'Solicitudes',
+                href: '/solicitudes',
+                icon: ClipboardList,
+            },
+            {
+                label: 'Historial',
+                href: '/historial',
+                icon: History,
+            },
+        ]
 
     const isActive = (href: string) => {
         return pathname === href || pathname.startsWith(href + '/')

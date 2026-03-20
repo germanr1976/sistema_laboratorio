@@ -2,15 +2,23 @@
 
 
 import { useState, useRef } from "react";
-import { Toaster, toast } from "react-hot-toast";
+import { toast } from "react-hot-toast";
 
 import Link from "next/link";
+
+const getErrorMessage = (error: unknown) => {
+    if (error instanceof Error && error.message) {
+        return error.message;
+    }
+    return 'Error al conectar con el servidor';
+};
 
 export default function LoginProfesional() {
     const formRef = useRef<HTMLFormElement | null>(null);
     const [dni, setDni] = useState("");
     const [dniError, setDniError] = useState("");
-    const DNI_MAX = 8;
+    const DNI_MIN = 7;
+    const DNI_MAX = 18;
 
     const [password, setPassword] = useState("");
     const [showPassword, setShowPassword] = useState(false);
@@ -23,8 +31,8 @@ export default function LoginProfesional() {
             toast.error('Ingrese DNI válido');
             return;
         }
-        if (dni.length < 8) {
-            setDniError('El DNI debe tener al menos 8 dígitos');
+        if (dni.length < DNI_MIN) {
+            setDniError(`El DNI debe tener al menos ${DNI_MIN} dígitos`);
             toast.error('DNI inválido');
             return;
         }
@@ -48,11 +56,22 @@ export default function LoginProfesional() {
             }
 
             const role = String(json?.data?.user?.role || '').toUpperCase();
+            const platformRole = role === 'PLATFORM_ADMIN';
+            const legacyPlatformFlag = Boolean(json?.data?.user?.isPlatformAdmin);
+            if (platformRole || legacyPlatformFlag) {
+                localStorage.removeItem('authToken');
+                localStorage.removeItem('userType');
+                localStorage.removeItem('userData');
+                toast.error('Este usuario pertenece al portal de plataforma. Ingresá por Acceso Plataforma.');
+                window.location.href = '/platform/login';
+                return;
+            }
+
             if (role !== 'BIOCHEMIST' && role !== 'ADMIN') {
                 localStorage.removeItem('authToken');
                 localStorage.removeItem('userType');
                 localStorage.removeItem('userData');
-                toast.error('Tu cuenta no tiene acceso al modulo profesional');
+                toast.error('Tu cuenta no tiene acceso al portal interno del laboratorio');
                 return;
             }
 
@@ -72,11 +91,11 @@ export default function LoginProfesional() {
                 }
             } catch { }
             toast.success('Login exitoso');
-            // Redirigir al dashboard
-            window.location.href = '/dashboard';
-        } catch (error: any) {
+            // Redirigir según rol interno del laboratorio
+            window.location.href = role === 'ADMIN' ? '/tenant-admin' : '/dashboard';
+        } catch (error: unknown) {
             console.error('Login error', error);
-            toast.error(error?.message || 'Error al conectar con el servidor');
+            toast.error(getErrorMessage(error));
         }
     };
 
@@ -86,8 +105,8 @@ export default function LoginProfesional() {
             const form = formRef.current;
             if (!form) return;
             // prefer requestSubmit if available to trigger React onSubmit handlers
-            if (typeof (form as any).requestSubmit === 'function') {
-                (form as any).requestSubmit();
+            if (typeof form.requestSubmit === 'function') {
+                form.requestSubmit();
             } else {
                 form.dispatchEvent(new Event('submit', { bubbles: true, cancelable: true }));
             }
@@ -104,8 +123,8 @@ export default function LoginProfesional() {
                     style={{ clipPath: "polygon(0 0, 100% 0, 100% 70%, 0 100%)" }}
                 />
                 <section className="bg-white rounded-2xl shadow-xl p-8 max-w-md w-full mx-auto mt-16 flex flex-col items-center">
-                    <h2 className="text-center text-black font-semibold text-2xl mb-1">Acceso administrativo</h2>
-                    <p className="text-center text-gray-500 text-sm mb-6">Acceso para personal administrativo del laboratorio. Ingresá con tu DNI y contraseña.</p>
+                    <h2 className="text-center text-black font-semibold text-2xl mb-1">Acceso interno del laboratorio</h2>
+                    <p className="text-center text-gray-500 text-sm mb-6">Bioquímicos, profesionales autorizados y administradores del laboratorio ingresan desde aquí. Según tu rol accederás a la sección correspondiente.</p>
                     <form ref={formRef} className="w-full flex flex-col gap-4" onSubmit={handleSubmit}>
                         <input
                             type="text"
@@ -118,7 +137,7 @@ export default function LoginProfesional() {
                                 const filtered = e.target.value.replace(/\D/g, '');
                                 setDni(filtered);
                                 if (!filtered) setDniError('Ingrese DNI');
-                                else if (filtered.length < 8) setDniError('El DNI debe tener al menos 8 dígitos');
+                                else if (filtered.length < DNI_MIN) setDniError(`El DNI debe tener al menos ${DNI_MIN} dígitos`);
                                 else setDniError('');
                             }}
                             onPaste={(e: React.ClipboardEvent<HTMLInputElement>) => {
@@ -174,10 +193,10 @@ export default function LoginProfesional() {
                         </Link>
                     </form>
                     <p className="text-center text-sm mt-6">
-                        ¿No tenés cuenta administrativa? {" "}
+                        ¿Sos profesional y todavía no tenés cuenta? {" "}
                         <Link href="/registro-profesional" className="font-bold underline">Registrate aquí</Link>
                     </p>
-                    <p className="text-xs text-gray-400 mt-2 text-center">El personal administrativo gestiona pacientes y carga de estudios.</p>
+                    <p className="text-xs text-gray-400 mt-2 text-center">Este acceso corresponde al portal interno del laboratorio y habilita funciones según el rol asignado.</p>
                     <Link href="/" className="text-blue-500 underline mt-4">Volver al inicio</Link>
                 </section>
             </main>

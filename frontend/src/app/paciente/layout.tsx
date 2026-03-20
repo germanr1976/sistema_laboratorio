@@ -5,50 +5,57 @@ import { useEffect, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
 import { Sidebar } from "./src/componentes/SideBar";
 
+function getPatientRouteAccess() {
+  if (typeof window === "undefined") {
+    return { canAccess: false, redirectTo: null as string | null };
+  }
+
+  const token = localStorage.getItem("authToken");
+  const userType = (localStorage.getItem("userType") || "").toLowerCase();
+
+  let role = "";
+  try {
+    const rawUser = localStorage.getItem("userData");
+    const parsedUser = rawUser ? JSON.parse(rawUser) : null;
+    role = String(parsedUser?.role || "").toUpperCase();
+  } catch {
+    role = "";
+  }
+
+  const isPatientRole = role === "PATIENT";
+  const isProfessionalRole = role === "BIOCHEMIST" || role === "ADMIN";
+  const isPatientType = userType === "patient";
+  const isProfessionalType = userType === "professional";
+
+  if (!token) {
+    return { canAccess: false, redirectTo: "/login-paciente" as string | null };
+  }
+
+  if (isProfessionalRole || isProfessionalType) {
+    return { canAccess: false, redirectTo: "/dashboard" as string | null };
+  }
+
+  if (!isPatientRole && !isPatientType) {
+    return { canAccess: false, redirectTo: "/" as string | null };
+  }
+
+  return { canAccess: true, redirectTo: null as string | null };
+}
+
 export default function PatientLayout({ children }: { children: React.ReactNode }) {
   const router = useRouter();
   const scrollContainerRef = useRef<HTMLElement | null>(null);
   const [isScrolled, setIsScrolled] = useState(false);
-  const [canAccess, setCanAccess] = useState(false);
+  const access = getPatientRouteAccess();
 
   useEffect(() => {
-    const token = localStorage.getItem("authToken");
-    const userType = (localStorage.getItem("userType") || "").toLowerCase();
-
-    let role = "";
-    try {
-      const rawUser = localStorage.getItem("userData");
-      const parsedUser = rawUser ? JSON.parse(rawUser) : null;
-      role = String(parsedUser?.role || "").toUpperCase();
-    } catch {
-      role = "";
+    if (access.redirectTo) {
+      router.replace(access.redirectTo);
     }
-
-    const isPatientRole = role === "PATIENT";
-    const isProfessionalRole = role === "BIOCHEMIST" || role === "ADMIN";
-    const isPatientType = userType === "patient";
-    const isProfessionalType = userType === "professional";
-
-    if (!token) {
-      router.replace("/login-paciente");
-      return;
-    }
-
-    if (isProfessionalRole || isProfessionalType) {
-      router.replace("/dashboard");
-      return;
-    }
-
-    if (!isPatientRole && !isPatientType) {
-      router.replace("/");
-      return;
-    }
-
-    setCanAccess(true);
-  }, [router]);
+  }, [access.redirectTo, router]);
 
   useEffect(() => {
-    if (!canAccess) return;
+    if (!access.canAccess) return;
 
     const el = scrollContainerRef.current;
     if (!el) return;
@@ -60,9 +67,9 @@ export default function PatientLayout({ children }: { children: React.ReactNode 
     onScroll();
     el.addEventListener("scroll", onScroll);
     return () => el.removeEventListener("scroll", onScroll);
-  }, [canAccess]);
+  }, [access.canAccess]);
 
-  if (!canAccess) {
+  if (!access.canAccess) {
     return null;
   }
 

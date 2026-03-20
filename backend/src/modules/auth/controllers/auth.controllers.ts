@@ -1,12 +1,30 @@
 import { Request, Response } from 'express';
 import { validateLogin } from '../validators/validators';
-import { comparePassword, generateToken, generatePasswordRecoveryToken, verifyPasswordRecoveryToken, hashPassword, verifyToken } from '../services/auth.services';
+import { buildRecoveryPasswordVersion, comparePassword, generateToken, generatePasswordRecoveryToken, verifyPasswordRecoveryToken, hashPassword, verifyToken } from '../services/auth.services';
 import { enviarCorreoRecuperacion } from '../services/emailService';
-import { PrismaClient } from '@prisma/client';
+import prisma from '@/config/prisma';
 import { validateDoctor, validatePatient } from '../validators/validators';
+import { AUDIT_EVENT_TYPES, recordAuditEvent } from '@/modules/audit/services/audit.services';
 
+async function resolveTenantFromRequest(req: Request, createIfMissing = false) {
+    const slugFromHeader = String(req.headers['x-tenant-slug'] || '').trim().toLowerCase();
+    const fallbackSlug = String(process.env.DEFAULT_TENANT_SLUG || 'default').trim().toLowerCase();
+    const fallbackName = String(process.env.DEFAULT_TENANT_NAME || 'Laboratorio principal').trim();
+    const tenantSlug = slugFromHeader || fallbackSlug;
 
-const prisma = new PrismaClient();
+    if (createIfMissing) {
+        return prisma.tenant.upsert({
+            where: { slug: tenantSlug },
+            update: {},
+            create: {
+                slug: tenantSlug,
+                name: fallbackName,
+            },
+        });
+    }
+
+    return prisma.tenant.findUnique({ where: { slug: tenantSlug } });
+}
 
 function normalizeEmail(email: unknown): string | undefined {
     if (typeof email !== 'string') return undefined;
@@ -81,7 +99,34 @@ async function sendPatientAccessLink(
 export async function loginController(req: Request, res: Response) {
     try {
         const validationResult = validateLogin(req.body);
+        const requestedTenantSlug = String(req.headers['x-tenant-slug'] || '').trim().toLowerCase();
+        let requestedTenantId: number | null = null;
+
+        if (requestedTenantSlug) {
+            const requestedTenant = await prisma.tenant.findUnique({
+                where: { slug: requestedTenantSlug },
+                select: { id: true },
+            });
+
+            if (!requestedTenant) {
+                return res.status(401).json({
+                    success: false,
+                    message: 'Credenciales inválidas'
+                });
+            }
+
+            requestedTenantId = requestedTenant.id;
+        }
+
         if (validationResult.error) {
+            await recordAuditEvent({
+                req,
+                eventType: AUDIT_EVENT_TYPES.LOGIN_FAILED,
+                tenantId: requestedTenantId,
+                metadata: {
+                    reason: 'invalid_input',
+                },
+            });
             return res.status(400).json({
                 success: false,
                 message: 'Datos de entrada invalidos'
@@ -91,22 +136,42 @@ export async function loginController(req: Request, res: Response) {
         const dni: string = validatedData.dni;
         const password: string | undefined = validatedData.password;
 
-        const user = await prisma.user.findUnique({
-            where: { dni },
+        const user = await prisma.user.findFirst({
+            where: requestedTenantId ? { dni, tenantId: requestedTenantId } : { dni },
             include: { profile: true, role: true }
         })
         if (!user) {
+            await recordAuditEvent({
+                req,
+                eventType: AUDIT_EVENT_TYPES.LOGIN_FAILED,
+                tenantId: requestedTenantId,
+                metadata: {
+                    reason: 'user_not_found',
+                    dni,
+                },
+            });
             return res.status(404).json({
                 success: false,
                 message: 'Usuario no encontrado'
             })
         } else {
+            const auditTenantId = user.tenantId;
+            const hasPlatformPortalAccess = user.role.name === 'PLATFORM_ADMIN' || user.isPlatformAdmin;
             switch (user.role.name) {
                 case 'PATIENT':
                     const patientEmail = user.email ?? '';
                     const hasPendingMarker = patientEmail.endsWith('@pending.local');
 
                     if (hasPendingMarker || !user.email || !user.password) {
+                        await recordAuditEvent({
+                            req,
+                            eventType: AUDIT_EVENT_TYPES.LOGIN_FAILED,
+                            tenantId: auditTenantId,
+                            actorUserId: user.id,
+                            metadata: {
+                                reason: 'patient_pending_registration',
+                            },
+                        });
                         return res.status(403).json({
                             success: false,
                             message: 'Debes completar tu registro de paciente para poder iniciar sesión'
@@ -114,6 +179,15 @@ export async function loginController(req: Request, res: Response) {
                     }
 
                     if (!password) {
+                        await recordAuditEvent({
+                            req,
+                            eventType: AUDIT_EVENT_TYPES.LOGIN_FAILED,
+                            tenantId: auditTenantId,
+                            actorUserId: user.id,
+                            metadata: {
+                                reason: 'missing_password',
+                            },
+                        });
                         return res.status(400).json({
                             success: false,
                             message: 'Password requerida'
@@ -122,6 +196,15 @@ export async function loginController(req: Request, res: Response) {
 
                     const patientPasswordVerify = await comparePassword(password, user.password)
                     if (!patientPasswordVerify) {
+                        await recordAuditEvent({
+                            req,
+                            eventType: AUDIT_EVENT_TYPES.LOGIN_FAILED,
+                            tenantId: auditTenantId,
+                            actorUserId: user.id,
+                            metadata: {
+                                reason: 'invalid_password',
+                            },
+                        });
                         return res.status(401).json({
                             success: false,
                             message: 'Error en la contraseña'
@@ -130,9 +213,20 @@ export async function loginController(req: Request, res: Response) {
 
                     const tokenGenerated = await generateToken({
                         userId: user.id,
+                        tenantId: user.tenantId,
                         dni: user.dni,
                         roleId: user.roleId,
-                        roleName: user.role.name
+                        roleName: user.role.name,
+                        isPlatformAdmin: hasPlatformPortalAccess,
+                    });
+                    await recordAuditEvent({
+                        req,
+                        eventType: AUDIT_EVENT_TYPES.LOGIN_SUCCESS,
+                        tenantId: auditTenantId,
+                        actorUserId: user.id,
+                        metadata: {
+                            role: user.role.name,
+                        },
                     });
                     return res.status(200).json({
                         success: true,
@@ -145,13 +239,25 @@ export async function loginController(req: Request, res: Response) {
                                 profile: {
                                     firstName: user.profile?.firstName,
                                     lastName: user.profile?.lastName
-                                }
+                                },
+                                isPlatformAdmin: hasPlatformPortalAccess,
                             },
                             token: tokenGenerated
                         }
                     });
                 case 'BIOCHEMIST':
+                case 'ADMIN':
+                case 'PLATFORM_ADMIN':
                     if (!password) {
+                        await recordAuditEvent({
+                            req,
+                            eventType: AUDIT_EVENT_TYPES.LOGIN_FAILED,
+                            tenantId: auditTenantId,
+                            actorUserId: user.id,
+                            metadata: {
+                                reason: 'missing_password',
+                            },
+                        });
                         return res.status(400).json({
                             success: false,
                             message: 'Password requerida'
@@ -159,6 +265,15 @@ export async function loginController(req: Request, res: Response) {
                     }
 
                     if (!user.password) {
+                        await recordAuditEvent({
+                            req,
+                            eventType: AUDIT_EVENT_TYPES.LOGIN_FAILED,
+                            tenantId: auditTenantId,
+                            actorUserId: user.id,
+                            metadata: {
+                                reason: 'missing_password_config',
+                            },
+                        });
                         return res.status(500).json({
                             success: false,
                             message: 'Usuario sin contraseña configurada'
@@ -167,6 +282,15 @@ export async function loginController(req: Request, res: Response) {
 
                     const passwordVerify = await comparePassword(password, user.password)
                     if (!passwordVerify) {
+                        await recordAuditEvent({
+                            req,
+                            eventType: AUDIT_EVENT_TYPES.LOGIN_FAILED,
+                            tenantId: auditTenantId,
+                            actorUserId: user.id,
+                            metadata: {
+                                reason: 'invalid_password',
+                            },
+                        });
                         return res.status(401).json({
                             success: false,
                             message: 'Error en la contraseñá'
@@ -174,9 +298,20 @@ export async function loginController(req: Request, res: Response) {
                     } else {
                         const tokenGenerated = await generateToken({
                             userId: user.id,
+                            tenantId: user.tenantId,
                             dni: user.dni,
                             roleId: user.roleId,
-                            roleName: user.role.name
+                            roleName: user.role.name,
+                            isPlatformAdmin: hasPlatformPortalAccess,
+                        });
+                        await recordAuditEvent({
+                            req,
+                            eventType: AUDIT_EVENT_TYPES.LOGIN_SUCCESS,
+                            tenantId: auditTenantId,
+                            actorUserId: user.id,
+                            metadata: {
+                                role: user.role.name,
+                            },
                         });
                         return res.status(200).json({
                             success: true,
@@ -189,7 +324,8 @@ export async function loginController(req: Request, res: Response) {
                                     profile: {
                                         firstName: user.profile?.firstName,
                                         lastName: user.profile?.lastName
-                                    }
+                                    },
+                                    isPlatformAdmin: hasPlatformPortalAccess,
                                 },
                                 token: tokenGenerated
                             }
@@ -206,7 +342,7 @@ export async function loginController(req: Request, res: Response) {
 
 
     } catch (error) {
-        console.error(error);
+        req.log.error({ err: error }, 'Error en login');
         return res.status(500).json({
             success: false,
             message: 'Error interno del servidor'
@@ -216,6 +352,26 @@ export async function loginController(req: Request, res: Response) {
 
 export async function registerDoctorController(req: Request, res: Response) {
     try {
+        const selfRegisterRaw = String(process.env.BIOCHEMIST_SELF_REGISTER_ENABLED || '').trim().toLowerCase();
+        const selfRegisterEnabled = selfRegisterRaw
+            ? selfRegisterRaw === 'true'
+            : process.env.NODE_ENV !== 'production';
+
+        if (!selfRegisterEnabled) {
+            return res.status(403).json({
+                success: false,
+                message: 'El registro libre de bioquímicos está deshabilitado. Contacta al ADMIN de tu tenant.',
+            });
+        }
+
+        const tenant = await resolveTenantFromRequest(req, true);
+        if (!tenant) {
+            return res.status(500).json({
+                success: false,
+                message: 'No se pudo resolver el tenant de registro'
+            });
+        }
+
         const validationResultDoctor = validateDoctor(req.body);
         if (validationResultDoctor.error) {
             return res.status(400).json({
@@ -231,8 +387,8 @@ export async function registerDoctorController(req: Request, res: Response) {
         const email: string = validatedData.email;
         const password: string = validatedData.password;
 
-        const existingUserByDni = await prisma.user.findUnique({
-            where: { dni }
+        const existingUserByDni = await prisma.user.findFirst({
+            where: { dni, tenantId: tenant.id }
         });
         const existingUserByEmail = await prisma.user.findUnique({
             where: { email }
@@ -266,6 +422,7 @@ export async function registerDoctorController(req: Request, res: Response) {
                     email,
                     password: hashedPassword,
                     license,
+                    tenantId: tenant.id,
                     roleId: doctorRole.id
                 }
             });
@@ -280,9 +437,11 @@ export async function registerDoctorController(req: Request, res: Response) {
         });
         const tokenGenerated = await generateToken({
             userId: result.user.id,
+            tenantId: result.user.tenantId,
             dni: result.user.dni,
             roleId: result.user.roleId,
-            roleName: doctorRole.name
+            roleName: doctorRole.name,
+            isPlatformAdmin: result.user.isPlatformAdmin,
         });
         return res.status(201).json({
             success: true,
@@ -301,7 +460,7 @@ export async function registerDoctorController(req: Request, res: Response) {
         });
 
     } catch (error) {
-        console.error(error);
+        req.log.error({ err: error }, 'Error en registro de bioquímico');
         return res.status(500).json({
             success: false,
             message: 'Error interno del servidor'
@@ -310,7 +469,15 @@ export async function registerDoctorController(req: Request, res: Response) {
 }
 export async function registerPatientController(req: Request, res: Response) {
     try {
-        console.log('📝 Registro de paciente - Datos recibidos:', JSON.stringify(req.body, null, 2));
+        const tenant = await resolveTenantFromRequest(req, true);
+        if (!tenant) {
+            return res.status(500).json({
+                success: false,
+                message: 'No se pudo resolver el tenant de registro'
+            });
+        }
+
+        req.log.info({ body: req.body }, 'Registro de paciente - Datos recibidos');
 
         let isBiochemistRequest = false;
         const authHeader = req.headers.authorization;
@@ -327,7 +494,7 @@ export async function registerPatientController(req: Request, res: Response) {
 
         const validationResultPatient = validatePatient(req.body)
         if (validationResultPatient.error) {
-            console.error('❌ Error de validación:', validationResultPatient.error.details);
+            req.log.error({ errors: validationResultPatient.error.details }, 'Error de validación en registro de paciente');
             return res.status(400).json({
                 success: false,
                 message: 'Datos de entrada invalidos',
@@ -350,8 +517,8 @@ export async function registerPatientController(req: Request, res: Response) {
             })
         }
 
-        const existingPatientByDni = await prisma.user.findUnique({
-            where: { dni },
+        const existingPatientByDni = await prisma.user.findFirst({
+            where: { dni, tenantId: tenant.id },
             include: { profile: true, role: true }
         });
         if (existingPatientByDni) {
@@ -516,6 +683,7 @@ export async function registerPatientController(req: Request, res: Response) {
                     dni,
                     email,
                     password: hashedPassword,
+                    tenantId: tenant.id,
                     roleId: patientRole?.id
                 }
             });
@@ -565,7 +733,7 @@ export async function registerPatientController(req: Request, res: Response) {
         return res.status(201).json(responsePayload);
 
     } catch (error) {
-        console.error(error);
+        req.log.error({ err: error }, 'Error en registro de paciente');
         return res.status(500).json({
             success: false,
             message: 'Error interno del servidor'
@@ -581,6 +749,7 @@ export async function registerPatientController(req: Request, res: Response) {
 export async function requestPasswordRecoveryController(req: Request, res: Response) {
     try {
         const { email } = req.body;
+        const tenant = await resolveTenantFromRequest(req);
         const allowRecoveryDebugLink = String(process.env.ALLOW_RECOVERY_DEBUG_LINK || '').toLowerCase() === 'true';
         let isBiochemistRequest = false;
 
@@ -595,6 +764,13 @@ export async function requestPasswordRecoveryController(req: Request, res: Respo
             }
         }
 
+        if (!tenant) {
+            return res.status(200).json({
+                success: true,
+                message: 'Si el email existe en nuestro sistema, recibirás un enlace de recuperación'
+            });
+        }
+
         if (!email || typeof email !== 'string') {
             return res.status(400).json({
                 success: false,
@@ -605,8 +781,8 @@ export async function requestPasswordRecoveryController(req: Request, res: Respo
         const genericMessage = 'Si el email existe en nuestro sistema, recibirás un enlace de recuperación';
 
         // Buscar usuario por email
-        const user = await prisma.user.findUnique({
-            where: { email },
+        const user = await prisma.user.findFirst({
+            where: { email, tenantId: tenant.id },
             include: { profile: true, role: true }
         });
 
@@ -619,7 +795,7 @@ export async function requestPasswordRecoveryController(req: Request, res: Respo
         }
 
         // Generar token de recuperación
-        const recoveryToken = await generatePasswordRecoveryToken(user.id, user.dni);
+        const recoveryToken = await generatePasswordRecoveryToken(user.id, user.tenantId, user.dni, user.password || '');
         const baseUrl = process.env.APP_FRONTEND_URL || 'http://localhost:3001';
         const recoveryLink = `${baseUrl}/recuperar-contrasena?token=${encodeURIComponent(recoveryToken)}`;
 
@@ -630,13 +806,13 @@ export async function requestPasswordRecoveryController(req: Request, res: Respo
         const smtpConfigured = Boolean(emailUser && emailPassword);
 
         if (!smtpConfigured) {
-            console.warn('SMTP no configurado: faltan EMAIL_USER y/o EMAIL_PASSWORD. Se omite envio de correo.');
+            req.log.warn('SMTP no configurado: faltan EMAIL_USER y/o EMAIL_PASSWORD. Se omite envio de correo.');
         } else {
             try {
                 await enviarCorreoRecuperacion(email, recoveryToken);
                 emailSent = true;
             } catch (emailError) {
-                console.error('No se pudo enviar correo de recuperación:', emailError);
+                req.log.error({ err: emailError }, 'No se pudo enviar correo de recuperación');
             }
         }
 
@@ -657,7 +833,7 @@ export async function requestPasswordRecoveryController(req: Request, res: Respo
         return res.status(200).json(responsePayload);
 
     } catch (error) {
-        console.error('Error en solicitud de recuperación de contraseña:', error);
+        req.log.error({ err: error }, 'Error en solicitud de recuperación de contraseña');
         return res.status(500).json({
             success: false,
             message: 'Error al procesar la solicitud'
@@ -707,14 +883,25 @@ export async function resetPasswordController(req: Request, res: Response) {
         }
 
         // Buscar usuario
-        const user = await prisma.user.findUnique({
-            where: { id: decodedToken.userId }
+        const user = await prisma.user.findFirst({
+            where: {
+                id: decodedToken.userId,
+                tenantId: decodedToken.tenantId,
+            }
         });
 
         if (!user) {
             return res.status(404).json({
                 success: false,
                 message: 'Usuario no encontrado'
+            });
+        }
+
+        const expectedPasswordVersion = buildRecoveryPasswordVersion(user.password || '');
+        if (decodedToken.passwordVersion !== expectedPasswordVersion) {
+            return res.status(401).json({
+                success: false,
+                message: 'Token inválido o expirado'
             });
         }
 
@@ -733,7 +920,7 @@ export async function resetPasswordController(req: Request, res: Response) {
         });
 
     } catch (error) {
-        console.error('Error al restablecer contraseña:', error);
+        req.log.error({ err: error }, 'Error al restablecer contraseña');
         return res.status(500).json({
             success: false,
             message: 'Error al restablecer la contraseña'
@@ -858,6 +1045,125 @@ export async function patientAccessLinkController(req: Request, res: Response) {
         return res.status(500).json({
             success: false,
             message: 'Error al generar link de acceso del paciente'
+        });
+    }
+}
+
+export async function changeUserRoleController(req: Request, res: Response) {
+    try {
+        const tenantId = req.tenantId;
+        if (!tenantId) {
+            return res.status(403).json({
+                success: false,
+                message: 'Contexto de tenant no disponible',
+            });
+        }
+
+        const targetUserId = Number(req.params.userId);
+        const roleName = String(req.body?.roleName || '').trim().toUpperCase();
+        if (!Number.isFinite(targetUserId) || targetUserId <= 0 || !roleName) {
+            return res.status(400).json({
+                success: false,
+                message: 'Parámetros inválidos',
+            });
+        }
+
+        const targetUser = await prisma.user.findFirst({
+            where: {
+                id: targetUserId,
+                tenantId,
+            },
+            include: { role: true },
+        });
+
+        if (!targetUser) {
+            return res.status(404).json({
+                success: false,
+                message: 'Usuario no encontrado',
+            });
+        }
+
+        const nextRole = await prisma.role.findUnique({ where: { name: roleName } });
+        if (!nextRole) {
+            return res.status(404).json({
+                success: false,
+                message: 'Rol no encontrado',
+            });
+        }
+
+        const updated = await prisma.user.update({
+            where: { id: targetUser.id },
+            data: { roleId: nextRole.id },
+            include: { role: true },
+        });
+
+        await recordAuditEvent({
+            req,
+            eventType: AUDIT_EVENT_TYPES.ROLE_CHANGED,
+            tenantId,
+            targetUserId: targetUser.id,
+            metadata: {
+                previousRole: targetUser.role.name,
+                newRole: updated.role.name,
+            },
+        });
+
+        return res.status(200).json({
+            success: true,
+            message: 'Rol actualizado exitosamente',
+            data: {
+                id: updated.id,
+                role: updated.role.name,
+            },
+        });
+    } catch (error) {
+        req.log.error({ err: error }, 'Error al cambiar rol de usuario');
+        return res.status(500).json({
+            success: false,
+            message: 'Error interno del servidor',
+        });
+    }
+}
+
+export async function setTenantSuspendedController(req: Request, res: Response) {
+    try {
+        const tenantId = req.tenantId;
+        if (!tenantId) {
+            return res.status(403).json({
+                success: false,
+                message: 'Contexto de tenant no disponible',
+            });
+        }
+
+        const suspended = Boolean(req.body?.suspended);
+
+        const updated = await prisma.tenant.update({
+            where: { id: tenantId },
+            data: { suspended },
+        });
+
+        await recordAuditEvent({
+            req,
+            eventType: AUDIT_EVENT_TYPES.TENANT_SUSPENDED,
+            tenantId,
+            metadata: {
+                suspended,
+            },
+        });
+
+        return res.status(200).json({
+            success: true,
+            message: suspended ? 'Tenant suspendido' : 'Tenant reactivado',
+            data: {
+                id: updated.id,
+                suspended: updated.suspended,
+            },
+        });
+    } catch (error) {
+        req.log.error({ err: error }, 'Error al actualizar suspensión del tenant');
+        return res.status(500).json({
+            success: false,
+            message: 'Error interno del servidor',
         });
     }
 }

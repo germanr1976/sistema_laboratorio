@@ -2,7 +2,7 @@
 
 import Link from "next/link";
 import React, { useState } from "react";
-import { Toaster, toast } from 'react-hot-toast';
+import { toast } from 'react-hot-toast';
 import { useRouter } from 'next/navigation';
 
 export default function RegistroProfesional() {
@@ -23,6 +23,13 @@ export default function RegistroProfesional() {
     const DNI_MAX = 8;
     const MATRICULA_MAX = 18;
 
+    const getErrorMessage = (error: unknown) => {
+        if (error instanceof Error && error.message) {
+            return error.message;
+        }
+        return 'Error al conectar con el servidor';
+    };
+
     const handleSubmit = async (e: React.FormEvent) => {
         e.preventDefault();
         let ok = true;
@@ -33,7 +40,7 @@ export default function RegistroProfesional() {
         if (password !== confirmPassword) { setPasswordError('Las contraseñas no coinciden'); ok = false; }
         if (!ok) return;
         // Aquí iría la lógica de registro
-        // Al completar con éxito, redirigimos al login de administrativos
+        // Al completar con éxito, redirigimos al acceso interno del laboratorio
         // Lógica real de registro: llamar al backend
         const base = process.env.NEXT_PUBLIC_API_URL ?? '';
         // separar nombre en firstName / lastName (aprox)
@@ -63,10 +70,10 @@ export default function RegistroProfesional() {
             toast.dismiss();
             toast.success('Registrado correctamente. Redirigiendo al login...');
             router.push('/login-profesional');
-        } catch (err: any) {
+        } catch (err: unknown) {
             toast.dismiss();
             console.error('Registro error', err);
-            toast.error(err?.message || 'Error al conectar con el servidor');
+            toast.error(getErrorMessage(err));
             setLoading(false);
         }
     };
@@ -81,8 +88,8 @@ export default function RegistroProfesional() {
                     style={{ clipPath: "polygon(0 0, 100% 0, 100% 70%, 0 100%)" }}
                 />
                 <section className="bg-white rounded-2xl shadow-xl p-8 max-w-md w-full mx-auto mt-16 flex flex-col items-center">
-                    <h2 className="text-center text-black font-semibold text-2xl mb-1">Registro administrativo</h2>
-                    <p className="text-center text-gray-500 text-sm mb-6">Completá tus datos para crear tu cuenta administrativa</p>
+                    <h2 className="text-center text-black font-semibold text-2xl mb-1">Registro profesional</h2>
+                    <p className="text-center text-gray-500 text-sm mb-6">Completá tus datos para crear tu cuenta profesional dentro del laboratorio</p>
                     <form className="w-full flex flex-col gap-4" onSubmit={handleSubmit}>
                         <input
                             type="text"
@@ -232,7 +239,7 @@ export default function RegistroProfesional() {
                             {loading ? 'Registrando...' : 'Registrarme'}
                         </button>
                     </form>
-                    <Link href="/login-profesional" className="text-blue-500 underline mt-4">Volver al login administrativo</Link>
+                    <Link href="/login-profesional" className="text-blue-500 underline mt-4">Volver al acceso interno del laboratorio</Link>
                 </section>
             </main>
         </>

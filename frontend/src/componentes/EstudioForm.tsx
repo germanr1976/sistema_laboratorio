@@ -3,22 +3,14 @@
 import React, { useState, useCallback, useEffect } from 'react'
 import { useRouter } from 'next/navigation'
 import authFetch from '../utils/authFetch'
-import { savePdf, getPdf } from '../utils/estudiosStore'
+import { savePdf } from '../utils/estudiosStore'
 import Toast from './Toast'
 import {
-    cardClasses,
-    leftColClasses,
-    nameClasses,
-    metaClasses,
-    rightActionsClasses,
-    btnPdf,
-    btnNoFile,
-    iconBtn,
     badgeCompletado,
     badgeParcial,
     badgeEnProceso,
 } from '../utils/uiClasses'
-import { Loader2, X, FileText, Upload, CheckCircle2, Clock, FileEdit, Save, Eye } from 'lucide-react'
+import { Loader2, X, FileText, Upload, Save, Eye } from 'lucide-react'
 
 const API_URL = process.env.NEXT_PUBLIC_API_URL || "http://localhost:3000"
 
@@ -41,6 +33,32 @@ interface EstudioFormProps {
     permitirCambioEstado?: boolean
     datosPacienteBloqueados?: boolean
     onSuccess?: () => void
+}
+
+interface LocalStudyMeta {
+    id?: string | number
+    backendId?: string | number
+    serverId?: string | number
+    fechaEstudio?: string
+    medico?: string
+    obraSocial?: string
+    studyDate?: string
+    doctor?: string
+    socialInsurance?: string
+    [key: string]: unknown
+}
+
+type StudyUpdatePayload = {
+    socialInsurance?: string
+    doctor?: string
+    studyDate?: string
+}
+
+const getErrorMessage = (error: unknown, fallback: string) => {
+    if (error instanceof Error && error.message) {
+        return error.message
+    }
+    return fallback
 }
 
 export function EstudioForm({
@@ -165,6 +183,7 @@ export function EstudioForm({
 
         const timeoutId = setTimeout(buscarPaciente, 500)
         return () => clearTimeout(timeoutId)
+    }, [dni, modoEdicion, estado])
     }, [dni, modoEdicion, estado])
 
     const handleFileChange = useCallback((e: React.ChangeEvent<HTMLInputElement>) => {
@@ -421,9 +440,9 @@ export function EstudioForm({
             } else {
                 window.location.reload();
             }
-        } catch (e: any) {
+        } catch (e: unknown) {
             console.error('Error al eliminar attachment:', e);
-            showToastMessage(e.message || 'Error al eliminar archivo', 'error');
+            showToastMessage(getErrorMessage(e, 'Error al eliminar archivo'), 'error');
         }
     }
 
@@ -542,7 +561,7 @@ export function EstudioForm({
 
                 if (modoEdicion && estudioExistente) {
                     // Actualizar estudio existente
-                    const index = metas.findIndex((m: any) => m.id === estudioExistente.id)
+                    const index = metas.findIndex((m: LocalStudyMeta) => m.id === estudioExistente.id)
                     if (index >= 0) {
                         metas[index] = { ...metas[index], ...estudioData }
                     }
@@ -571,7 +590,6 @@ export function EstudioForm({
                 // Paso 1: Verificar/Crear paciente (solo cuando se crea un nuevo estudio)
                 let pacienteId = null
                 const normalizedPatientEmail = emailPaciente.trim().toLowerCase()
-
                 if (!modoEdicion) {
                     // Buscar si el paciente ya existe
                     const buscarResponse = await authFetch(`${API_URL}/api/studies/patient/${dni}`)
@@ -743,7 +761,7 @@ export function EstudioForm({
                         try {
                             const rawMeta = localStorage.getItem('estudios_metadata')
                             const metas = rawMeta ? JSON.parse(rawMeta) : []
-                            const idx = metas.findIndex((m: any) => m.id === studyId)
+                            const idx = metas.findIndex((m: LocalStudyMeta) => m.id === studyId)
                             if (idx >= 0 && createdId) {
                                 // Actualizar con los datos que devuelve el backend
                                 // Intentar acceder a data en diferentes estructuras
@@ -817,7 +835,7 @@ export function EstudioForm({
                     }
 
                     // Actualizar campos de estudio (obra social, médico, fecha)
-                    const updatePayload: any = {}
+                    const updatePayload: StudyUpdatePayload = {}
                     // Agregar campos si cambiaron o si están vacíos en el existente y ahora tienen valor
                     if (obraSocial !== estudioExistente.obraSocial || (!estudioExistente.obraSocial && obraSocial)) {
                         updatePayload.socialInsurance = obraSocial
@@ -895,9 +913,9 @@ export function EstudioForm({
                         }
                     }
                 }
-            } catch (error: any) {
+            } catch (error: unknown) {
                 console.error('Error con el backend:', error)
-                showToastMessage(`Guardado localmente. Error: ${error.message || 'Backend no disponible'}`, 'info')
+                showToastMessage(`Guardado localmente. Error: ${getErrorMessage(error, 'Backend no disponible')}`, 'info')
             }
 
             showToastMessage(
@@ -922,7 +940,6 @@ export function EstudioForm({
         }
     }
 
-    const mostrarPdf = estado === 'completado' || estado === 'parcial'
     const camposDeshabilitados = (modoEdicion && !permitirCambioEstado) || datosPacienteBloqueados
 
     const getEstadoBadgeClass = (est: EstadoEstudio) => {

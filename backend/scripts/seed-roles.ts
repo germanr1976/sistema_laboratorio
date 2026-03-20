@@ -10,6 +10,7 @@ async function main() {
     { name: 'ADMIN' },
     { name: 'PATIENT' },
     { name: 'BIOCHEMIST' },
+    { name: 'PLATFORM_ADMIN' },
   ];
 
   for (const role of roles) {

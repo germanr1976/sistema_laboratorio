@@ -6,6 +6,15 @@ const prisma = new PrismaClient();
 async function main() {
     console.log('🌱 Sembrando datos de prueba...');
 
+    const defaultTenant = await prisma.tenant.upsert({
+        where: { slug: 'default' },
+        update: {},
+        create: {
+            slug: 'default',
+            name: 'Laboratorio principal',
+        },
+    });
+
     // Obtener roles
     const patientRole = await prisma.role.findUnique({
         where: { name: 'PATIENT' },
@@ -29,6 +38,7 @@ async function main() {
         const patient = await prisma.user.create({
             data: {
                 dni: '87654321',
+                tenantId: defaultTenant.id,
                 roleId: patientRole.id,
                 profile: {
                     create: {
@@ -54,6 +64,7 @@ async function main() {
         const biochemist = await prisma.user.create({
             data: {
                 dni: '12345678',
+                tenantId: defaultTenant.id,
                 email: 'juan@lab.com',
                 license: 'BQ001',
                 password: hashedPassword,

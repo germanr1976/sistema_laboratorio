@@ -1,5 +1,6 @@
 import nodemailer from "nodemailer";
 import dotenv from "dotenv";
+import logger from "@/config/logger";
 
 dotenv.config();
 
@@ -71,7 +72,7 @@ function buildTransporter() {
     };
 
     if (smtpHost) {
-        console.log(`[email] SMTP host configurado: ${smtpHost}:${smtpPort} (secure=${smtpSecure})`);
+        logger.info({ host: smtpHost, port: smtpPort, secure: smtpSecure }, 'SMTP host configurado');
         return nodemailer.createTransport({
             host: smtpHost,
             port: smtpPort,
@@ -112,8 +113,8 @@ export async function enviarCorreoRecuperacion(destinatario: string, token: stri
         const linkRecuperacion = `${baseUrl}/recuperar-contrasena?token=${encodedToken}`;
         const loginPacienteLink = `${baseUrl}/login-paciente`;
 
-        console.log("Intentando enviar correo a:", destinatario);
-        console.log("Link de recuperación:", linkRecuperacion);
+        logger.info({ destinatario }, "Intentando enviar correo");
+        logger.debug({ linkRecuperacion }, "Link de recuperación generado");
 
         // Most SMTP providers reject spoofed sender domains. Use EMAIL_FROM when configured,
         // otherwise default to the authenticated mailbox to maximize deliverability.
@@ -144,10 +145,10 @@ export async function enviarCorreoRecuperacion(destinatario: string, token: stri
             `
         });
 
-        console.log("Correo enviado correctamente:", info.response);
+        logger.info({ messageId: info.messageId }, "Correo enviado correctamente");
         return { success: true, messageId: info.messageId };
     } catch (error) {
-        console.error("Error enviando el correo:", error);
+        logger.error({ err: error }, "Error enviando el correo");
         throw new Error(`Error al enviar correo de recuperación: ${error}`);
     }
 }

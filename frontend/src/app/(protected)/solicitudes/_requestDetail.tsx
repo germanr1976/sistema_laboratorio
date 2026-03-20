@@ -4,9 +4,37 @@ import React, { useState } from "react";
 import { useRouter } from "next/navigation";
 import { Eye, Download, Trash2, X } from "lucide-react";
 
+interface RequestDetailProfile {
+    firstName?: string | null;
+    lastName?: string | null;
+}
+
+interface RequestDetailRequest {
+    id: number;
+    dni: string;
+    requestedDate: string;
+    insuranceName: string;
+    doctorName: string;
+    status: string;
+    convertedStudyId?: number | null;
+    patient?: {
+        profile?: RequestDetailProfile | null;
+    } | null;
+}
+
+interface RequestDetailAttachment {
+    id: number;
+}
+
+interface RequestDetailStudy {
+    id: number;
+    pdfUrl?: string | null;
+    attachments?: RequestDetailAttachment[];
+}
+
 interface Props {
-    request: any;
-    study: any | null;
+    request: RequestDetailRequest;
+    study: RequestDetailStudy | null;
     loadingStudy: boolean;
     uploading: boolean;
     onClose: () => void;

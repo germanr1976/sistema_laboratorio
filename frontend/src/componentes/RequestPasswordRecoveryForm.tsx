@@ -9,6 +9,11 @@ interface RequestPasswordRecoveryFormProps {
     roleLabel: string;
 }
 
+interface RecoveryResponse {
+    message?: string;
+    debugRecoveryLink?: string;
+}
+
 export default function RequestPasswordRecoveryForm({ loginHref, roleLabel }: RequestPasswordRecoveryFormProps) {
     const [email, setEmail] = useState('');
     const [loading, setLoading] = useState(false);
@@ -54,10 +59,10 @@ export default function RequestPasswordRecoveryForm({ loginHref, roleLabel }: Re
             });
 
             const raw = await response.text();
-            let data: any = {};
+            let data: RecoveryResponse = {};
             if (raw) {
                 try {
-                    data = JSON.parse(raw);
+                    data = JSON.parse(raw) as RecoveryResponse;
                 } catch {
                     data = {};
                 }

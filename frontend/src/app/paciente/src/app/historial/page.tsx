@@ -9,6 +9,29 @@ import type { Study } from "../../utils/tipos"
 const API_URL = process.env.NEXT_PUBLIC_API_URL || "http://localhost:3000"
 const DATE_ONLY_REGEX = /^(\d{4})-(\d{2})-(\d{2})$/
 
+interface ApiAttachment {
+  url?: string | null
+}
+
+interface ApiPatientStudy {
+  id?: string | number
+  attachments?: ApiAttachment[]
+  pdfs?: string[]
+  pdfUrl?: string
+  patient?: {
+    profile?: {
+      firstName?: string
+      lastName?: string
+    }
+  }
+  socialInsurance?: string
+  studyDate?: string
+  status?: {
+    name?: string
+  }
+  doctor?: string
+}
+
 const parseDateSafe = (value?: string) => {
   if (!value) return new Date(NaN)
   const raw = value.trim()
@@ -29,6 +52,7 @@ export default function LabHistoryPage() {
   const [endDate, setEndDate] = useState("")
   const [sortOrder, setSortOrder] = useState<"desc" | "asc">("desc")
   const [studies, setStudies] = useState<Study[]>([])
+  const [filteredStudies, setFilteredStudies] = useState<Study[]>([])
   const [loading, setLoading] = useState(true)
   const [currentPage, setCurrentPage] = useState(1)
   const [totalStudies, setTotalStudies] = useState(0)
@@ -67,9 +91,9 @@ export default function LabHistoryPage() {
           console.warn('Formato inesperado en /patient/me:', result);
         }
         // Transformar datos del backend al formato del componente
-        const transformedStudies: Study[] = backendStudies.map((s: any) => {
+        const transformedStudies: Study[] = backendStudies.map((s: ApiPatientStudy) => {
           const attachmentUrls = Array.isArray(s.attachments)
-            ? s.attachments.map((a: any) => a?.url).filter(Boolean)
+            ? s.attachments.map((a: ApiAttachment) => a?.url).filter((url): url is string => Boolean(url))
             : [];
           const rawPdfs = attachmentUrls.length > 0
             ? attachmentUrls
@@ -88,7 +112,9 @@ export default function LabHistoryPage() {
             pdfs: pdfLinks,
           };
         });
+        const sorted = sortStudiesByDate(transformedStudies, sortOrder)
         setStudies(transformedStudies);
+        setFilteredStudies(sorted)
         setLoading(false);
       } catch (e) {
         console.error('Error loading studies:', e);
@@ -96,7 +122,9 @@ export default function LabHistoryPage() {
       }
     };
     loadStudies();
-  }, [currentPage]);
+  }, [currentPage, sortOrder]);
+
+  const allStudies = studies
 
   const handleSearch = () => {
     if (!startDate && !endDate) {
@@ -231,7 +259,7 @@ export default function LabHistoryPage() {
                 </div>
               </div>
               <div className="p-6">
-                <StudiesTable studies={studies} />
+                <StudiesTable studies={filteredStudies} />
                 {/* Controles de paginación */}
                 {totalPages > 1 && (
                   <div className="flex items-center justify-center gap-2 mt-6 pt-6 border-t border-gray-200">
@@ -248,8 +276,8 @@ export default function LabHistoryPage() {
                           key={page}
                           onClick={() => setCurrentPage(page)}
                           className={`px-3 py-2 rounded-lg text-sm font-medium transition-colors ${currentPage === page
-                              ? "bg-blue-600 text-white"
-                              : "border border-gray-300 text-gray-700 hover:bg-gray-50"
+                            ? "bg-blue-600 text-white"
+                            : "border border-gray-300 text-gray-700 hover:bg-gray-50"
                             }`}
                         >
                           {page}

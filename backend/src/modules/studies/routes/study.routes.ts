@@ -4,10 +4,16 @@ import {
   authMiddleware,
   isBiochemist,
   isAdmin,
+  isPatient,
 } from "@/modules/auth/middlewares/auth.middleware";
+import { TENANT_PERMISSION_KEYS } from '@/modules/auth/constants/permissions';
+import { requireTenantPermission } from '@/modules/auth/middlewares/permissions.middleware';
 import { upload } from "@/config/upload";
+import { tenantContext } from '@/middlewares/tenantContext.middleware';
+import { quotaGuard } from '@/middlewares/quotaGuard.middleware';
 
 const router = Router();
+const requirePermission = requireTenantPermission;
 
 /**
  * @route   POST /api/studies
@@ -17,7 +23,10 @@ const router = Router();
 router.post(
   "/",
   authMiddleware,
+  tenantContext,
   isBiochemist,
+  requirePermission(TENANT_PERMISSION_KEYS.STUDIES_CREATE),
+  quotaGuard('studies'),
   upload.fields([{ name: 'pdf', maxCount: 1 }, { name: 'pdfs', maxCount: 20 }]),
   studyController.createStudy
 );
@@ -37,7 +46,9 @@ router.post(
 router.get(
   "/biochemist/me",
   authMiddleware,
+  tenantContext,
   isBiochemist,
+  requirePermission(TENANT_PERMISSION_KEYS.STUDIES_READ_ASSIGNED),
   studyController.getMyStudies
 );
 
@@ -46,7 +57,7 @@ router.get(
  * @desc    Obtener todos los estudios (solo administradores)
  * @access  Private (Admin)
  */
-router.get("/all", authMiddleware, isAdmin, studyController.getAllStudies);
+router.get("/all", authMiddleware, tenantContext, isAdmin, studyController.getAllStudies);
 
 /**
  * @route   GET /api/studies/patient/me
@@ -56,6 +67,8 @@ router.get("/all", authMiddleware, isAdmin, studyController.getAllStudies);
 router.get(
   "/patient/me",
   authMiddleware,
+  tenantContext,
+  isPatient,
   studyController.getMyStudiesAsPatient
 );
 
@@ -67,7 +80,9 @@ router.get(
 router.get(
   "/patient/:dni",
   authMiddleware,
+  tenantContext,
   isBiochemist,
+  requirePermission(TENANT_PERMISSION_KEYS.STUDIES_PATIENT_LOOKUP),
   studyController.getPatientByDni
 );
 
@@ -76,7 +91,9 @@ router.get(
  * @desc    Obtener un estudio específico por ID
  * @access  Private
  */
-router.get("/:id", authMiddleware, studyController.getStudyById);
+router.get("/:id/download", authMiddleware, tenantContext, studyController.downloadStudy);
+
+router.get("/:id", authMiddleware, tenantContext, studyController.getStudyById);
 
 /**
  * @route   PATCH /api/studies/:id
@@ -86,7 +103,9 @@ router.get("/:id", authMiddleware, studyController.getStudyById);
 router.patch(
   "/:id",
   authMiddleware,
+  tenantContext,
   isBiochemist,
+  requirePermission(TENANT_PERMISSION_KEYS.STUDIES_UPDATE),
   studyController.updateStudy
 );
 
@@ -98,7 +117,9 @@ router.patch(
 router.patch(
   "/:id/status",
   authMiddleware,
+  tenantContext,
   isBiochemist,
+  requirePermission(TENANT_PERMISSION_KEYS.STUDIES_STATUS_UPDATE),
   studyController.updateStudyStatus
 );
 
@@ -110,7 +131,9 @@ router.patch(
 router.patch(
   "/:id/pdf",
   authMiddleware,
+  tenantContext,
   isBiochemist,
+  requirePermission(TENANT_PERMISSION_KEYS.STUDIES_UPDATE),
   upload.fields([{ name: 'pdf', maxCount: 1 }, { name: 'pdfs', maxCount: 20 }]),
   studyController.updateStudyPdf
 );
@@ -123,7 +146,9 @@ router.patch(
 router.delete(
   "/:studyId/attachments/:attachmentId",
   authMiddleware,
+  tenantContext,
   isBiochemist,
+  requirePermission(TENANT_PERMISSION_KEYS.STUDIES_ATTACHMENTS_DELETE),
   studyController.deleteAttachment
 );
 
@@ -135,7 +160,9 @@ router.delete(
 router.post(
   "/:id/cancel",
   authMiddleware,
+  tenantContext,
   isBiochemist,
+  requirePermission(TENANT_PERMISSION_KEYS.STUDIES_CANCEL),
   studyController.cancelStudy
 );
 

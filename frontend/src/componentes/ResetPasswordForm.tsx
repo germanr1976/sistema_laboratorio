@@ -9,6 +9,10 @@ interface ResetPasswordFormProps {
     loginHref: string;
 }
 
+interface ResetPasswordResponse {
+    message?: string;
+}
+
 export default function ResetPasswordForm({ token, loginHref }: ResetPasswordFormProps) {
     const [formData, setFormData] = useState({
         newPassword: '',
@@ -91,10 +95,10 @@ export default function ResetPasswordForm({ token, loginHref }: ResetPasswordFor
             });
 
             const raw = await response.text();
-            let data: any = {};
+            let data: ResetPasswordResponse = {};
             if (raw) {
                 try {
-                    data = JSON.parse(raw);
+                    data = JSON.parse(raw) as ResetPasswordResponse;
                 } catch {
                     data = {};
                 }

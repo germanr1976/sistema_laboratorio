@@ -1,5 +1,7 @@
 import bcrypt from 'bcryptjs'
 import jwt from 'jsonwebtoken'
+import crypto from 'crypto'
+import logger from '@/config/logger';
 
 export async function hashPassword(password: string): Promise<string> {
     const saltRounds = parseInt(process.env.BCRYPT_SALT_ROUNDS || '12');
@@ -14,9 +16,11 @@ export async function comparePassword(password: string, hashedPassword: string):
 
 export async function generateToken(userData: {
     userId: number,
+    tenantId: number,
     dni: string,
     roleId: number,
-    roleName: string
+    roleName: string,
+    isPlatformAdmin?: boolean,
 }): Promise<string> {
     const jwtSecret = process.env.JWT_SECRET || 'fallback-secret';
     const expiresIn = process.env.JWT_EXPIRES_IN || '24h';
@@ -31,7 +35,7 @@ export async function verifyToken(token: string): Promise<any> {
         const isTokenCorrect = jwt.verify(token, jwtSecret)
         return isTokenCorrect
     } catch (error) {
-        console.error(error)
+        logger.error({ err: error }, 'Error verificando token');
         throw error
     }
 }
@@ -42,14 +46,30 @@ export async function verifyToken(token: string): Promise<any> {
  * @param dni - DNI del usuario
  * @returns Token con expiración de 1 hora
  */
-export async function generatePasswordRecoveryToken(userId: number, dni: string): Promise<string> {
+export async function generatePasswordRecoveryToken(
+    userId: number,
+    tenantId: number,
+    dni: string,
+    passwordHash: string
+): Promise<string> {
     const jwtSecret = process.env.JWT_SECRET || 'fallback-secret';
+    const passwordVersion = buildRecoveryPasswordVersion(passwordHash);
     const token = jwt.sign(
-        { userId, dni, type: 'password-recovery' },
+        { userId, tenantId, dni, type: 'password-recovery', passwordVersion },
         jwtSecret,
         { expiresIn: '1h' }
     );
     return token;
+}
+
+/**
+ * Deriva una versión estable de contraseña para invalidar tokens de recovery
+ * cuando la contraseña ya cambió.
+ */
+export function buildRecoveryPasswordVersion(passwordHash: string): string {
+    const jwtSecret = process.env.JWT_SECRET || 'fallback-secret';
+    const source = `${passwordHash}::${jwtSecret}`;
+    return crypto.createHash('sha256').update(source).digest('hex').slice(0, 24);
 }
 
 /**
@@ -66,7 +86,7 @@ export async function verifyPasswordRecoveryToken(token: string): Promise<any> {
         }
         return decoded;
     } catch (error) {
-        console.error('Error verificando token de recuperación:', error);
+        logger.error({ err: error }, 'Error verificando token de recuperación');
         throw error;
     }
 }

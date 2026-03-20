@@ -1,6 +1,7 @@
 import prisma from "@/config/prisma";
 
 interface CreateStudyData {
+  tenantId: number;
   userId: number;
   studyName: string;
   studyDate?: Date | null;
@@ -21,6 +22,7 @@ interface UpdateStudyPdfData {
 
 export const createStudy = async (data: CreateStudyData) => {
   const payload: any = {
+    tenantId: data.tenantId,
     userId: data.userId,
     studyName: data.studyName,
     socialInsurance: data.socialInsurance || null,
@@ -51,10 +53,11 @@ export const createStudy = async (data: CreateStudyData) => {
   });
 };
 
-export const getStudiesByBiochemist = async (biochemistId: number) => {
+export const getStudiesByBiochemist = async (biochemistId: number, tenantId: number) => {
   return await prisma.study.findMany({
     where: {
       biochemistId,
+      tenantId,
     },
     include: {
       patient: { include: { profile: true } },
@@ -68,8 +71,11 @@ export const getStudiesByBiochemist = async (biochemistId: number) => {
   });
 };
 
-export const getAllStudies = async () => {
+export const getAllStudies = async (tenantId: number) => {
   return await prisma.study.findMany({
+    where: {
+      tenantId,
+    },
     include: {
       patient: { include: { profile: true } },
       biochemist: { include: { profile: true } },
@@ -82,10 +88,11 @@ export const getAllStudies = async () => {
   });
 };
 
-export const getStudyById = async (studyId: number) => {
-  return await prisma.study.findUnique({
+export const getStudyById = async (studyId: number, tenantId: number) => {
+  return await prisma.study.findFirst({
     where: {
       id: studyId,
+      tenantId,
     },
     include: {
       patient: { include: { profile: true } },
@@ -98,11 +105,24 @@ export const getStudyById = async (studyId: number) => {
 
 export const updateStudyStatus = async (
   studyId: number,
+  tenantId: number,
   data: UpdateStudyStatusData
 ) => {
-  return await prisma.study.update({
+  const existing = await prisma.study.findFirst({
     where: {
       id: studyId,
+      tenantId,
+    },
+    select: { id: true },
+  });
+
+  if (!existing) {
+    return null;
+  }
+
+  return await prisma.study.update({
+    where: {
+      id: existing.id,
     },
     data: {
       statusId: data.statusId,
@@ -118,10 +138,23 @@ export const updateStudyStatus = async (
 
 export const updateStudyPdfUrl = async (
   studyId: number,
+  tenantId: number,
   data: UpdateStudyPdfData
 ) => {
+  const existing = await prisma.study.findFirst({
+    where: {
+      id: studyId,
+      tenantId,
+    },
+    select: { id: true },
+  });
+
+  if (!existing) {
+    return null;
+  }
+
   return await prisma.study.update({
-    where: { id: studyId },
+    where: { id: existing.id },
     data: { pdfUrl: data.pdfUrl },
     include: {
       patient: { include: { profile: true } },
@@ -134,16 +167,18 @@ export const updateStudyPdfUrl = async (
 
 export const addStudyAttachments = async (
   studyId: number,
+  tenantId: number,
   files: { url: string; filename?: string }[]
 ) => {
   if (files.length === 0) return { count: 0 };
   return await prisma.studyAttachment.createMany({
-    data: files.map((f) => ({ studyId, url: f.url, filename: f.filename || null })),
+    data: files.map((f) => ({ tenantId, studyId, url: f.url, filename: f.filename || null })),
   });
 };
 
 export const getStudiesByPatient = async (
   userId: number,
+  tenantId: number,
   page = 1,
   limit = 10
 ) => {
@@ -153,7 +188,7 @@ export const getStudiesByPatient = async (
 
   const [items, total, grouped] = await prisma.$transaction([
     prisma.study.findMany({
-      where: { userId },
+      where: { userId, tenantId },
       include: {
         patient: { include: { profile: true } },
         biochemist: { include: { profile: true } },
@@ -166,10 +201,10 @@ export const getStudiesByPatient = async (
       skip,
       take: safeLimit,
     }),
-    prisma.study.count({ where: { userId } }),
+    prisma.study.count({ where: { userId, tenantId } }),
     prisma.study.groupBy({
       by: ["statusId"],
-      where: { userId },
+      where: { userId, tenantId },
       orderBy: {
         statusId: "asc",
       },
@@ -207,23 +242,47 @@ export const getStudiesByPatient = async (
   };
 };
 
-export const deleteStudy = async (studyId: number) => {
-  return await prisma.study.delete({
+export const deleteStudy = async (studyId: number, tenantId: number) => {
+  const existing = await prisma.study.findFirst({
     where: {
       id: studyId,
+      tenantId,
+    },
+    select: { id: true },
+  });
+
+  if (!existing) {
+    return null;
+  }
+
+  return await prisma.study.delete({
+    where: {
+      id: existing.id,
     },
   });
 };
 
-export const cancelStudy = async (studyId: number) => {
+export const cancelStudy = async (studyId: number, tenantId: number) => {
   // Obtener el estado CANCELLED
   const cancelledStatus = await getStatusByName("CANCELLED");
   if (!cancelledStatus) {
     throw new Error("Estado CANCELLED no encontrado en la BD");
   }
 
+  const existing = await prisma.study.findFirst({
+    where: {
+      id: studyId,
+      tenantId,
+    },
+    select: { id: true },
+  });
+
+  if (!existing) {
+    return null;
+  }
+
   return await prisma.study.update({
-    where: { id: studyId },
+    where: { id: existing.id },
     data: { statusId: cancelledStatus.id },
     include: {
       patient: { include: { profile: true } },
@@ -242,10 +301,14 @@ export const getStatusByName = async (statusName: string) => {
   });
 };
 
-export const getPatientByDni = async (dni: string) => {
-  return await prisma.user.findUnique({
+export const getPatientByDni = async (dni: string, tenantId: number) => {
+  return await prisma.user.findFirst({
     where: {
       dni,
+      tenantId,
+      role: {
+        name: 'PATIENT',
+      },
     },
     include: {
       profile: true,
@@ -253,10 +316,11 @@ export const getPatientByDni = async (dni: string) => {
   });
 };
 
-export const getBiochemistById = async (biochemistId: number) => {
-  return await prisma.user.findUnique({
+export const getBiochemistById = async (biochemistId: number, tenantId: number) => {
+  return await prisma.user.findFirst({
     where: {
       id: biochemistId,
+      tenantId,
     },
     include: {
       role: true,
@@ -265,9 +329,10 @@ export const getBiochemistById = async (biochemistId: number) => {
   });
 };
 
-export const getAllBiochemists = async () => {
+export const getAllBiochemists = async (tenantId: number) => {
   return await prisma.user.findMany({
     where: {
+      tenantId,
       role: {
         name: "BIOCHEMIST",
       },
@@ -284,8 +349,20 @@ export const getAllBiochemists = async () => {
 // Función NUEVA para obtener estudios con paginación
 // Servicio de paginación eliminado
 
-export const deleteAttachment = async (attachmentId: number) => {
+export const deleteAttachment = async (attachmentId: number, tenantId: number) => {
+  const existing = await prisma.studyAttachment.findFirst({
+    where: {
+      id: attachmentId,
+      tenantId,
+    },
+    select: { id: true },
+  });
+
+  if (!existing) {
+    return null;
+  }
+
   return await prisma.studyAttachment.delete({
-    where: { id: attachmentId },
+    where: { id: existing.id },
   });
 };

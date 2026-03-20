@@ -5,7 +5,6 @@ import type React from "react"
 import { useState, useRef, useEffect } from "react"
 import { useRouter } from "next/navigation"
 
-import { savePdf } from "../utils/estudiosStore"
 import authFetch from "../utils/authFetch"
 import Toast from "./Toast"
 
@@ -86,7 +85,15 @@ interface PatientData {
   obraSocial: string
 }
 
+const getErrorMessage = (error: unknown, fallback: string) => {
+  if (error instanceof Error && error.message) {
+    return error.message
+  }
+  return fallback
+}
+
 export function CargarNuevo({ onCargarEstudio, initialId, initialData }: CargarNuevoProps) {
+  void onCargarEstudio
   const router = useRouter()
 
   // PASO 1: Búsqueda/creación de paciente
@@ -184,7 +191,7 @@ export function CargarNuevo({ onCargarEstudio, initialId, initialData }: CargarN
       try {
         const raw = localStorage.getItem('estudios_metadata')
         const metas = raw ? JSON.parse(raw) : []
-        const found = metas.find((m: any) => m.id === initialId)
+        const found = metas.find((m: EstudioData) => m.id?.toString() === initialId)
 
         if (found) {
           // Precarga los datos del paciente
@@ -321,9 +328,9 @@ export function CargarNuevo({ onCargarEstudio, initialId, initialData }: CargarN
 
       // Pasar al siguiente paso
       setCurrentStep(2)
-    } catch (e: any) {
+    } catch (e: unknown) {
       console.error('Error saving patient:', e)
-      showToastMessage(e.message || 'Error al guardar paciente', 'error')
+      showToastMessage(getErrorMessage(e, 'Error al guardar paciente'), 'error')
     }
   }
 
@@ -379,9 +386,9 @@ export function CargarNuevo({ onCargarEstudio, initialId, initialData }: CargarN
         // Si es parcial o completado, pasar al paso 3 para subir archivo
         setCurrentStep(3)
       }
-    } catch (e: any) {
+    } catch (e: unknown) {
       console.error('Error creating study:', e)
-      showToastMessage(e.message || 'Error al crear estudio', 'error')
+      showToastMessage(getErrorMessage(e, 'Error al crear estudio'), 'error')
     }
   }
 
@@ -498,9 +505,9 @@ export function CargarNuevo({ onCargarEstudio, initialId, initialData }: CargarN
 
       showToastMessage(`✓ Estudio finalizado exitosamente con estado: ${studyData.estado.toUpperCase()}`, "success")
       setTimeout(() => router.push('/dashboard'), 900)
-    } catch (e: any) {
+    } catch (e: unknown) {
       console.error('Error finishing study:', e)
-      showToastMessage(e.message || 'Error al finalizar estudio', 'error')
+      showToastMessage(getErrorMessage(e, 'Error al finalizar estudio'), 'error')
     }
   }
 
